@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>角色扮演 · RolePlay Chat</title>
+<!-- 【PWA 修改点 1】关联 manifest 文件 -->
+<link rel="manifest" href="manifest-chat.json">
+<meta name="theme-color" content="#000000">
 <style>
 *{box-sizing:border-box;}
 :root{
@@ -686,6 +689,15 @@ async function init(){
 
 // 执行启动
 init();
+
+/* ---------- 【PWA 修改点 2】注册 Service Worker ---------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw-chat.js')
+      .then(reg => console.log('✅ Service Worker 注册成功:', reg.scope))
+      .catch(err => console.log('❌ Service Worker 注册失败:', err));
+  });
+}
 </script>
 </body>
 </html>
