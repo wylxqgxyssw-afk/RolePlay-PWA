@@ -84,6 +84,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .side-foot .btn{width:100%;}
 .btn-logout{background:transparent;color:#ff8080;border:1px solid #ff8080;margin-top:6px;}
 .btn-logout:hover{background:rgba(255,128,128,0.1);}
+.btn-clear-chat{background:transparent;color:#ff8080;border:1px solid #ff8080;margin-top:6px;}
+.btn-clear-chat:hover{background:rgba(255,128,128,0.1);}
 
 /* ---------- 按钮 ---------- */
 .btn{
@@ -237,6 +239,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     </div>
     <div class="side-foot">
       <button class="btn primary" id="applyBtn">应用并新开对话</button>
+      <!-- 【修复】补充这个清空聊天按钮 -->
+      <button class="btn btn-clear-chat" id="clearChatBtn">清空聊天记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
   </aside>
@@ -376,7 +380,7 @@ async function saveAgentSettings() {
     } catch (e) { console.error('❌ 保存请求异常:', e); }
 }
 
-/* ---------- 【新增】云端：将单条消息推送到 Supabase ---------- */
+/* ---------- 云端：将单条消息推送到 Supabase ---------- */
 async function saveMessageToCloud(role, content) {
     if (!USER_ID) return;
     try {
@@ -389,7 +393,7 @@ async function saveMessageToCloud(role, content) {
     } catch (e) { console.error('❌ 消息同步异常:', e); }
 }
 
-/* ---------- 【新增】云端：从 Supabase 拉取历史记录 ---------- */
+/* ---------- 云端：从 Supabase 拉取历史记录 ---------- */
 async function loadMessagesFromCloud() {
     if (!USER_ID) return [];
     try {
@@ -549,7 +553,7 @@ async function generate(){
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
       msgs.push({role:'assistant', content: full});
-      saveMessageToCloud('assistant', full); // 【新增】AI回复同步云端
+      saveMessageToCloud('assistant', full);
     }else{
       contentEl.innerHTML = '<span class="muted">（模型返回了空内容，请检查API配置）</span>';
     }
@@ -591,7 +595,7 @@ async function send(){
   addBubble('user', text);
   msgs.push({role:'user', content: text});
   saveHistoryLocal();
-  await saveMessageToCloud('user', text); // 【新增】用户消息同步云端
+  await saveMessageToCloud('user', text);
   await generate();
 }
 
@@ -613,14 +617,14 @@ function newChat(){
   if(cfg.greeting && cfg.greeting.trim()){
     addBubble('assistant', cfg.greeting);
     msgs.push({role:'assistant', content: cfg.greeting});
-    saveMessageToCloud('assistant', cfg.greeting); // 【新增】开场白同步云端
+    saveMessageToCloud('assistant', cfg.greeting);
   }else{
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">在左侧设置好 API 与角色，然后开始对话吧。</div>';
   }
   saveHistoryLocal();
 }
 
-/* 【新增】清空聊天时，同时清空云端记录 */
+/* 清空聊天 */
 async function clearChat() {
   if(!confirm('确定要清空所有聊天记录吗？此操作不可恢复。')) return;
   msgs = [];
@@ -676,7 +680,7 @@ function bindEvents(){
     newChat();
   });
   $('#exportBtn').addEventListener('click', exportChat);
-  $('#clearChatBtn').addEventListener('click', clearChat);
+  $('#clearChatBtn').addEventListener('click', clearChat); // 【修复】现在按钮存在了，不会报错
 
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
@@ -794,17 +798,15 @@ async function loadUserData() {
 
   cfg = loadCfg();
   initForm();
-  bindEvents();
+  bindEvents(); // 注意：这里现在不会因为 clearChatBtn 缺失而崩溃了
   await fetchAgentSettings();
 
-  // 【新增】优先从云端拉取聊天记录
   let cloudMsgs = await loadMessagesFromCloud();
   if (cloudMsgs.length > 0) {
     msgs = cloudMsgs;
     msgs.forEach(m => addBubble(m.role, m.content));
-    saveHistoryLocal(); // 覆盖本地缓存，保持最新
+    saveHistoryLocal();
   } else {
-    // 云端无记录，尝试从本地恢复（兼容旧数据）
     let restored = false;
     try{
       const raw = localStorage.getItem('rp_history_' + USER_ID);
@@ -814,7 +816,6 @@ async function loadUserData() {
           arr.forEach(m => addBubble(m.role, m.content));
           msgs = arr;
           restored = true;
-          // 将本地记录同步到云端
           for (let m of arr) {
             await saveMessageToCloud(m.role, m.content);
           }
