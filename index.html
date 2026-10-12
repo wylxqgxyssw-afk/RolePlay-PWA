@@ -239,7 +239,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     </div>
     <div class="side-foot">
       <button class="btn primary" id="applyBtn">应用并新开对话</button>
-      <!-- 【修复】补充这个清空聊天按钮 -->
       <button class="btn btn-clear-chat" id="clearChatBtn">清空聊天记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
@@ -303,7 +302,6 @@ let msgs = [];
 let busy = false;
 let abortCtrl = null;
 
-/* ---------- 锁与状态标志（防重复） ---------- */
 let hasBoundEvents = false;
 let currentLoadedUserId = null;
 
@@ -311,7 +309,7 @@ let currentLoadedUserId = null;
 function loadCfg(){
   if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
-    const raw = localStorage.getItem('rp_cfg_' + USER_ID); // 带上用户ID
+    const raw = localStorage.getItem('rp_cfg_' + USER_ID);
     return raw ? Object.assign({}, DEFAULTS, JSON.parse(raw)) : Object.assign({}, DEFAULTS);
   }catch(e){ return Object.assign({}, DEFAULTS); }
 }
@@ -324,13 +322,13 @@ function saveHistoryLocal(){
   try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){}
 }
 
-/* ---------- 云端：从 Supabase 拉取角色配置 ---------- */
+/* ---------- 【修改核心1】云端：从 Supabase 拉取全部配置（含API配置） ---------- */
 async function fetchAgentSettings() {
     if (!USER_ID) return false;
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
-            .select('agent_name, agent_prompt')
+            .select('agent_name, agent_prompt, api_base, api_key, model, temperature, max_tokens, ctx_limit')
             .eq('id', USER_ID)
             .maybeSingle();
 
@@ -340,12 +338,29 @@ async function fetchAgentSettings() {
         }
 
         if (data) {
-            console.log('✅ 成功从 Supabase 获取角色配置:', data);
+            console.log('✅ 成功从 Supabase 获取全部配置:', data);
+            // 覆盖角色配置
             if (data.agent_name) cfg.charName = data.agent_name;
             if (data.agent_prompt) cfg.charPrompt = data.agent_prompt;
+            // 覆盖 API 配置
+            if (data.api_base) cfg.apiBase = data.api_base;
+            if (data.api_key) cfg.apiKey = data.api_key;
+            if (data.model) cfg.model = data.model;
+            if (data.temperature !== null && data.temperature !== undefined) cfg.temperature = data.temperature;
+            if (data.max_tokens !== null && data.max_tokens !== undefined) cfg.maxTokens = data.max_tokens;
+            if (data.ctx_limit !== null && data.ctx_limit !== undefined) cfg.ctxLimit = data.ctx_limit;
+            
             saveCfg();
+            // 刷新 UI
             if ($('#charName')) $('#charName').value = cfg.charName;
             if ($('#charPrompt')) $('#charPrompt').value = cfg.charPrompt;
+            if ($('#apiBase')) $('#apiBase').value = cfg.apiBase;
+            if ($('#apiKey')) $('#apiKey').value = cfg.apiKey;
+            if ($('#model')) $('#model').value = cfg.model;
+            if ($('#temperature')) $('#temperature').value = cfg.temperature;
+            if ($('#maxTokens')) $('#maxTokens').value = cfg.maxTokens;
+            if ($('#ctxLimit')) $('#ctxLimit').value = cfg.ctxLimit;
+            $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
             updateHeadName();
             return true;
         } else {
@@ -353,7 +368,13 @@ async function fetchAgentSettings() {
             const { error: insertError } = await supabaseClient.from('agent_settings').insert({
                 id: USER_ID,
                 agent_name: cfg.charName,
-                agent_prompt: cfg.charPrompt
+                agent_prompt: cfg.charPrompt,
+                api_base: cfg.apiBase,
+                api_key: cfg.apiKey,
+                model: cfg.model,
+                temperature: Number(cfg.temperature),
+                max_tokens: Number(cfg.maxTokens),
+                ctx_limit: Number(cfg.ctxLimit)
             });
             if (insertError) console.error('❌ 写入默认配置失败:', insertError.message);
             return false;
@@ -364,7 +385,7 @@ async function fetchAgentSettings() {
     return false;
 }
 
-/* ---------- 云端：向 Supabase 推送并保存配置 ---------- */
+/* ---------- 【修改核心2】云端：向 Supabase 推送并保存全部配置 ---------- */
 async function saveAgentSettings() {
     if (!USER_ID) { alert('请先登录后再保存设置！'); return; }
     try {
@@ -373,10 +394,16 @@ async function saveAgentSettings() {
             .upsert({ 
                 id: USER_ID, 
                 agent_name: cfg.charName, 
-                agent_prompt: cfg.charPrompt 
+                agent_prompt: cfg.charPrompt,
+                api_base: cfg.apiBase,
+                api_key: cfg.apiKey,
+                model: cfg.model,
+                temperature: Number(cfg.temperature),
+                max_tokens: Number(cfg.maxTokens),
+                ctx_limit: Number(cfg.ctxLimit)
             });
         if (error) console.error('❌ 保存到云端失败:', error.message);
-        else console.log('✅ 成功保存到云端!');
+        else console.log('✅ 成功保存全部配置到云端!');
     } catch (e) { console.error('❌ 保存请求异常:', e); }
 }
 
@@ -680,7 +707,7 @@ function bindEvents(){
     newChat();
   });
   $('#exportBtn').addEventListener('click', exportChat);
-  $('#clearChatBtn').addEventListener('click', clearChat); // 【修复】现在按钮存在了，不会报错
+  $('#clearChatBtn').addEventListener('click', clearChat);
 
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
@@ -798,7 +825,7 @@ async function loadUserData() {
 
   cfg = loadCfg();
   initForm();
-  bindEvents(); // 注意：这里现在不会因为 clearChatBtn 缺失而崩溃了
+  bindEvents();
   await fetchAgentSettings();
 
   let cloudMsgs = await loadMessagesFromCloud();
