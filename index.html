@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>角色扮演 · RolePlay Chat</title>
-<!-- 【PWA 修改点 1】关联 manifest 文件 -->
 <link rel="manifest" href="manifest-chat.json">
 <meta name="theme-color" content="#000000">
 <style>
@@ -13,7 +12,6 @@
   --bg:#0d0f16; --panel:#141824; --panel-2:#1c2130; --border:#2a3040;
   --text:#e7e9f0; --muted:#8b93a7; --accent:#7c6cff;
 }
-/* 【1.1修改点】增加 100dvh 防止键盘遮挡 */
 html,body{height:100%;height:100dvh;margin:0;}
 body{
   background:var(--bg);color:var(--text);overflow:hidden;
@@ -184,7 +182,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </head>
 <body>
 
-<!-- 【新增】全屏登录/注册遮罩层 -->
 <div id="auth-overlay" class="hidden">
   <div class="auth-card">
     <h2 id="auth-title">欢迎回来</h2>
@@ -198,13 +195,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </div>
 
 <div class="app">
-  <!-- ================= 侧栏设置 ================= -->
   <aside id="sidebar">
     <div class="side-head">
       <span>设置</span>
       <button class="icon-btn" id="closeSide" title="关闭">✕</button>
     </div>
-
     <div class="side-body">
       <section>
         <h3>接口配置</h3>
@@ -240,17 +235,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <textarea id="userPrompt" rows="3" spellcheck="false"></textarea>
       </section>
     </div>
-
     <div class="side-foot">
       <button class="btn primary" id="applyBtn">应用并新开对话</button>
-      <!-- 【新增】退出登录按钮 -->
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
   </aside>
 
   <div id="backdrop"></div>
 
-  <!-- ================= 聊天区 ================= -->
   <main class="chat">
     <header class="chat-head">
       <button class="icon-btn" id="menuBtn" title="设置">☰</button>
@@ -274,25 +266,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </main>
 </div>
 
-<!-- 【1.2修改点】引入 Supabase JS SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-/* =========================================================
-   角色扮演聊天 · 多用户版
-   ========================================================= */
-
 /* ---------- Supabase 初始化 ---------- */
 const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = s => document.querySelector(s);
-
-// 动态用户ID（登录后被赋值）
 let USER_ID = null;
 
-/* ---------- 默认配置 ---------- */
 const DEFAULTS = {
   apiBase: 'https://token.xsxc.site/v1',
   apiKey: 'dp_53d5cdede7ca46e645a4a647624a',
@@ -315,6 +299,10 @@ let msgs = [];
 let busy = false;
 let abortCtrl = null;
 
+/* ---------- 锁与状态标志（防重复） ---------- */
+let hasBoundEvents = false;
+let currentLoadedUserId = null;
+
 /* ---------- 配置读写 ---------- */
 function loadCfg(){
   try{
@@ -322,29 +310,25 @@ function loadCfg(){
     return raw ? Object.assign({}, DEFAULTS, JSON.parse(raw)) : Object.assign({}, DEFAULTS);
   }catch(e){ return Object.assign({}, DEFAULTS); }
 }
-function saveCfg(){
-  try{ localStorage.setItem('rp_cfg', JSON.stringify(cfg)); }catch(e){}
-}
-function saveHistory(){
-  try{ localStorage.setItem('rp_history', JSON.stringify(msgs.slice(-300))); }catch(e){}
-}
+function saveCfg(){ try{ localStorage.setItem('rp_cfg', JSON.stringify(cfg)); }catch(e){} }
+function saveHistory(){ try{ localStorage.setItem('rp_history', JSON.stringify(msgs.slice(-300))); }catch(e){} }
 function clearLocalData(){
   localStorage.removeItem('rp_cfg');
   localStorage.removeItem('rp_history');
 }
 
-/* ---------- 从 Supabase 拉取角色配置 ---------- */
+/* ---------- 【修复核心1】从 Supabase 拉取角色配置 (解决406报错) ---------- */
 async function fetchAgentSettings() {
-    if (!USER_ID) return false; // 未登录不拉取
+    if (!USER_ID) return false;
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
             .select('agent_name, agent_prompt')
-            .eq('id', USER_ID) // 【修改】使用真实用户ID查询
-            .single();
+            .eq('id', USER_ID)
+            .maybeSingle(); // 【关键修复】改用 maybeSingle()，查不到数据不报错，返回 null
 
         if (error) {
-            console.warn('⚠️ Supabase 拉取失败（可能是新用户，尚无数据）:', error.message);
+            console.warn('⚠️ Supabase 拉取失败:', error.message);
             return false;
         }
 
@@ -357,6 +341,16 @@ async function fetchAgentSettings() {
             if ($('#charPrompt')) $('#charPrompt').value = cfg.charPrompt;
             updateHeadName();
             return true;
+        } else {
+            // 【新增逻辑】新用户首次登录，无数据，自动向云端写入默认设定
+            console.log('🌱 新用户首次登录，正在向云端写入默认配置...');
+            const { error: insertError } = await supabaseClient.from('agent_settings').insert({
+                id: USER_ID,
+                agent_name: cfg.charName,
+                agent_prompt: cfg.charPrompt
+            });
+            if (insertError) console.error('❌ 写入默认配置失败:', insertError.message);
+            return false;
         }
     } catch (e) {
         console.error('❌ Supabase 请求异常:', e);
@@ -366,34 +360,23 @@ async function fetchAgentSettings() {
 
 /* ---------- 向 Supabase 推送并保存配置 ---------- */
 async function saveAgentSettings() {
-    if (!USER_ID) {
-        alert('请先登录后再保存设置！');
-        return;
-    }
+    if (!USER_ID) { alert('请先登录后再保存设置！'); return; }
     try {
-        const { data, error } = await supabaseClient
+        const { error } = await supabaseClient
             .from('agent_settings')
             .upsert({ 
-                id: USER_ID, // 【修改】使用真实用户ID作为主键
+                id: USER_ID, 
                 agent_name: cfg.charName, 
                 agent_prompt: cfg.charPrompt 
             });
-            
-        if (error) {
-            console.error('❌ 保存到云端失败:', error.message);
-        } else {
-            console.log('✅ 成功保存到云端!');
-        }
-    } catch (e) {
-        console.error('❌ 保存请求异常:', e);
-    }
+        if (error) console.error('❌ 保存到云端失败:', error.message);
+        else console.log('✅ 成功保存到云端!');
+    } catch (e) { console.error('❌ 保存请求异常:', e); }
 }
 
 /* ---------- 文本处理 ---------- */
 function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
-  ));
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function renderContent(s){
   let h = escapeHtml(s || '');
@@ -422,9 +405,7 @@ function initForm(){
   $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
 }
 
-function updateHeadName(){
-  $('#headName').textContent = cfg.charName || '角色';
-}
+function updateHeadName(){ $('#headName').textContent = cfg.charName || '角色'; }
 
 /* ---------- 消息气泡 ---------- */
 const msgBox = $('#messages');
@@ -433,9 +414,7 @@ function addBubble(role, content){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
   const name = role === 'user' ? (cfg.userName || '你') : (cfg.charName || '角色');
-  wrap.innerHTML =
-    '<div class="meta">' + escapeHtml(name) + '</div>' +
-    '<div class="content"></div>';
+  wrap.innerHTML = '<div class="meta">' + escapeHtml(name) + '</div><div class="content"></div>';
   wrap.querySelector('.content').innerHTML = renderContent(content);
   msgBox.appendChild(wrap);
   scrollBottom(true);
@@ -460,12 +439,9 @@ function endpoint(){
 
 function systemPrompt(){
   const parts = [];
-  parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，' +
-             '不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
-  parts.push('【你的角色】' + (cfg.charName || '角色') +
-             (cfg.charPrompt ? '\n' + cfg.charPrompt : ''));
-  parts.push('【对话对象】' + (cfg.userName || '用户') +
-             (cfg.userPrompt ? '\n' + cfg.userPrompt : ''));
+  parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
+  parts.push('【你的角色】' + (cfg.charName || '角色') + (cfg.charPrompt ? '\n' + cfg.charPrompt : ''));
+  parts.push('【对话对象】' + (cfg.userName || '用户') + (cfg.userPrompt ? '\n' + cfg.userPrompt : ''));
   parts.push('动作、神态、环境描写用 *星号* 包裹。回复长度贴合语境，像真人聊天一样自然。');
   return parts.join('\n\n');
 }
@@ -479,7 +455,6 @@ function buildMessages(){
 /* ---------- 核心：发送并流式接收 ---------- */
 async function generate(){
   if(busy || msgs.length === 0) return;
-
   busy = true;
   setBusyUI(true);
 
@@ -491,32 +466,19 @@ async function generate(){
   abortCtrl = new AbortController();
 
   try{
-    const payload = {
-      model: cfg.model,
-      messages: buildMessages(),
-      temperature: Number(cfg.temperature),
-      max_tokens: Number(cfg.maxTokens),
-      stream: true
-    };
-
+    const payload = { model: cfg.model, messages: buildMessages(), temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), stream: true };
     const res = await fetch(endpoint(), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (cfg.apiKey || '')
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
       body: JSON.stringify(payload),
       signal: abortCtrl.signal
     });
 
     if(!res.ok){
       const txt = await res.text().catch(() => '');
-      throw new Error('HTTP ' + res.status + ' ' + res.statusText +
-                      (txt ? '\n' + txt.slice(0, 500) : ''));
+      throw new Error('HTTP ' + res.status + ' ' + res.statusText + (txt ? '\n' + txt.slice(0, 500) : ''));
     }
-    if(!res.body){
-      throw new Error('该接口未返回可读流（可能不支持 stream）');
-    }
+    if(!res.body) throw new Error('该接口未返回可读流（可能不支持 stream）');
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -525,27 +487,20 @@ async function generate(){
     while(true){
       const {done, value} = await reader.read();
       if(done) break;
-
       buf += decoder.decode(value, {stream: true});
       const lines = buf.split('\n');
       buf = lines.pop();
 
       for(const raw of lines){
         const line = raw.trim();
-        if(!line || line.startsWith(':')) continue;
-        if(!line.startsWith('data:')) continue;
-
+        if(!line || line.startsWith(':') || !line.startsWith('data:')) continue;
         const data = line.slice(5).trim();
         if(data === '[DONE]') continue;
-
         let json;
         try{ json = JSON.parse(data); }catch(e){ continue; }
-
         const choice = json.choices && json.choices[0];
         if(!choice) continue;
-        const delta = (choice.delta && choice.delta.content)
-                   ?? (choice.message && choice.message.content)
-                   ?? '';
+        const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
         if(delta){
           full += delta;
           contentEl.innerHTML = renderContent(full) + '<span class="cursor"></span>';
@@ -558,22 +513,15 @@ async function generate(){
       contentEl.innerHTML = renderContent(full);
       msgs.push({role:'assistant', content: full});
     }else{
-      contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
+      contentEl.innerHTML = '<span class="muted">（模型返回了空内容，请检查API配置）</span>';
     }
 
   }catch(err){
     if(err.name === 'AbortError'){
-      if(full.trim()){
-        contentEl.innerHTML = renderContent(full) + '<div class="err">（已手动停止）</div>';
-        msgs.push({role:'assistant', content: full});
-      }else{
-        bubble.remove();
-      }
+      if(full.trim()){ contentEl.innerHTML = renderContent(full) + '<div class="err">（已手动停止）</div>'; msgs.push({role:'assistant', content: full}); }
+      else { bubble.remove(); }
     }else{
-      if(full.trim()){
-        contentEl.innerHTML = renderContent(full);
-        msgs.push({role:'assistant', content: full});
-      }
+      if(full.trim()){ contentEl.innerHTML = renderContent(full); msgs.push({role:'assistant', content: full}); }
       contentEl.innerHTML += '<div class="err">请求失败：' + escapeHtml(err.message) + '</div>';
       scrollBottom(true);
     }
@@ -600,14 +548,11 @@ async function send(){
   const input = $('#input');
   const text = input.value.trim();
   if(!text) return;
-
   input.value = '';
   autoResize();
-
   addBubble('user', text);
   msgs.push({role:'user', content: text});
   saveHistory();
-
   await generate();
 }
 
@@ -618,10 +563,7 @@ async function regenerate(){
     msgs.pop();
     if(bubbles.length) bubbles[bubbles.length - 1].remove();
   }
-  if(msgs.length === 0){
-    newChat();
-    return;
-  }
+  if(msgs.length === 0){ newChat(); return; }
   await generate();
 }
 
@@ -633,8 +575,7 @@ function newChat(){
     addBubble('assistant', cfg.greeting);
     msgs.push({role:'assistant', content: cfg.greeting});
   }else{
-    msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">' +
-                       '在左侧设置好 API 与角色，然后开始对话吧。</div>';
+    msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">在左侧设置好 API 与角色，然后开始对话吧。</div>';
   }
   saveHistory();
 }
@@ -660,6 +601,10 @@ function autoResize(){
 
 /* ---------- 事件绑定 ---------- */
 function bindEvents(){
+  // 【修复核心2】加入防重复绑定锁
+  if (hasBoundEvents) return;
+  hasBoundEvents = true;
+
   $('#sendBtn').addEventListener('click', () => {
     if(busy){ abortCtrl && abortCtrl.abort(); return; }
     send();
@@ -688,14 +633,11 @@ function bindEvents(){
     updateHeadName();
     saveCfg();
     await saveAgentSettings(); 
-    if(msgs.length && !confirm('已保存设置。是否清空当前对话，用新设定重新开始？')){
-      return;
-    }
+    if(msgs.length && !confirm('已保存设置。是否清空当前对话，用新设定重新开始？')){ return; }
     newChat();
     document.body.classList.remove('side-open');
   });
 
-  // 【新增】退出登录按钮
   $('#logoutBtn').addEventListener('click', async () => {
     if(!confirm('确定要退出登录吗？退出后聊天记录将清空。')) return;
     await supabaseClient.auth.signOut();
@@ -730,16 +672,8 @@ authRegisterBtn.addEventListener('click', toggleAuthMode);
 async function handleAuthAction() {
   const email = authEmail.value.trim();
   const password = authPassword.value;
-  if (!email || !password) {
-    authMsg.textContent = '请填写邮箱和密码';
-    authMsg.className = 'auth-msg error';
-    return;
-  }
-  if (password.length < 6) {
-    authMsg.textContent = '密码至少需要6位';
-    authMsg.className = 'auth-msg error';
-    return;
-  }
+  if (!email || !password) { authMsg.textContent = '请填写邮箱和密码'; authMsg.className = 'auth-msg error'; return; }
+  if (password.length < 6) { authMsg.textContent = '密码至少需要6位'; authMsg.className = 'auth-msg error'; return; }
 
   authLoginBtn.disabled = true;
   authMsg.textContent = '处理中...';
@@ -747,27 +681,19 @@ async function handleAuthAction() {
 
   try {
     let result;
-    if (isRegisterMode) {
-      result = await supabaseClient.auth.signUp({ email, password });
-    } else {
-      result = await supabaseClient.auth.signInWithPassword({ email, password });
-    }
+    if (isRegisterMode) { result = await supabaseClient.auth.signUp({ email, password }); }
+    else { result = await supabaseClient.auth.signInWithPassword({ email, password }); }
 
     if (result.error) {
       authMsg.textContent = result.error.message;
       authMsg.className = 'auth-msg error';
     } else {
       if (isRegisterMode) {
-        authMsg.textContent = '注册成功！请检查邮箱确认（若开启了验证）或直接登录。';
+        authMsg.textContent = '注册成功！请直接登录。';
         authMsg.className = 'auth-msg success';
-        if (result.data.session) {
-          // 如果注册后自动登录了
-          window.location.reload();
-        } else {
-          toggleAuthMode(); // 切换回登录界面
-        }
+        if (result.data.session) { window.location.reload(); }
+        else { toggleAuthMode(); }
       } else {
-        // 登录成功，刷新页面让 onAuthStateChange 接管
         window.location.reload();
       }
     }
@@ -783,13 +709,11 @@ authLoginBtn.addEventListener('click', handleAuthAction);
 
 /* ---------- 启动逻辑 ---------- */
 async function init() {
-  // 1. 先监听 Auth 状态变化
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
       USER_ID = session.user.id;
       authOverlay.classList.add('hidden');
       console.log('✅ 用户已登录:', USER_ID);
-      // 登录后，加载数据
       loadUserData();
     } else {
       USER_ID = null;
@@ -798,7 +722,6 @@ async function init() {
     }
   });
 
-  // 2. 检查当前是否已有 Session
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
     authOverlay.classList.remove('hidden');
@@ -811,6 +734,14 @@ async function init() {
 
 async function loadUserData() {
   if (!USER_ID) return;
+  // 【修复核心3】防止同一个用户重复加载和绑定
+  if (currentLoadedUserId === USER_ID) return;
+  currentLoadedUserId = USER_ID;
+  
+  // 登录新账号时，清空上一账号残留的聊天记录，防止串号
+  msgs = [];
+  msgBox.innerHTML = '';
+  
   initForm();
   bindEvents();
   await fetchAgentSettings();
