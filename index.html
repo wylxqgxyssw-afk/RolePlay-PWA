@@ -21,8 +21,39 @@ body{
   font-size:15px;
 }
 button{font-family:inherit;}
-/* 【1.1修改点】增加 100dvh */
 .app{display:flex;height:100%;height:100dvh;}
+
+/* ---------- 登录遮罩层 ---------- */
+#auth-overlay{
+  position:fixed;inset:0;z-index:999;
+  background:rgba(13,15,22,0.98);backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;transition:opacity 0.3s;
+}
+#auth-overlay.hidden{opacity:0;pointer-events:none;}
+.auth-card{
+  width:100%;max-width:380px;background:var(--panel);
+  border:1px solid var(--border);border-radius:16px;
+  padding:28px 24px;box-shadow:0 10px 40px rgba(0,0,0,0.5);
+}
+.auth-card h2{font-size:20px;font-weight:600;margin:0 0 8px 0;text-align:center;}
+.auth-card p{font-size:13px;color:var(--muted);text-align:center;margin:0 0 20px 0;}
+.auth-card input{
+  width:100%;background:var(--panel-2);border:1px solid var(--border);
+  color:var(--text);border-radius:9px;padding:12px;font-size:14px;margin-bottom:12px;outline:none;
+}
+.auth-card input:focus{border-color:var(--accent);}
+.auth-card button{
+  width:100%;padding:12px;border-radius:9px;font-size:14px;font-weight:600;
+  cursor:pointer;transition:0.2s;border:none;
+}
+.btn-login{background:var(--accent);color:#fff;margin-bottom:10px;}
+.btn-login:hover{filter:brightness(1.1);}
+.btn-register{background:transparent;color:var(--text);border:1px solid var(--border) !important;}
+.btn-register:hover{background:var(--panel-2);}
+.auth-msg{font-size:12px;text-align:center;margin-top:12px;min-height:18px;}
+.auth-msg.error{color:#ff8080;}
+.auth-msg.success{color:#6bff8b;}
 
 /* ---------- 侧栏 ---------- */
 #sidebar{
@@ -51,8 +82,10 @@ textarea{resize:vertical;line-height:1.55;}
 input[type=range]{padding:0;background:none;border:none;-webkit-appearance:none;appearance:none;height:20px;}
 input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--border);border-radius:2px;}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--accent);margin-top:-5.5px;cursor:pointer;}
-.side-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;}
-.side-foot .btn{flex:1;}
+.side-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-direction:column;}
+.side-foot .btn{width:100%;}
+.btn-logout{background:transparent;color:#ff8080;border:1px solid #ff8080;margin-top:6px;}
+.btn-logout:hover{background:rgba(255,128,128,0.1);}
 
 /* ---------- 按钮 ---------- */
 .btn{
@@ -79,7 +112,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .head-actions{display:flex;gap:6px;}
 #menuBtn{display:none;}
 
-/* 【1.1修改点】增加移动端顺滑滚动和防弹跳 */
 #messages{
   flex:1;overflow-y:auto;padding:22px 18px 10px;
   display:flex;flex-direction:column;gap:18px;
@@ -106,7 +138,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
 
-/* 【1.1修改点】增加底部安全区适配 */
 .composer{
   display:flex;gap:10px;align-items:flex-end;
   padding:12px 16px 16px;
@@ -127,7 +158,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 #backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none;}
 
-/* 【1.1修改点】移动端媒体查询，防止iOS放大，增大按钮触摸面积 */
 @media(max-width:860px){
   #menuBtn{display:block;}
   #sidebar{
@@ -138,17 +168,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   body.side-open #sidebar{transform:none;}
   body.side-open #backdrop{display:block;}
   .msg{max-width:90%;}
-  
-  /* 防止 iOS 自动放大 */
-  input, textarea {
-    font-size: 16px !important;
-  }
-  
-  /* 增大移动端按钮点击区域 */
-  .btn.sm {
-    padding: 10px 14px;
-    font-size: 13.5px;
-  }
+  input, textarea { font-size: 16px !important; }
+  .btn.sm { padding: 10px 14px; font-size: 13.5px; }
 }
 @media(max-width:640px){
   #exportBtn{display:none;}
@@ -162,6 +183,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </style>
 </head>
 <body>
+
+<!-- 【新增】全屏登录/注册遮罩层 -->
+<div id="auth-overlay" class="hidden">
+  <div class="auth-card">
+    <h2 id="auth-title">欢迎回来</h2>
+    <p id="auth-subtitle">登录以同步您的角色与聊天记录</p>
+    <input type="email" id="auth-email" placeholder="邮箱地址" autocomplete="email">
+    <input type="password" id="auth-password" placeholder="密码（至少6位）" autocomplete="current-password">
+    <button class="btn-login" id="auth-login-btn">登录</button>
+    <button class="btn-register" id="auth-register-btn">没有账号？点击注册</button>
+    <div class="auth-msg" id="auth-msg"></div>
+  </div>
+</div>
 
 <div class="app">
   <!-- ================= 侧栏设置 ================= -->
@@ -209,6 +243,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
     <div class="side-foot">
       <button class="btn primary" id="applyBtn">应用并新开对话</button>
+      <!-- 【新增】退出登录按钮 -->
+      <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
   </aside>
 
@@ -243,19 +279,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 <script>
 /* =========================================================
-   角色扮演聊天 · 单文件版
-   已预填 token.xsxc.site 配置 & 对接 Supabase
-   ⚠️ 密钥已泄露，请尽快到平台删除/重置，换成新的再填进设置里
+   角色扮演聊天 · 多用户版
    ========================================================= */
 
-/* ---------- 【1.2修改点】Supabase 初始化 ---------- */
+/* ---------- Supabase 初始化 ---------- */
 const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = s => document.querySelector(s);
 
-/* ---------- 默认配置（已预填你的 API 信息） ---------- */
+// 动态用户ID（登录后被赋值）
+let USER_ID = null;
+
+/* ---------- 默认配置 ---------- */
 const DEFAULTS = {
   apiBase: 'https://token.xsxc.site/v1',
   apiKey: 'dp_53d5cdede7ca46e645a4a647624a',
@@ -263,8 +300,8 @@ const DEFAULTS = {
   temperature: 0.85,
   maxTokens: 1024,
   ctxLimit: 30,
-  charName: '林澈', // 这个会被云端数据覆盖
-  charPrompt: '24岁，老城区一家独立书店的店主。\n性格：表面冷淡、话少，实则细心温柔，习惯用行动而非言语表达关心。\n说话风格：短句，偶尔带点调侃，很少用感叹号。\n背景：书店生意清淡，但他从没打算关门。', // 这个会被云端数据覆盖
+  charName: '林澈',
+  charPrompt: '24岁，老城区一家独立书店的店主。\n性格：表面冷淡、话少，实则细心温柔，习惯用行动而非言语表达关心。\n说话风格：短句，偶尔带点调侃，很少用感叹号。\n背景：书店生意清淡，但他从没打算关门。',
   greeting: '*傍晚，店里只剩一盏暖黄的灯。他头也不抬地翻着书页，直到门铃响起，才慢慢抬眼。*\n\n"……随便看。想喝点什么的话，壶里有茶。"',
   userName: '旅人',
   userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
@@ -274,7 +311,7 @@ const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit
                   'charName','charPrompt','greeting','userName','userPrompt'];
 
 let cfg = loadCfg();
-let msgs = [];          // [{role:'user'|'assistant', content:string}]
+let msgs = [];
 let busy = false;
 let abortCtrl = null;
 
@@ -291,30 +328,31 @@ function saveCfg(){
 function saveHistory(){
   try{ localStorage.setItem('rp_history', JSON.stringify(msgs.slice(-300))); }catch(e){}
 }
+function clearLocalData(){
+  localStorage.removeItem('rp_cfg');
+  localStorage.removeItem('rp_history');
+}
 
-/* ---------- 【1.2修改点】从 Supabase 拉取角色配置 ---------- */
+/* ---------- 从 Supabase 拉取角色配置 ---------- */
 async function fetchAgentSettings() {
+    if (!USER_ID) return false; // 未登录不拉取
     try {
-        // 从 agent_settings 表拉取 id 为 default 的 agent_name 和 agent_prompt
         const { data, error } = await supabaseClient
             .from('agent_settings')
             .select('agent_name, agent_prompt')
-            .eq('id', 'default')
+            .eq('id', USER_ID) // 【修改】使用真实用户ID查询
             .single();
 
         if (error) {
-            console.warn('⚠️ Supabase 拉取失败（请检查RLS策略或表结构）:', error.message);
+            console.warn('⚠️ Supabase 拉取失败（可能是新用户，尚无数据）:', error.message);
             return false;
         }
 
         if (data) {
             console.log('✅ 成功从 Supabase 获取角色配置:', data);
-            // 覆盖本地默认配置
             if (data.agent_name) cfg.charName = data.agent_name;
             if (data.agent_prompt) cfg.charPrompt = data.agent_prompt;
             saveCfg();
-            
-            // 同步更新到左侧输入框和顶部标题
             if ($('#charName')) $('#charName').value = cfg.charName;
             if ($('#charPrompt')) $('#charPrompt').value = cfg.charPrompt;
             updateHeadName();
@@ -326,20 +364,23 @@ async function fetchAgentSettings() {
     return false;
 }
 
-/* ---------- 【新增】向 Supabase 推送并保存配置（实现云端同步） ---------- */
+/* ---------- 向 Supabase 推送并保存配置 ---------- */
 async function saveAgentSettings() {
+    if (!USER_ID) {
+        alert('请先登录后再保存设置！');
+        return;
+    }
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
             .upsert({ 
-                id: 'default', 
+                id: USER_ID, // 【修改】使用真实用户ID作为主键
                 agent_name: cfg.charName, 
                 agent_prompt: cfg.charPrompt 
             });
             
         if (error) {
             console.error('❌ 保存到云端失败:', error.message);
-            // 可选：使用 alert 提示用户，但容易打断操作，暂不强制弹出
         } else {
             console.log('✅ 成功保存到云端!');
         }
@@ -487,7 +528,7 @@ async function generate(){
 
       buf += decoder.decode(value, {stream: true});
       const lines = buf.split('\n');
-      buf = lines.pop();   // 最后一段可能不完整，留到下次
+      buf = lines.pop();
 
       for(const raw of lines){
         const line = raw.trim();
@@ -643,31 +684,137 @@ function bindEvents(){
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
 
-  // 【1.2修改点】点击应用时，先保存到本地，然后推送到云端
   $('#applyBtn').addEventListener('click', async () => {
     updateHeadName();
-    saveCfg(); // 保存到本地 localStorage
-    
-    // 新增：同步保存到云端
+    saveCfg();
     await saveAgentSettings(); 
-    
     if(msgs.length && !confirm('已保存设置。是否清空当前对话，用新设定重新开始？')){
       return;
     }
     newChat();
     document.body.classList.remove('side-open');
   });
+
+  // 【新增】退出登录按钮
+  $('#logoutBtn').addEventListener('click', async () => {
+    if(!confirm('确定要退出登录吗？退出后聊天记录将清空。')) return;
+    await supabaseClient.auth.signOut();
+    clearLocalData();
+    window.location.reload();
+  });
 }
 
-/* ---------- 【1.2修改点】启动逻辑（改为异步，等待云端数据） ---------- */
-async function init(){
+/* ---------- 登录/注册 UI 逻辑 ---------- */
+const authOverlay = $('#auth-overlay');
+const authTitle = $('#auth-title');
+const authSubtitle = $('#auth-subtitle');
+const authEmail = $('#auth-email');
+const authPassword = $('#auth-password');
+const authLoginBtn = $('#auth-login-btn');
+const authRegisterBtn = $('#auth-register-btn');
+const authMsg = $('#auth-msg');
+
+let isRegisterMode = false;
+
+function toggleAuthMode() {
+  isRegisterMode = !isRegisterMode;
+  authTitle.textContent = isRegisterMode ? '创建账号' : '欢迎回来';
+  authSubtitle.textContent = isRegisterMode ? '注册一个新账号开始使用' : '登录以同步您的角色与聊天记录';
+  authLoginBtn.textContent = isRegisterMode ? '注册' : '登录';
+  authRegisterBtn.textContent = isRegisterMode ? '已有账号？点击登录' : '没有账号？点击注册';
+  authMsg.textContent = '';
+}
+
+authRegisterBtn.addEventListener('click', toggleAuthMode);
+
+async function handleAuthAction() {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  if (!email || !password) {
+    authMsg.textContent = '请填写邮箱和密码';
+    authMsg.className = 'auth-msg error';
+    return;
+  }
+  if (password.length < 6) {
+    authMsg.textContent = '密码至少需要6位';
+    authMsg.className = 'auth-msg error';
+    return;
+  }
+
+  authLoginBtn.disabled = true;
+  authMsg.textContent = '处理中...';
+  authMsg.className = 'auth-msg';
+
+  try {
+    let result;
+    if (isRegisterMode) {
+      result = await supabaseClient.auth.signUp({ email, password });
+    } else {
+      result = await supabaseClient.auth.signInWithPassword({ email, password });
+    }
+
+    if (result.error) {
+      authMsg.textContent = result.error.message;
+      authMsg.className = 'auth-msg error';
+    } else {
+      if (isRegisterMode) {
+        authMsg.textContent = '注册成功！请检查邮箱确认（若开启了验证）或直接登录。';
+        authMsg.className = 'auth-msg success';
+        if (result.data.session) {
+          // 如果注册后自动登录了
+          window.location.reload();
+        } else {
+          toggleAuthMode(); // 切换回登录界面
+        }
+      } else {
+        // 登录成功，刷新页面让 onAuthStateChange 接管
+        window.location.reload();
+      }
+    }
+  } catch (e) {
+    authMsg.textContent = '网络错误，请重试';
+    authMsg.className = 'auth-msg error';
+  } finally {
+    authLoginBtn.disabled = false;
+  }
+}
+
+authLoginBtn.addEventListener('click', handleAuthAction);
+
+/* ---------- 启动逻辑 ---------- */
+async function init() {
+  // 1. 先监听 Auth 状态变化
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      USER_ID = session.user.id;
+      authOverlay.classList.add('hidden');
+      console.log('✅ 用户已登录:', USER_ID);
+      // 登录后，加载数据
+      loadUserData();
+    } else {
+      USER_ID = null;
+      authOverlay.classList.remove('hidden');
+      console.log('⛔ 用户未登录');
+    }
+  });
+
+  // 2. 检查当前是否已有 Session
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    authOverlay.classList.remove('hidden');
+  } else {
+    USER_ID = session.user.id;
+    authOverlay.classList.add('hidden');
+    loadUserData();
+  }
+}
+
+async function loadUserData() {
+  if (!USER_ID) return;
   initForm();
   bindEvents();
-  
-  // 尝试从 Supabase 拉取最新角色配置
   await fetchAgentSettings();
   
-  // 拉取完成后，再根据本地历史记录决定显示旧对话还是新对话
   let restored = false;
   try{
     const raw = localStorage.getItem('rp_history');
@@ -682,7 +829,6 @@ async function init(){
   }catch(e){}
 
   if(!restored) newChat();
-
   autoResize();
   scrollBottom(true);
 }
@@ -690,7 +836,7 @@ async function init(){
 // 执行启动
 init();
 
-/* ---------- 【PWA 修改点 2】注册 Service Worker ---------- */
+/* ---------- 注册 Service Worker ---------- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw-chat.js')
