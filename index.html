@@ -238,7 +238,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       </section>
     </div>
     <div class="side-foot">
-      <button class="btn primary" id="applyBtn">应用并新开对话</button>
+      <button class="btn primary" id="applyBtn">保存并应用设定</button>
       <button class="btn btn-clear-chat" id="clearChatBtn">清空聊天记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
@@ -322,7 +322,7 @@ function saveHistoryLocal(){
   try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){}
 }
 
-/* ---------- 【修改核心1】云端：从 Supabase 拉取全部配置（含API配置） ---------- */
+/* ---------- 云端：从 Supabase 拉取全部配置 ---------- */
 async function fetchAgentSettings() {
     if (!USER_ID) return false;
     try {
@@ -339,10 +339,8 @@ async function fetchAgentSettings() {
 
         if (data) {
             console.log('✅ 成功从 Supabase 获取全部配置:', data);
-            // 覆盖角色配置
             if (data.agent_name) cfg.charName = data.agent_name;
             if (data.agent_prompt) cfg.charPrompt = data.agent_prompt;
-            // 覆盖 API 配置
             if (data.api_base) cfg.apiBase = data.api_base;
             if (data.api_key) cfg.apiKey = data.api_key;
             if (data.model) cfg.model = data.model;
@@ -351,7 +349,6 @@ async function fetchAgentSettings() {
             if (data.ctx_limit !== null && data.ctx_limit !== undefined) cfg.ctxLimit = data.ctx_limit;
             
             saveCfg();
-            // 刷新 UI
             if ($('#charName')) $('#charName').value = cfg.charName;
             if ($('#charPrompt')) $('#charPrompt').value = cfg.charPrompt;
             if ($('#apiBase')) $('#apiBase').value = cfg.apiBase;
@@ -385,7 +382,7 @@ async function fetchAgentSettings() {
     return false;
 }
 
-/* ---------- 【修改核心2】云端：向 Supabase 推送并保存全部配置 ---------- */
+/* ---------- 云端：向 Supabase 推送并保存全部配置 ---------- */
 async function saveAgentSettings() {
     if (!USER_ID) { alert('请先登录后再保存设置！'); return; }
     try {
@@ -713,13 +710,22 @@ function bindEvents(){
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
 
+  // 【核心修改】保存设定，保留聊天记录
   $('#applyBtn').addEventListener('click', async () => {
     updateHeadName();
     saveCfg();
     await saveAgentSettings(); 
-    if(msgs.length && !confirm('已保存设置。是否清空当前对话，用新设定重新开始？')){ return; }
-    newChat();
+    
+    // 更新现有气泡的名字，让UI立刻显示新设定
+    document.querySelectorAll('.msg.assistant .meta').forEach(el => {
+      el.textContent = cfg.charName || '角色';
+    });
+    document.querySelectorAll('.msg.user .meta').forEach(el => {
+      el.textContent = cfg.userName || '你';
+    });
+
     document.body.classList.remove('side-open');
+    alert('设定已保存！AI将继续基于新设定和当前记录回复。');
   });
 
   $('#logoutBtn').addEventListener('click', async () => {
