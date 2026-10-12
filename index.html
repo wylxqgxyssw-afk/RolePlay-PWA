@@ -294,7 +294,7 @@ const DEFAULTS = {
 const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit',
                   'charName','charPrompt','greeting','userName','userPrompt'];
 
-let cfg = loadCfg();
+let cfg = Object.assign({}, DEFAULTS);
 let msgs = [];
 let busy = false;
 let abortCtrl = null;
@@ -303,21 +303,24 @@ let abortCtrl = null;
 let hasBoundEvents = false;
 let currentLoadedUserId = null;
 
-/* ---------- 配置读写 ---------- */
+/* ---------- 【修复核心1】配置读写（按用户ID隔离） ---------- */
 function loadCfg(){
+  if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
-    const raw = localStorage.getItem('rp_cfg');
+    const raw = localStorage.getItem('rp_cfg_' + USER_ID); // 带上用户ID
     return raw ? Object.assign({}, DEFAULTS, JSON.parse(raw)) : Object.assign({}, DEFAULTS);
   }catch(e){ return Object.assign({}, DEFAULTS); }
 }
-function saveCfg(){ try{ localStorage.setItem('rp_cfg', JSON.stringify(cfg)); }catch(e){} }
-function saveHistory(){ try{ localStorage.setItem('rp_history', JSON.stringify(msgs.slice(-300))); }catch(e){} }
-function clearLocalData(){
-  localStorage.removeItem('rp_cfg');
-  localStorage.removeItem('rp_history');
+function saveCfg(){
+  if(!USER_ID) return;
+  try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
+}
+function saveHistory(){
+  if(!USER_ID) return;
+  try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){} // 带上用户ID
 }
 
-/* ---------- 【修复核心1】从 Supabase 拉取角色配置 (解决406报错) ---------- */
+/* ---------- 从 Supabase 拉取角色配置 ---------- */
 async function fetchAgentSettings() {
     if (!USER_ID) return false;
     try {
@@ -325,7 +328,7 @@ async function fetchAgentSettings() {
             .from('agent_settings')
             .select('agent_name, agent_prompt')
             .eq('id', USER_ID)
-            .maybeSingle(); // 【关键修复】改用 maybeSingle()，查不到数据不报错，返回 null
+            .maybeSingle();
 
         if (error) {
             console.warn('⚠️ Supabase 拉取失败:', error.message);
@@ -342,7 +345,6 @@ async function fetchAgentSettings() {
             updateHeadName();
             return true;
         } else {
-            // 【新增逻辑】新用户首次登录，无数据，自动向云端写入默认设定
             console.log('🌱 新用户首次登录，正在向云端写入默认配置...');
             const { error: insertError } = await supabaseClient.from('agent_settings').insert({
                 id: USER_ID,
@@ -601,7 +603,6 @@ function autoResize(){
 
 /* ---------- 事件绑定 ---------- */
 function bindEvents(){
-  // 【修复核心2】加入防重复绑定锁
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
@@ -638,10 +639,11 @@ function bindEvents(){
     document.body.classList.remove('side-open');
   });
 
+  // 【修复核心2】退出登录时不清空本地数据，数据已按 ID 隔离，绝对不串号
   $('#logoutBtn').addEventListener('click', async () => {
-    if(!confirm('确定要退出登录吗？退出后聊天记录将清空。')) return;
+    if(!confirm('确定要退出登录吗？')) return;
     await supabaseClient.auth.signOut();
-    clearLocalData();
+    // 刷新页面，让系统重新读取当前登录状态
     window.location.reload();
   });
 }
@@ -734,21 +736,23 @@ async function init() {
 
 async function loadUserData() {
   if (!USER_ID) return;
-  // 【修复核心3】防止同一个用户重复加载和绑定
   if (currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
   
-  // 登录新账号时，清空上一账号残留的聊天记录，防止串号
   msgs = [];
   msgBox.innerHTML = '';
-  
+
+  // 【修复核心3】动态加载当前用户的本地配置和历史记录
+  cfg = loadCfg();
+
   initForm();
   bindEvents();
   await fetchAgentSettings();
   
   let restored = false;
   try{
-    const raw = localStorage.getItem('rp_history');
+    // 读取当前用户专属的历史记录
+    const raw = localStorage.getItem('rp_history_' + USER_ID);
     if(raw){
       const arr = JSON.parse(raw);
       if(Array.isArray(arr) && arr.length){
