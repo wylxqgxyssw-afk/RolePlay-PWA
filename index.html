@@ -303,7 +303,7 @@ let abortCtrl = null;
 let hasBoundEvents = false;
 let currentLoadedUserId = null;
 
-/* ---------- 【修复核心1】配置读写（按用户ID隔离） ---------- */
+/* ---------- 配置读写（按用户ID隔离） ---------- */
 function loadCfg(){
   if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
@@ -315,12 +315,12 @@ function saveCfg(){
   if(!USER_ID) return;
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
-function saveHistory(){
+function saveHistoryLocal(){
   if(!USER_ID) return;
-  try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){} // 带上用户ID
+  try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){}
 }
 
-/* ---------- 从 Supabase 拉取角色配置 ---------- */
+/* ---------- 云端：从 Supabase 拉取角色配置 ---------- */
 async function fetchAgentSettings() {
     if (!USER_ID) return false;
     try {
@@ -360,7 +360,7 @@ async function fetchAgentSettings() {
     return false;
 }
 
-/* ---------- 向 Supabase 推送并保存配置 ---------- */
+/* ---------- 云端：向 Supabase 推送并保存配置 ---------- */
 async function saveAgentSettings() {
     if (!USER_ID) { alert('请先登录后再保存设置！'); return; }
     try {
@@ -374,6 +374,41 @@ async function saveAgentSettings() {
         if (error) console.error('❌ 保存到云端失败:', error.message);
         else console.log('✅ 成功保存到云端!');
     } catch (e) { console.error('❌ 保存请求异常:', e); }
+}
+
+/* ---------- 【新增】云端：将单条消息推送到 Supabase ---------- */
+async function saveMessageToCloud(role, content) {
+    if (!USER_ID) return;
+    try {
+        const { error } = await supabaseClient.from('chat_messages').insert({
+            user_id: USER_ID,
+            role: role,
+            content: content
+        });
+        if (error) console.error('❌ 消息同步到云端失败:', error.message);
+    } catch (e) { console.error('❌ 消息同步异常:', e); }
+}
+
+/* ---------- 【新增】云端：从 Supabase 拉取历史记录 ---------- */
+async function loadMessagesFromCloud() {
+    if (!USER_ID) return [];
+    try {
+        const { data, error } = await supabaseClient
+            .from('chat_messages')
+            .select('role, content, created_at')
+            .eq('user_id', USER_ID)
+            .order('created_at', { ascending: true })
+            .limit(300);
+            
+        if (error) {
+            console.warn('⚠️ 拉取云端聊天记录失败:', error.message);
+            return [];
+        }
+        return data.map(d => ({ role: d.role, content: d.content }));
+    } catch (e) {
+        console.error('❌ 拉取云端聊天记录异常:', e);
+        return [];
+    }
 }
 
 /* ---------- 文本处理 ---------- */
@@ -514,16 +549,17 @@ async function generate(){
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
       msgs.push({role:'assistant', content: full});
+      saveMessageToCloud('assistant', full); // 【新增】AI回复同步云端
     }else{
       contentEl.innerHTML = '<span class="muted">（模型返回了空内容，请检查API配置）</span>';
     }
 
   }catch(err){
     if(err.name === 'AbortError'){
-      if(full.trim()){ contentEl.innerHTML = renderContent(full) + '<div class="err">（已手动停止）</div>'; msgs.push({role:'assistant', content: full}); }
+      if(full.trim()){ contentEl.innerHTML = renderContent(full) + '<div class="err">（已手动停止）</div>'; msgs.push({role:'assistant', content: full}); saveMessageToCloud('assistant', full); }
       else { bubble.remove(); }
     }else{
-      if(full.trim()){ contentEl.innerHTML = renderContent(full); msgs.push({role:'assistant', content: full}); }
+      if(full.trim()){ contentEl.innerHTML = renderContent(full); msgs.push({role:'assistant', content: full}); saveMessageToCloud('assistant', full); }
       contentEl.innerHTML += '<div class="err">请求失败：' + escapeHtml(err.message) + '</div>';
       scrollBottom(true);
     }
@@ -531,7 +567,7 @@ async function generate(){
     busy = false;
     abortCtrl = null;
     setBusyUI(false);
-    saveHistory();
+    saveHistoryLocal();
   }
 }
 
@@ -554,7 +590,8 @@ async function send(){
   autoResize();
   addBubble('user', text);
   msgs.push({role:'user', content: text});
-  saveHistory();
+  saveHistoryLocal();
+  await saveMessageToCloud('user', text); // 【新增】用户消息同步云端
   await generate();
 }
 
@@ -576,10 +613,24 @@ function newChat(){
   if(cfg.greeting && cfg.greeting.trim()){
     addBubble('assistant', cfg.greeting);
     msgs.push({role:'assistant', content: cfg.greeting});
+    saveMessageToCloud('assistant', cfg.greeting); // 【新增】开场白同步云端
   }else{
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">在左侧设置好 API 与角色，然后开始对话吧。</div>';
   }
-  saveHistory();
+  saveHistoryLocal();
+}
+
+/* 【新增】清空聊天时，同时清空云端记录 */
+async function clearChat() {
+  if(!confirm('确定要清空所有聊天记录吗？此操作不可恢复。')) return;
+  msgs = [];
+  msgBox.innerHTML = '';
+  saveHistoryLocal();
+  if (USER_ID) {
+    const { error } = await supabaseClient.from('chat_messages').delete().eq('user_id', USER_ID);
+    if (error) console.error('❌ 清空云端记录失败:', error.message);
+  }
+  newChat();
 }
 
 function exportChat(){
@@ -625,6 +676,7 @@ function bindEvents(){
     newChat();
   });
   $('#exportBtn').addEventListener('click', exportChat);
+  $('#clearChatBtn').addEventListener('click', clearChat);
 
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
@@ -639,11 +691,9 @@ function bindEvents(){
     document.body.classList.remove('side-open');
   });
 
-  // 【修复核心2】退出登录时不清空本地数据，数据已按 ID 隔离，绝对不串号
   $('#logoutBtn').addEventListener('click', async () => {
     if(!confirm('确定要退出登录吗？')) return;
     await supabaseClient.auth.signOut();
-    // 刷新页面，让系统重新读取当前登录状态
     window.location.reload();
   });
 }
@@ -742,28 +792,38 @@ async function loadUserData() {
   msgs = [];
   msgBox.innerHTML = '';
 
-  // 【修复核心3】动态加载当前用户的本地配置和历史记录
   cfg = loadCfg();
-
   initForm();
   bindEvents();
   await fetchAgentSettings();
-  
-  let restored = false;
-  try{
-    // 读取当前用户专属的历史记录
-    const raw = localStorage.getItem('rp_history_' + USER_ID);
-    if(raw){
-      const arr = JSON.parse(raw);
-      if(Array.isArray(arr) && arr.length){
-        arr.forEach(m => addBubble(m.role, m.content));
-        msgs = arr;
-        restored = true;
-      }
-    }
-  }catch(e){}
 
-  if(!restored) newChat();
+  // 【新增】优先从云端拉取聊天记录
+  let cloudMsgs = await loadMessagesFromCloud();
+  if (cloudMsgs.length > 0) {
+    msgs = cloudMsgs;
+    msgs.forEach(m => addBubble(m.role, m.content));
+    saveHistoryLocal(); // 覆盖本地缓存，保持最新
+  } else {
+    // 云端无记录，尝试从本地恢复（兼容旧数据）
+    let restored = false;
+    try{
+      const raw = localStorage.getItem('rp_history_' + USER_ID);
+      if(raw){
+        const arr = JSON.parse(raw);
+        if(Array.isArray(arr) && arr.length){
+          arr.forEach(m => addBubble(m.role, m.content));
+          msgs = arr;
+          restored = true;
+          // 将本地记录同步到云端
+          for (let m of arr) {
+            await saveMessageToCloud(m.role, m.content);
+          }
+        }
+      }
+    }catch(e){}
+    if(!restored) newChat();
+  }
+
   autoResize();
   scrollBottom(true);
 }
