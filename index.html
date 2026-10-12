@@ -138,7 +138,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
 
-/* 新增：消息操作栏（重新生成、版本切换、编辑） */
+/* 新增：消息操作栏（重新生成、版本切换、编辑、删除、Token） */
 .msg-actions {
   display: flex;
   align-items: center;
@@ -149,6 +149,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   color: var(--muted);
   opacity: 0.6;
   transition: opacity 0.2s;
+  flex-wrap: wrap;
 }
 .msg-actions:hover {
   opacity: 1;
@@ -168,6 +169,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .action-btn:hover {
   color: var(--text);
   background: var(--border);
+}
+.action-btn.delete-btn {
+  color: #ff8080;
+}
+.action-btn.delete-btn:hover {
+  background: rgba(255,128,128,0.15);
 }
 .version-switcher {
   display: flex;
@@ -194,6 +201,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .version-switcher button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+.token-display {
+  font-family: monospace;
+  font-size: 11px;
+  color: #6b7280;
+  background: rgba(0,0,0,0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: auto;
 }
 
 .composer{
@@ -472,7 +488,8 @@ async function saveMessageToCloud(msg) {
             role: msg.role,
             content: msg.content,
             versions: msg.versions || null,
-            current_version: msg.currentVersion || 0
+            current_version: msg.currentVersion || 0,
+            tokens: msg.tokens || null // 【新增】同步 tokens
         };
         const { error } = await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
         if (error) console.error('❌ 消息同步到云端失败:', error.message);
@@ -485,7 +502,7 @@ async function loadMessagesFromCloud() {
     try {
         const { data, error } = await supabaseClient
             .from('chat_messages')
-            .select('role, content, versions, current_version, local_id, created_at')
+            .select('role, content, versions, current_version, local_id, tokens, created_at')
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: true })
             .limit(300);
@@ -495,7 +512,7 @@ async function loadMessagesFromCloud() {
             return [];
         }
         return data.map(d => {
-            const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId() };
+            const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId(), tokens: d.tokens || null };
             if (d.role === 'assistant') {
                 msg.versions = d.versions || [d.content];
                 msg.currentVersion = d.current_version || 0;
@@ -550,44 +567,56 @@ function updateVersionSwitcher(index, msg) {
     const actionsDiv = msgRow.querySelector('.msg-actions');
     if (!actionsDiv) return;
 
-    // 移除旧的切换器
     const oldSwitcher = actionsDiv.querySelector('.version-switcher');
     if (oldSwitcher) oldSwitcher.remove();
 
-    // 如果版本大于1，添加切换器
     if (msg.versions && msg.versions.length > 1) {
         const switcher = document.createElement('div');
         switcher.className = 'version-switcher';
         switcher.innerHTML = `
-            <button data-msg-index="${index}" data-direction="-1" ${msg.currentVersion === 0 ? 'disabled' : ''}>&lt;</button>
+            <button class="version-btn" data-msg-index="${index}" data-direction="-1" ${msg.currentVersion === 0 ? 'disabled' : ''}>&lt;</button>
             <span>${msg.currentVersion + 1}/${msg.versions.length}</span>
-            <button data-msg-index="${index}" data-direction="1" ${msg.currentVersion === msg.versions.length - 1 ? 'disabled' : ''}>&gt;</button>
+            <button class="version-btn" data-msg-index="${index}" data-direction="1" ${msg.currentVersion === msg.versions.length - 1 ? 'disabled' : ''}>&gt;</button>
         `;
-        // 插入到"重新生成"按钮前面
         const regenBtn = actionsDiv.querySelector('.regen-btn');
         if (regenBtn) actionsDiv.insertBefore(switcher, regenBtn);
         else actionsDiv.appendChild(switcher);
     }
 }
 
-function addBubble(role, content, index = null, animate = false){
+function addBubble(role, content, index = null, tokens = null){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
   if (index !== null) wrap.setAttribute('data-msg-index', index);
 
   const name = role === 'user' ? (cfg.userName || '你') : (cfg.charName || '角色');
+  
+  // 构建操作栏 HTML
+  let actionsHtml = '';
+  if (role === 'assistant') {
+      actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
+  } else {
+      actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
+  }
+  actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
+  
+  // 构建 Token 显示 HTML
+  let tokenHtml = '';
+  if (tokens) {
+      tokenHtml = `<span class="token-display" title="完成 Token: ${tokens.completion_tokens || 0} / 总 Token: ${tokens.total_tokens || 0}">T: ${tokens.total_tokens || 0}</span>`;
+  }
+
   wrap.innerHTML = `
     <div class="meta">${escapeHtml(name)}</div>
     <div class="content"></div>
     <div class="msg-actions">
-      ${role === 'assistant' ? `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>` : ''}
-      ${role === 'user' ? `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>` : ''}
+      ${actionsHtml}
+      ${tokenHtml}
     </div>
   `;
   wrap.querySelector('.content').innerHTML = renderContent(content);
   msgBox.appendChild(wrap);
 
-  // 如果是 AI 消息且已有版本，更新切换器
   if (role === 'assistant' && index !== null) {
       const msg = msgs[index];
       if (msg && msg.versions) updateVersionSwitcher(index, msg);
@@ -628,9 +657,16 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-/* ---------- 核心：AI 回复流式接收 ---------- */
+/* ---------- 核心：AI 回复流式接收（返回文本和Token） ---------- */
 async function fetchAIResponse(contextMsgs) {
-  const payload = { model: cfg.model, messages: buildMessages(contextMsgs), temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), stream: true };
+  const payload = { 
+      model: cfg.model, 
+      messages: buildMessages(contextMsgs), 
+      temperature: Number(cfg.temperature), 
+      max_tokens: Number(cfg.maxTokens), 
+      stream: true,
+      stream_options: { include_usage: true } // 【关键】让 API 返回 token 用量
+  };
   const res = await fetch(endpoint(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
@@ -647,6 +683,7 @@ async function fetchAIResponse(contextMsgs) {
   const decoder = new TextDecoder('utf-8');
   let full = '';
   let buf = '';
+  let usage = null;
 
   while(true){
     const {done, value} = await reader.read();
@@ -662,6 +699,12 @@ async function fetchAIResponse(contextMsgs) {
       if(data === '[DONE]') continue;
       let json;
       try{ json = JSON.parse(data); }catch(e){ continue; }
+      
+      // 捕获 usage 信息
+      if (json.usage) {
+          usage = json.usage;
+      }
+      
       const choice = json.choices && json.choices[0];
       if(!choice) continue;
       const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
@@ -670,7 +713,7 @@ async function fetchAIResponse(contextMsgs) {
       }
     }
   }
-  return full;
+  return { full, usage };
 }
 
 /* ---------- 核心：普通发送消息 ---------- */
@@ -688,7 +731,6 @@ async function send(){
   saveHistoryLocal();
   await saveMessageToCloud(userMsg);
 
-  // 构建上下文
   const contextMsgs = msgs.slice(0, -1).concat(userMsg);
   await generateAIResponse(contextMsgs);
 }
@@ -703,16 +745,33 @@ async function generateAIResponse(contextMsgs) {
   contentEl.innerHTML = '<span class="cursor"></span>';
 
   try {
-    const full = await fetchAIResponse(contextMsgs);
+    const { full, usage } = await fetchAIResponse(contextMsgs);
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
-      const aiMsg = { role: 'assistant', content: full, versions: [full], currentVersion: 0, local_id: generateId() };
+      const aiMsg = { 
+          role: 'assistant', 
+          content: full, 
+          versions: [full], 
+          currentVersion: 0, 
+          local_id: generateId(),
+          tokens: usage // 【存储 token】
+      };
       msgs.push(aiMsg);
       const idx = msgs.length - 1;
+      
+      // 更新 DOM 属性
       bubble.setAttribute('data-msg-index', idx);
-      // 更新按钮的 data-msg-index
       bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
       
+      // 如果有 token，插入到操作栏
+      if (usage) {
+          const tokenSpan = document.createElement('span');
+          tokenSpan.className = 'token-display';
+          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens || 0}`;
+          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
+          bubble.querySelector('.msg-actions').appendChild(tokenSpan);
+      }
+
       await saveMessageToCloud(aiMsg);
     }else{
       contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
@@ -732,7 +791,6 @@ async function regenerateMessage(index) {
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
-  // 获取对应的用户消息
   let userMsgContext = [];
   for (let i = index - 1; i >= 0; i--) {
     if (msgs[i].role === 'user') {
@@ -751,7 +809,7 @@ async function regenerateMessage(index) {
   contentEl.innerHTML = '<span class="cursor"></span>';
 
   try {
-    const full = await fetchAIResponse(userMsgContext);
+    const { full, usage } = await fetchAIResponse(userMsgContext);
     if (full.trim()) {
       if (!msg.versions) {
         msg.versions = [msg.content];
@@ -760,8 +818,21 @@ async function regenerateMessage(index) {
       msg.versions.push(full);
       msg.currentVersion = msg.versions.length - 1;
       msg.content = full;
+      msg.tokens = usage; // 更新 token
 
       contentEl.innerHTML = renderContent(full);
+      
+      // 更新 token 显示
+      const oldToken = msgRow.querySelector('.token-display');
+      if (oldToken) oldToken.remove();
+      if (usage) {
+          const tokenSpan = document.createElement('span');
+          tokenSpan.className = 'token-display';
+          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens || 0}`;
+          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
+          msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
+      }
+
       updateVersionSwitcher(index, msg);
       await saveMessageToCloud(msg);
     } else {
@@ -807,19 +878,41 @@ function editUserMessage(index) {
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
 
-  // 截断该消息之后的所有对话
   msgs = msgs.slice(0, index + 1);
   msg.content = newContent;
 
-  // 清空并重新渲染历史
+  // 重新渲染整个聊天框（因为删除了后续消息，索引会变）
   msgBox.innerHTML = '';
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i));
+  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
 
   saveHistoryLocal();
 
-  // 重新发送（基于截断后的上下文）
   const contextMsgs = msgs.slice(0, index + 1);
   generateAIResponse(contextMsgs);
+}
+
+/* ---------- 核心：删除单条消息 ---------- */
+async function deleteMessage(index) {
+    if (busy) return;
+    if (!confirm('确定要删除这条消息吗？删除后无法恢复。')) return;
+    
+    const msg = msgs[index];
+    if (!msg) return;
+
+    // 从数组中移除
+    msgs.splice(index, 1);
+
+    // 重新渲染整个聊天框（因为索引全变了）
+    msgBox.innerHTML = '';
+    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+
+    saveHistoryLocal();
+
+    // 从云端删除
+    if (USER_ID && msg.local_id) {
+        const { error } = await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
+        if (error) console.error('❌ 云端删除失败:', error.message);
+    }
 }
 
 /* ---------- UI 状态 ---------- */
@@ -945,6 +1038,10 @@ function bindEvents(){
       const index = parseInt(target.getAttribute('data-msg-index'));
       editUserMessage(index);
     }
+    else if (target.classList.contains('delete-btn')) {
+      const index = parseInt(target.getAttribute('data-msg-index'));
+      await deleteMessage(index);
+    }
   });
 }
 
@@ -1050,7 +1147,7 @@ async function loadUserData() {
   let cloudMsgs = await loadMessagesFromCloud();
   if (cloudMsgs.length > 0) {
     msgs = cloudMsgs;
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i));
+    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
     saveHistoryLocal();
   } else {
     let restored = false;
@@ -1060,7 +1157,7 @@ async function loadUserData() {
         const arr = JSON.parse(raw);
         if(Array.isArray(arr) && arr.length){
           msgs = arr;
-          msgs.forEach((m, i) => addBubble(m.role, m.content, i));
+          msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
           restored = true;
           for (let m of arr) {
             await saveMessageToCloud(m);
