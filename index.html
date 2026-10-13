@@ -22,29 +22,14 @@ button{font-family:inherit;}
 .app{display:flex;height:100%;height:100dvh;}
 
 /* ---------- 登录遮罩层 ---------- */
-#auth-overlay{
-  position:fixed;inset:0;z-index:999;
-  background:rgba(13,15,22,0.98);backdrop-filter:blur(10px);
-  display:flex;align-items:center;justify-content:center;
-  padding:20px;transition:opacity 0.3s;
-}
+#auth-overlay{position:fixed;inset:0;z-index:999;background:rgba(13,15,22,0.98);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity 0.3s;}
 #auth-overlay.hidden{opacity:0;pointer-events:none;}
-.auth-card{
-  width:100%;max-width:380px;background:var(--panel);
-  border:1px solid var(--border);border-radius:16px;
-  padding:28px 24px;box-shadow:0 10px 40px rgba(0,0,0,0.5);
-}
+.auth-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 24px;box-shadow:0 10px 40px rgba(0,0,0,0.5);}
 .auth-card h2{font-size:20px;font-weight:600;margin:0 0 8px 0;text-align:center;}
 .auth-card p{font-size:13px;color:var(--muted);text-align:center;margin:0 0 20px 0;}
-.auth-card input{
-  width:100%;background:var(--panel-2);border:1px solid var(--border);
-  color:var(--text);border-radius:9px;padding:12px;font-size:14px;margin-bottom:12px;outline:none;
-}
+.auth-card input{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:12px;font-size:14px;margin-bottom:12px;outline:none;}
 .auth-card input:focus{border-color:var(--accent);}
-.auth-card button{
-  width:100%;padding:12px;border-radius:9px;font-size:14px;font-weight:600;
-  cursor:pointer;transition:0.2s;border:none;
-}
+.auth-card button{width:100%;padding:12px;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;transition:0.2s;border:none;}
 .btn-login{background:var(--accent);color:#fff;margin-bottom:10px;}
 .btn-login:hover{filter:brightness(1.1);}
 .btn-register{background:transparent;color:var(--text);border:1px solid var(--border) !important;}
@@ -54,50 +39,42 @@ button{font-family:inherit;}
 .auth-msg.success{color:#6bff8b;}
 
 /* ---------- 侧栏 ---------- */
-#sidebar{
-  width:330px;flex:0 0 330px;background:var(--panel);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;min-height:0;
-}
-.side-head{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;
-}
+#sidebar{width:330px;flex:0 0 330px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.side-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;}
 .side-body{flex:1;overflow-y:auto;padding:16px;}
 
+/* 云端状态指示器 */
+#cloud-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 16px;
+    font-size: 12px;
+    color: #6b7280;
+    background: rgba(0,0,0,0.2);
+    border-bottom: 1px solid var(--border);
+    transition: 0.3s;
+}
+#cloud-status-bar.online { color: #6bff8b; }
+#cloud-status-bar.offline { color: #ff8080; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+#cloud-status-bar.online .status-dot { background: #6bff8b; box-shadow: 0 0 8px #6bff8b; }
+#cloud-status-bar.offline .status-dot { background: #ff8080; box-shadow: 0 0 8px #ff8080; }
+
 /* 会话列表样式 */
-.conv-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 6px;
-  border: 1px solid transparent;
-  transition: 0.2s;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.conv-item {padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 6px; border: 1px solid transparent; transition: 0.2s; display: flex; justify-content: space-between; align-items: center;}
 .conv-item:hover { background: var(--panel-2); }
-.conv-item.active {
-  background: rgba(124, 108, 255, 0.1);
-  border-color: var(--accent);
-}
+.conv-item.active { background: rgba(124, 108, 255, 0.1); border-color: var(--accent); }
 .conv-item .conv-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
 .conv-item .conv-delete { color: #ff8080; cursor: pointer; padding: 4px; border-radius: 4px; opacity: 0; transition: 0.2s; font-size: 12px;}
 .conv-item:hover .conv-delete { opacity: 1; }
 .conv-item .conv-delete:hover { background: rgba(255,128,128,0.2); }
 
 .side-body section{margin-bottom:22px;}
-.side-body h3{
-  font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--muted);margin:0 0 8px;font-weight:600;
-}
+.side-body h3{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:600;}
 label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 5px;}
-input,textarea{
-  width:100%;background:var(--panel-2);border:1px solid var(--border);
-  color:var(--text);border-radius:9px;padding:9px 11px;font-size:13.5px;
-  font-family:inherit;outline:none;transition:border-color .15s;
-}
+input,textarea{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit;outline:none;transition:border-color .15s;}
 input:focus,textarea:focus{border-color:var(--accent);}
 textarea{resize:vertical;line-height:1.55;}
 input[type=range]{padding:0;background:none;border:none;-webkit-appearance:none;appearance:none;height:20px;}
@@ -111,10 +88,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .btn-clear-chat:hover{background:rgba(255,128,128,0.1);}
 
 /* ---------- 按钮 ---------- */
-.btn{
-  background:var(--panel-2);border:1px solid var(--border);color:var(--text);
-  padding:8px 14px;border-radius:9px;cursor:pointer;font-size:13.5px;transition:.15s;
-}
+.btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:13.5px;transition:.15s;}
 .btn:hover{border-color:var(--accent);}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
 .btn.sm{padding:6px 11px;font-size:12.5px;}
@@ -124,87 +98,69 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 /* ---------- 聊天区 ---------- */
 .chat{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
-.chat-head{
-  display:flex;align-items:center;gap:10px;padding:12px 16px;
-  border-bottom:1px solid var(--border);background:rgba(20,24,36,.72);
-  backdrop-filter:blur(10px);
-}
+.chat-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:rgba(20,24,36,.72);backdrop-filter:blur(10px);}
 .chat-head .title{display:flex;flex-direction:column;line-height:1.3;flex:1;min-width:0;}
 .chat-head .title .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .chat-head .sub{font-size:11.5px;color:var(--muted);}
 .head-actions{display:flex;gap:6px;}
 #menuBtn{display:none;}
 
-#messages{
-  flex:1;overflow-y:auto;padding:22px 18px 10px;
-  display:flex;flex-direction:column;gap:18px;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-}
+#messages{flex:1;overflow-y:auto;padding:22px 18px 10px;display:flex;flex-direction:column;gap:18px;-webkit-overflow-scrolling: touch;overscroll-behavior-y: contain;}
 .msg{display:flex;flex-direction:column;max-width:min(78%,760px);animation:pop .18s ease;}
 @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
 .msg.user{align-self:flex-end;}
 .msg.assistant{align-self:flex-start;}
 .msg .meta{font-size:11.5px;color:var(--muted);margin-bottom:5px;padding:0 4px;}
 .msg.user .meta{text-align:right;}
-.msg .content{
-  padding:11px 15px;border-radius:16px;line-height:1.72;
-  word-break:break-word;overflow-wrap:anywhere;
-}
+.msg .content{padding:11px 15px;border-radius:16px;line-height:1.72;word-break:break-word;overflow-wrap:anywhere;}
 .msg.user .content{background:linear-gradient(135deg,#5b4bff,#3f7bff);color:#fff;border-bottom-right-radius:5px;}
 .msg.assistant .content{background:var(--panel-2);border:1px solid var(--border);border-bottom-left-radius:5px;}
 .msg .content em{color:#a99cff;font-style:italic;}
 .msg.user .content em{color:#e2e8ff;}
 .err{color:#ff8080;font-size:12.5px;margin-top:8px;white-space:pre-wrap;line-height:1.5;}
 .muted{color:var(--muted);}
-.cursor{display:inline-block;width:7px;height:1em;background:var(--accent);
-  vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
+.cursor{display:inline-block;width:7px;height:1em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
 
 /* 消息操作栏 */
-.msg-actions {
-  display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 0 4px;
-  font-size: 12px; color: var(--muted); opacity: 0.6; transition: opacity 0.2s; flex-wrap: wrap;
-}
+.msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 4px;padding: 0 4px;font-size: 12px;color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
 .msg-actions:hover { opacity: 1; }
 .msg.user .msg-actions { justify-content: flex-end; }
-.action-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 4px; font-size: 12px; border-radius: 4px; }
+.action-btn {background: none; border: none; color: var(--muted);cursor: pointer; padding: 2px 4px; font-size: 12px; border-radius: 4px;}
 .action-btn:hover { color: var(--text); background: var(--border); }
 .action-btn.delete-btn { color: #ff8080; }
 .action-btn.delete-btn:hover { background: rgba(255,128,128,0.15); }
 .version-switcher { display: flex; align-items: center; gap: 4px; }
 .version-switcher span { font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
-.version-switcher button { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; border-radius: 3px; padding: 0 4px; }
+.version-switcher button {background: none; border: 1px solid var(--border); color: var(--muted);cursor: pointer; border-radius: 3px; padding: 0 4px;}
 .version-switcher button:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
 .version-switcher button:disabled { opacity: 0.3; cursor: not-allowed; }
-.token-display { font-family: monospace; font-size: 11px; color: #6b7280; background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 4px; margin-left: auto; }
+.token-display {font-family: monospace; font-size: 11px; color: #6b7280;background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 4px; margin-left: auto;}
 
-.composer{
-  display:flex;gap:10px;align-items:flex-end;
-  padding:12px 16px 16px;
-  padding-bottom: calc(16px + env(safe-area-inset-bottom));
-  border-top:1px solid var(--border);background:var(--panel);
-}
-#input{
-  flex:1;resize:none;max-height:180px;min-height:44px;
-  line-height:1.55;padding:11px 14px;border-radius:12px;overflow-y:auto;
-}
-#sendBtn{
-  height:44px;padding:0 22px;border-radius:12px;background:var(--accent);
-  border:none;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s;
-}
+.composer{display:flex;gap:10px;align-items:flex-end;padding:12px 16px 16px;padding-bottom: calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:var(--panel);}
+#input{flex:1;resize:none;max-height:180px;min-height:44px;line-height:1.55;padding:11px 14px;border-radius:12px;overflow-y:auto;}
+#sendBtn{height:44px;padding:0 22px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s;}
 #sendBtn:hover{filter:brightness(1.1);}
 #sendBtn.stop{background:#e05252;}
 
 #backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none;}
 
+/* 热更新提示框 */
+#update-toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1c2130; border: 1px solid var(--accent);
+    border-radius: 12px; padding: 14px 20px; display: none;
+    align-items: center; gap: 16px; z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: slideUp 0.3s ease;
+}
+@keyframes slideUp { from { bottom: -50px; opacity: 0; } to { bottom: 20px; opacity: 1; } }
+#update-toast span { font-size: 14px; color: #fff; }
+#update-toast button { padding: 8px 16px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+
 @media(max-width:860px){
   #menuBtn{display:block;}
-  #sidebar{
-    position:fixed;top:0;bottom:0;left:0;z-index:50;
-    width:min(88vw,340px);flex-basis:auto;
-    transform:translateX(-100%);transition:transform .25s ease;
-  }
+  #sidebar{position:fixed;top:0;bottom:0;left:0;z-index:50;width:min(88vw,340px);flex-basis:auto;transform:translateX(-100%);transition:transform .25s ease;}
   body.side-open #sidebar{transform:none;}
   body.side-open #backdrop{display:block;}
   .msg{max-width:90%;}
@@ -243,18 +199,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="icon-btn" id="closeSide" title="关闭">✕</button>
     </div>
     
+    <!-- 云端连接状态指示器 -->
+    <div id="cloud-status-bar" class="online">
+        <span class="status-dot"></span>
+        <span id="cloud-status-text">云端已连接</span>
+    </div>
+
     <div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
       <button class="btn primary" id="newConvBtn" style="width:100%;">➕ 新建角色对话</button>
     </div>
 
     <div class="side-body">
-      <!-- 会话列表区 -->
       <section>
         <h3>我的会话</h3>
         <div id="conversationListContainer"></div>
       </section>
 
-      <!-- 角色设定区 (针对当前会话) -->
       <section style="border-top: 1px solid var(--border); padding-top: 16px;">
         <h3>当前角色设定</h3>
         <label>角色名</label>
@@ -265,7 +225,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <textarea id="greeting" rows="3" spellcheck="false"></textarea>
       </section>
 
-      <!-- 全局 API 配置区 -->
       <section style="border-top: 1px solid var(--border); padding-top: 16px;">
         <h3>全局接口配置</h3>
         <label>API 地址（Base URL）</label>
@@ -327,6 +286,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </main>
 </div>
 
+<!-- 热更新提示框 -->
+<div id="update-toast">
+    <span>✨ 发现新版本，是否更新？</span>
+    <button id="update-confirm-btn">立即更新</button>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
@@ -335,33 +300,68 @@ const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* ---------- 全局变量集中声明（防止丢失） ---------- */
 const $ = s => document.querySelector(s);
+const msgBox = $('#messages');
+const inputEl = $('#input');
 let USER_ID = null;
-let currentConversationId = null; // 当前会话ID
-
-/* ---------- 全局默认配置（API配置不再保存至会话，保存在全局） ---------- */
-const DEFAULTS = {
-  apiBase: '', 
-  apiKey: '',  
-  model: '',   
-  temperature: 0.85,
-  maxTokens: 1024,
-  ctxLimit: 30,
-  userName: '旅人',
-  userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
-};
-
-const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit','userName','userPrompt'];
-
-let cfg = Object.assign({}, DEFAULTS);
+let currentConversationId = null;
+let cfg = {};
 let msgs = [];
 let busy = false;
 let abortCtrl = null;
-
 let hasBoundEvents = false;
 let currentLoadedUserId = null;
+let isRegisterMode = false;
 
-/* ---------- 全局配置读写 ---------- */
+/* ---------- 全局默认配置 ---------- */
+const DEFAULTS = {
+  apiBase: '', apiKey: '', model: '', temperature: 0.85, maxTokens: 1024, ctxLimit: 30,
+  userName: '旅人', userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
+};
+const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit','userName','userPrompt'];
+
+/* ---------- 工具函数 ---------- */
+function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderContent(s){
+  let h = escapeHtml(s || '');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  h = h.replace(/\n/g, '<br>');
+  return h;
+}
+function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
+
+/* ---------- 云端连接状态监控 ---------- */
+function updateCloudStatusUI(isOnline) {
+    const bar = $('#cloud-status-bar');
+    const text = $('#cloud-status-text');
+    if (isOnline) {
+        bar.className = 'online';
+        text.textContent = '云端已连接';
+    } else {
+        bar.className = 'offline';
+        text.textContent = '云端未连接，数据可能无法同步';
+    }
+}
+
+// 每分钟检查一次云端连接状态
+setInterval(async () => {
+    if (!USER_ID) return;
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        const { error } = await supabaseClient.from('agent_settings').select('id').limit(1).abortSignal(controller.signal);
+        clearTimeout(timeoutId);
+        if (error) throw error;
+        updateCloudStatusUI(true);
+    } catch (e) {
+        updateCloudStatusUI(false);
+    }
+}, 60000);
+
+/* ---------- 配置读写 ---------- */
 function loadCfg(){
   if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
@@ -373,19 +373,17 @@ function saveCfg(){
   if(!USER_ID) return;
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
-function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 
-/* ---------- 云端：从 Supabase 拉取全局 API 配置 ---------- */
+/* ---------- 云端：全局配置读写 ---------- */
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
             .select('api_base, api_key, model, temperature, max_tokens, ctx_limit, user_name, user_prompt')
-            .eq('id', USER_ID)
-            .maybeSingle();
+            .eq('id', USER_ID).maybeSingle();
 
-        if (error) { console.warn('⚠️ 全局配置拉取失败:', error.message); return false; }
+        if (error) { console.warn('⚠️ 全局配置拉取失败:', error.message); updateCloudStatusUI(false); return false; }
 
         if (data) {
             console.log('✅ 成功从 Supabase 获取全局配置');
@@ -398,24 +396,20 @@ async function fetchGlobalSettings() {
             if (data.user_name) cfg.userName = data.user_name;
             if (data.user_prompt) cfg.userPrompt = data.user_prompt;
             
-            saveCfg();
-            updateGlobalUI();
-            return true;
+            saveCfg(); updateGlobalUI(); updateCloudStatusUI(true); return true;
         } else {
-            // 新用户，写入默认全局配置
             const { error: insertError } = await supabaseClient.from('agent_settings').insert({
                 id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
                 temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
                 user_name: cfg.userName, user_prompt: cfg.userPrompt
             });
-            if (insertError) console.error('❌ 写入默认全局配置失败:', insertError.message);
+            if (insertError) { console.error('❌ 写入默认全局配置失败:', insertError.message); updateCloudStatusUI(false); }
             return false;
         }
-    } catch (e) { console.error('❌ 全局配置请求异常:', e); }
+    } catch (e) { console.error('❌ 全局配置请求异常:', e); updateCloudStatusUI(false); }
     return false;
 }
 
-/* ---------- 云端：保存全局配置 ---------- */
 async function saveGlobalSettings() {
     if (!USER_ID) return;
     try {
@@ -424,113 +418,81 @@ async function saveGlobalSettings() {
             temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
             user_name: cfg.userName, user_prompt: cfg.userPrompt
         });
-        if (error) console.error('❌ 保存全局配置失败:', error.message);
-    } catch (e) { console.error('❌ 保存全局配置异常:', e); }
+        if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
+        else updateCloudStatusUI(true);
+    } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
 }
 
-/* ---------- 云端：加载会话列表 ---------- */
+/* ---------- 云端：会话管理 ---------- */
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
-        const { data, error } = await supabaseClient
-            .from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at')
-            .eq('user_id', USER_ID)
-            .order('created_at', { ascending: false });
+        const { data, error } = await supabaseClient.from('conversations').select('id, agent_name, agent_prompt, greeting, created_at').eq('user_id', USER_ID).order('created_at', { ascending: false });
         if (error) throw error;
-        return data || [];
-    } catch (e) { console.error('❌ 加载会话列表失败:', e); return []; }
+        updateCloudStatusUI(true); return data || [];
+    } catch (e) { console.error('❌ 加载会话列表失败:', e); updateCloudStatusUI(false); return []; }
 }
 
-/* ---------- 云端：创建新会话 ---------- */
 async function createConversation() {
     if (!USER_ID) return null;
-    const defaultName = '新角色';
-    const defaultPrompt = '请在这里输入角色设定...';
-    const defaultGreeting = '你好，我是新角色。';
     try {
         const { data, error } = await supabaseClient.from('conversations').insert({
-            user_id: USER_ID, agent_name: defaultName, agent_prompt: defaultPrompt, greeting: defaultGreeting
+            user_id: USER_ID, agent_name: '新角色', agent_prompt: '请在这里输入角色设定...', greeting: '你好，我是新角色。'
         }).select().single();
         if (error) throw error;
         return data;
-    } catch (e) { console.error('❌ 创建会话失败:', e); return null; }
+    } catch (e) { console.error('❌ 创建会话失败:', e); updateCloudStatusUI(false); return null; }
 }
 
-/* ---------- 云端：保存会话的角色设定 ---------- */
 async function saveConversationSettings(convId, name, prompt, greet) {
     if (!USER_ID || !convId) return;
     try {
-        const { error } = await supabaseClient.from('conversations').update({
-            agent_name: name, agent_prompt: prompt, greeting: greet
-        }).eq('id', convId);
+        const { error } = await supabaseClient.from('conversations').update({ agent_name: name, agent_prompt: prompt, greeting: greet }).eq('id', convId);
         if (error) console.error('❌ 保存会话设定失败:', error.message);
     } catch (e) { console.error('❌ 保存会话设定异常:', e); }
 }
 
-/* ---------- 云端：删除会话 ---------- */
 async function deleteConversation(convId) {
     if (!USER_ID || !convId) return;
     if (!confirm('确定要删除这个角色及所有聊天记录吗？')) return;
     try {
         await supabaseClient.from('conversations').delete().eq('id', convId);
-        // 注意：chat_messages 表有外键约束，删除会话会自动级联删除聊天记录
-        // 为了保险，手动删一次
         await supabaseClient.from('chat_messages').delete().eq('conversation_id', convId);
-        // 从界面移除
         const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
         if (el) el.remove();
-        // 如果删的是当前会话，切换到第一个
         if (currentConversationId === convId) {
             const remaining = document.querySelectorAll('.conv-item');
-            if (remaining.length > 0) {
-                switchConversation(remaining[0].getAttribute('data-id'));
-            } else {
-                const newConv = await createConversation();
-                if (newConv) initUserData();
-            }
+            if (remaining.length > 0) switchConversation(remaining[0].getAttribute('data-id'));
+            else { const newConv = await createConversation(); if (newConv) initUserData(); }
         }
-    } catch (e) { console.error('❌ 删除会话异常:', e); }
+    } catch (e) { console.error('❌ 删除会话异常:', e); updateCloudStatusUI(false); }
 }
 
-/* ---------- 云端：消息读写（绑定 conversation_id） ---------- */
+/* ---------- 云端：消息读写 ---------- */
 async function saveMessageToCloud(msg) {
     if (!USER_ID || !currentConversationId) return;
     try {
-        const payload = {
-            user_id: USER_ID, conversation_id: currentConversationId,
-            local_id: msg.local_id, role: msg.role, content: msg.content,
-            versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null
-        };
+        const payload = { user_id: USER_ID, conversation_id: currentConversationId, local_id: msg.local_id, role: msg.role, content: msg.content, versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null };
         const { error } = await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
-        if (error) console.error('❌ 消息同步到云端失败:', error.message);
-    } catch (e) { console.error('❌ 消息同步异常:', e); }
+        if (error) { console.error('❌ 消息同步到云端失败:', error.message); updateCloudStatusUI(false); }
+        else updateCloudStatusUI(true);
+    } catch (e) { console.error('❌ 消息同步异常:', e); updateCloudStatusUI(false); }
 }
 
 async function loadMessagesFromCloud() {
     if (!USER_ID || !currentConversationId) return [];
     try {
-        const { data, error } = await supabaseClient
-            .from('chat_messages')
-            .select('role, content, versions, current_version, local_id, tokens, created_at')
-            .eq('user_id', USER_ID)
-            .eq('conversation_id', currentConversationId)
-            .order('created_at', { ascending: false })
-            .limit(300);
-            
-        if (error) { console.warn('⚠️ 拉取聊天记录失败:', error.message); return []; }
+        const { data, error } = await supabaseClient.from('chat_messages').select('role, content, versions, current_version, local_id, tokens, created_at').eq('user_id', USER_ID).eq('conversation_id', currentConversationId).order('created_at', { ascending: false }).limit(300);
+        if (error) { console.warn('⚠️ 拉取聊天记录失败:', error.message); updateCloudStatusUI(false); return []; }
         return data.reverse().map(d => {
             const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId(), tokens: d.tokens || null };
-            if (d.role === 'assistant') {
-                msg.versions = d.versions || [d.content];
-                msg.currentVersion = d.current_version || 0;
-            }
+            if (d.role === 'assistant') { msg.versions = d.versions || [d.content]; msg.currentVersion = d.current_version || 0; }
             return msg;
         });
-    } catch (e) { console.error('❌ 拉取聊天记录异常:', e); return []; }
+    } catch (e) { console.error('❌ 拉取聊天记录异常:', e); updateCloudStatusUI(false); return []; }
 }
 
-/* ---------- 界面更新 ---------- */
+/* ---------- UI 更新函数 ---------- */
 function updateGlobalUI() {
   if ($('#apiBase')) $('#apiBase').value = cfg.apiBase || '';
   if ($('#apiKey')) $('#apiKey').value = cfg.apiKey || '';
@@ -550,18 +512,9 @@ function renderConversationList(convs) {
         const item = document.createElement('div');
         item.className = 'conv-item' + (c.id === currentConversationId ? ' active' : '');
         item.setAttribute('data-id', c.id);
-        item.innerHTML = `
-            <span class="conv-name">${escapeHtml(c.agent_name || '未命名')}</span>
-            <span class="conv-delete" data-id="${c.id}">✕</span>
-        `;
-        item.addEventListener('click', (e) => {
-            if (e.target.classList.contains('conv-delete')) return;
-            switchConversation(c.id);
-        });
-        item.querySelector('.conv-delete').addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteConversation(c.id);
-        });
+        item.innerHTML = `<span class="conv-name">${escapeHtml(c.agent_name || '未命名')}</span><span class="conv-delete" data-id="${c.id}">✕</span>`;
+        item.addEventListener('click', (e) => { if (!e.target.classList.contains('conv-delete')) switchConversation(c.id); });
+        item.querySelector('.conv-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c.id); });
         container.appendChild(item);
     });
 }
@@ -572,10 +525,7 @@ function updateCurrentConversationUI(conv) {
     $('#charPrompt').value = conv.agent_prompt || '';
     $('#greeting').value = conv.greeting || '';
     $('#headName').textContent = conv.agent_name || '角色';
-    // 高亮当前会话
-    document.querySelectorAll('.conv-item').forEach(el => {
-        el.classList.toggle('active', el.getAttribute('data-id') === conv.id);
-    });
+    document.querySelectorAll('.conv-item').forEach(el => { el.classList.toggle('active', el.getAttribute('data-id') === conv.id); });
 }
 
 /* ---------- 切换会话 ---------- */
@@ -585,27 +535,21 @@ async function switchConversation(convId) {
     
     currentConversationId = convId;
     const conv = { id: convId };
-    
-    // 临时从列表里拿名字
     const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
     if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
     
-    // 重新渲染界面
     updateCurrentConversationUI(conv);
     
-    // 清空消息并重新拉取
-    msgs = [];
-    msgBox.innerHTML = '';
+    msgs = []; msgBox.innerHTML = '';
     let cloudMsgs = await loadMessagesFromCloud();
     if (cloudMsgs.length > 0) {
         msgs = cloudMsgs;
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
     } else {
-        if (conv.greeting && conv.greeting.trim()) {
-            const aiMsg = { role: 'assistant', content: conv.greeting, versions: [conv.greeting], currentVersion: 0, local_id: generateId() };
-            msgs.push(aiMsg);
-            addBubble('assistant', conv.greeting, 0);
-            saveMessageToCloud(aiMsg);
+        const greetingText = $('#greeting').value.trim();
+        if (greetingText) {
+            const aiMsg = { role: 'assistant', content: greetingText, versions: [greetingText], currentVersion: 0, local_id: generateId() };
+            msgs.push(aiMsg); addBubble('assistant', greetingText, 0); saveMessageToCloud(aiMsg);
         } else {
             msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">发送一条消息开始对话吧。</div>';
         }
@@ -613,35 +557,7 @@ async function switchConversation(convId) {
     scrollBottom(true);
 }
 
-/* ---------- 文本处理 ---------- */
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-function renderContent(s){
-  let h = escapeHtml(s || '');
-  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  h = h.replace(/\n/g, '<br>');
-  return h;
-}
-
-/* ---------- 表单初始化（仅绑定输入事件，防止全局配置被覆盖） ---------- */
-function initForm(){
-  CFG_KEYS.forEach(k => {
-    const el = document.getElementById(k);
-    if(!el) return;
-    el.addEventListener('input', () => {
-      if(el.type === 'number' || el.type === 'range') cfg[k] = Number(el.value);
-      else cfg[k] = el.value;
-      if(k === 'temperature') $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
-      saveCfg();
-    });
-  });
-}
-
 /* ---------- 消息渲染与版本控制 ---------- */
-const msgBox = $('#messages');
-
 function updateVersionSwitcher(index, msg) {
     const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
     if (!msgRow) return;
@@ -678,11 +594,7 @@ function addBubble(role, content, index = null, tokens = null){
   let tokenHtml = '';
   if (tokens) tokenHtml = `<span class="token-display" title="完成 Token: ${tokens.completion_tokens || 0} / 总 Token: ${tokens.total_tokens || 0}">T: ${tokens.total_tokens || 0}</span>`;
 
-  wrap.innerHTML = `
-    <div class="meta">${escapeHtml(name)}</div>
-    <div class="content"></div>
-    <div class="msg-actions">${actionsHtml}${tokenHtml}</div>
-  `;
+  wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   wrap.querySelector('.content').innerHTML = renderContent(content);
   msgBox.appendChild(wrap);
 
@@ -702,7 +614,7 @@ function scrollBottom(force){
   msgBox.scrollTop = msgBox.scrollHeight;
 }
 
-/* ---------- 构造请求 ---------- */
+/* ---------- 请求构造与流式接收 ---------- */
 function endpoint(){
   let base = String(cfg.apiBase || '').trim().replace(/\/+$/, '');
   if(!base) throw new Error('请先在左侧填写 API 地址');
@@ -712,7 +624,6 @@ function endpoint(){
 
 function systemPrompt(){
   const promptText = $('#charPrompt').value.trim();
-  const greetingText = $('#greeting').value.trim();
   const charName = $('#charName').value.trim() || '角色';
   const parts = [];
   parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
@@ -728,13 +639,8 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-/* ---------- 核心：流式接收 ---------- */
 async function fetchAIResponseStreaming(contextMsgs, onProgress) {
-  const payload = { 
-      model: cfg.model, messages: buildMessages(contextMsgs), 
-      temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), 
-      stream: true, stream_options: { include_usage: true }
-  };
+  const payload = { model: cfg.model, messages: buildMessages(contextMsgs), temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), stream: true, stream_options: { include_usage: true } };
   const res = await fetch(endpoint(), {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
     body: JSON.stringify(payload)
@@ -768,7 +674,7 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   return { full, usage };
 }
 
-/* ---------- 发送与生成 ---------- */
+/* ---------- 核心业务：发送与生成 ---------- */
 async function send(){
   if(busy || !currentConversationId) return;
   const input = $('#input');
@@ -777,10 +683,7 @@ async function send(){
   input.value = ''; autoResize();
 
   const userMsg = { role: 'user', content: text, local_id: generateId() };
-  msgs.push(userMsg);
-  addBubble('user', text, msgs.length - 1);
-  saveHistoryLocal();
-  await saveMessageToCloud(userMsg);
+  msgs.push(userMsg); addBubble('user', text, msgs.length - 1); await saveMessageToCloud(userMsg);
   await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
 }
 
@@ -795,7 +698,6 @@ async function generateAIResponse(contextMsgs) {
   const idx = msgs.length - 1;
   bubble.setAttribute('data-msg-index', idx);
   bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
-  saveHistoryLocal();
   await saveMessageToCloud(aiMsg);
 
   let lastCloudSave = 0;
@@ -803,7 +705,6 @@ async function generateAIResponse(contextMsgs) {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
         aiMsg.content = partialText; aiMsg.versions = [partialText];
-        saveHistoryLocal();
         if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(aiMsg); lastCloudSave = Date.now(); }
     });
     if(full.trim()){
@@ -816,17 +717,13 @@ async function generateAIResponse(contextMsgs) {
           tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
           bubble.querySelector('.msg-actions').appendChild(tokenSpan);
       }
-    } else {
-      contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
-      aiMsg.content = '（模型返回了空内容）'; aiMsg.versions = [aiMsg.content];
-    }
+    } else { contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; aiMsg.content = '（模型返回了空内容）'; aiMsg.versions = [aiMsg.content]; }
   } catch(err) {
     contentEl.innerHTML = renderContent(aiMsg.content || '') + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
-    if (!aiMsg.content) aiMsg.content = '（请求失败）';
-    aiMsg.versions = [aiMsg.content];
+    if (!aiMsg.content) aiMsg.content = '（请求失败）'; aiMsg.versions = [aiMsg.content];
   } finally {
     await saveMessageToCloud(aiMsg);
-    busy = false; setBusyUI(false); saveHistoryLocal();
+    busy = false; setBusyUI(false);
   }
 }
 
@@ -835,9 +732,7 @@ async function regenerateMessage(index) {
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
   let userMsgContext = [];
-  for (let i = index - 1; i >= 0; i--) {
-    if (msgs[i].role === 'user') { userMsgContext = msgs.slice(0, i + 1); break; }
-  }
+  for (let i = index - 1; i >= 0; i--) { if (msgs[i].role === 'user') { userMsgContext = msgs.slice(0, i + 1); break; } }
   if (userMsgContext.length === 0) return;
 
   busy = true; setBusyUI(true);
@@ -850,31 +745,24 @@ async function regenerateMessage(index) {
   try {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
-        msg.content = partialText;
-        msg.versions = msg.versions || [msg.content];
-        if (msg.versions.length === 0) msg.versions = [partialText];
-        else msg.versions[msg.versions.length - 1] = partialText;
-        saveHistoryLocal();
+        msg.content = partialText; msg.versions = msg.versions || [msg.content];
+        if (msg.versions.length === 0) msg.versions = [partialText]; else msg.versions[msg.versions.length - 1] = partialText;
         if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(msg); lastCloudSave = Date.now(); }
     });
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
       msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full; msg.tokens = usage;
       contentEl.innerHTML = renderContent(full);
-      const oldToken = msgRow.querySelector('.token-display');
-      if (oldToken) oldToken.remove();
+      const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
       if (usage) {
-          const tokenSpan = document.createElement('span');
-          tokenSpan.className = 'token-display';
+          const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
           tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens || 0}`;
-          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
-          msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
+          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`; msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
       }
       updateVersionSwitcher(index, msg);
     } else { contentEl.innerHTML = originalContent; }
-  } catch(e) {
-    contentEl.innerHTML = originalContent + '<div class="err">重新生成失败：' + escapeHtml(e.message) + '</div>';
-  } finally { await saveMessageToCloud(msg); busy = false; setBusyUI(false); saveHistoryLocal(); }
+  } catch(e) { contentEl.innerHTML = originalContent + '<div class="err">重新生成失败：' + escapeHtml(e.message) + '</div>'; }
+  finally { await saveMessageToCloud(msg); busy = false; setBusyUI(false); }
 }
 
 function switchVersion(index, direction) {
@@ -884,12 +772,8 @@ function switchVersion(index, direction) {
   if (newVer < 0 || newVer >= msg.versions.length) return;
   msg.currentVersion = newVer; msg.content = msg.versions[newVer];
   const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
-  if (msgRow) {
-    const contentEl = msgRow.querySelector('.content');
-    contentEl.innerHTML = renderContent(msg.content);
-    updateVersionSwitcher(index, msg);
-  }
-  saveHistoryLocal(); saveMessageToCloud(msg);
+  if (msgRow) { contentEl.innerHTML = renderContent(msg.content); updateVersionSwitcher(index, msg); }
+  saveMessageToCloud(msg);
 }
 
 function editUserMessage(index) {
@@ -898,11 +782,8 @@ function editUserMessage(index) {
   if (!msg || msg.role !== 'user') return;
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
-  msgs = msgs.slice(0, index + 1);
-  msg.content = newContent;
-  msgBox.innerHTML = '';
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-  saveHistoryLocal();
+  msgs = msgs.slice(0, index + 1); msg.content = newContent;
+  msgBox.innerHTML = ''; msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
   generateAIResponse(msgs.slice(0, index + 1));
 }
 
@@ -911,44 +792,32 @@ async function deleteMessage(index) {
     if (!confirm('确定要删除这条消息吗？删除后无法恢复。')) return;
     const msg = msgs[index];
     if (!msg) return;
-    msgs.splice(index, 1);
-    msgBox.innerHTML = '';
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-    saveHistoryLocal();
-    if (USER_ID && msg.local_id) {
-        await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
-    }
+    msgs.splice(index, 1); msgBox.innerHTML = ''; msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+    if (USER_ID && msg.local_id) await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
 }
 
 function setBusyUI(b){
-  const btn = $('#sendBtn');
-  btn.textContent = b ? '停止' : '发送';
-  btn.classList.toggle('stop', b);
-  $('#newBtn').disabled = b;
+  const btn = $('#sendBtn'); btn.textContent = b ? '停止' : '发送';
+  btn.classList.toggle('stop', b); $('#newBtn').disabled = b;
 }
 
-function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
-
-/* ---------- 事件绑定 ---------- */
+/* ---------- 事件绑定与热更新机制 ---------- */
 function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
   $('#sendBtn').addEventListener('click', () => { if(busy){ abortCtrl && abortCtrl.abort(); return; } send(); });
   inputEl.addEventListener('input', autoResize);
-  inputEl.addEventListener('keydown', e => {
-    if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!busy) send(); }
-  });
+  inputEl.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!busy) send(); } });
 
   $('#newBtn').addEventListener('click', () => {
     if (busy) { alert('请等待回复完成。'); return; }
     if (msgs.length && !confirm('确定要清空当前对话，重新开始吗？')) return;
     msgs = []; msgBox.innerHTML = '';
-    if ($('#greeting').value.trim()) {
-        const aiMsg = { role: 'assistant', content: $('#greeting').value.trim(), versions: [$('#greeting').value.trim()], currentVersion: 0, local_id: generateId() };
-        msgs.push(aiMsg);
-        addBubble('assistant', $('#greeting').value.trim(), 0);
-        saveMessageToCloud(aiMsg);
+    const greetingText = $('#greeting').value.trim();
+    if (greetingText) {
+        const aiMsg = { role: 'assistant', content: greetingText, versions: [greetingText], currentVersion: 0, local_id: generateId() };
+        msgs.push(aiMsg); addBubble('assistant', greetingText, 0); saveMessageToCloud(aiMsg);
     }
   });
   
@@ -957,105 +826,64 @@ function bindEvents(){
       const nameOf = r => r === 'user' ? (cfg.userName || '我') : ($('#charName').value || '角色');
       const text = msgs.map(m => nameOf(m.role) + '：\n' + m.content).join('\n\n---\n\n');
       const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = ($('#charName').value || 'chat') + '-' + new Date().toISOString().slice(0,10) + '.txt';
-      a.click();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = ($('#charName').value || 'chat') + '-' + new Date().toISOString().slice(0,10) + '.txt'; a.click();
   });
   
   $('#clearChatBtn').addEventListener('click', async () => {
       if(!confirm('确定要清空当前会话的聊天记录吗？此操作不可恢复。')) return;
-      msgs = []; msgBox.innerHTML = ''; saveHistoryLocal();
-      if (USER_ID && currentConversationId) {
-        await supabaseClient.from('chat_messages').delete().eq('conversation_id', currentConversationId);
-      }
+      msgs = []; msgBox.innerHTML = '';
+      if (USER_ID && currentConversationId) await supabaseClient.from('chat_messages').delete().eq('conversation_id', currentConversationId);
   });
 
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
 
-  // 获取模型列表
   $('#fetchModelsBtn').addEventListener('click', async () => {
-    const btn = $('#fetchModelsBtn');
-    const modelListContainer = $('#modelListContainer');
-    const apiBase = $('#apiBase').value.trim();
-    const apiKey = $('#apiKey').value.trim();
+    const btn = $('#fetchModelsBtn'); const modelListContainer = $('#modelListContainer');
+    const apiBase = $('#apiBase').value.trim(); const apiKey = $('#apiKey').value.trim();
     if (!apiBase) { alert('请先填写 API 地址！'); return; }
-    let baseUrl = apiBase.replace(/\/+$/, '');
-    if (baseUrl.endsWith('/chat/completions')) baseUrl = baseUrl.replace('/chat/completions', '');
-    if (!baseUrl.endsWith('/v1')) baseUrl += '/v1';
-    const modelsUrl = baseUrl + '/models';
-    btn.textContent = '获取中...'; btn.disabled = true;
-    modelListContainer.style.display = 'none'; modelListContainer.innerHTML = '';
+    let baseUrl = apiBase.replace(/\/+$/, ''); if (baseUrl.endsWith('/chat/completions')) baseUrl = baseUrl.replace('/chat/completions', ''); if (!baseUrl.endsWith('/v1')) baseUrl += '/v1';
+    btn.textContent = '获取中...'; btn.disabled = true; modelListContainer.style.display = 'none'; modelListContainer.innerHTML = '';
     try {
-      const res = await fetch(modelsUrl, { method: 'GET', headers: { 'Authorization': 'Bearer ' + apiKey } });
+      const res = await fetch(baseUrl + '/models', { method: 'GET', headers: { 'Authorization': 'Bearer ' + apiKey } });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      const models = Array.isArray(data) ? data : (data.data || []);
-      if (models.length === 0) {
-        modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">未找到任何模型。</div>';
-        modelListContainer.style.display = 'block'; return;
-      }
+      const data = await res.json(); const models = Array.isArray(data) ? data : (data.data || []);
+      if (models.length === 0) { modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">未找到任何模型。</div>'; modelListContainer.style.display = 'block'; return; }
       models.forEach(m => {
         const modelId = m.id || m.model || m.name || String(m);
-        const item = document.createElement('div');
-        item.textContent = modelId;
+        const item = document.createElement('div'); item.textContent = modelId;
         item.style.cssText = 'padding:6px 10px; font-size:13px; cursor:pointer; border-radius:4px;';
-        item.onmouseover = () => item.style.background = 'var(--border)';
-        item.onmouseout = () => item.style.background = 'transparent';
+        item.onmouseover = () => item.style.background = 'var(--border)'; item.onmouseout = () => item.style.background = 'transparent';
         item.onclick = () => { $('#model').value = modelId; cfg.model = modelId; saveCfg(); modelListContainer.style.display = 'none'; };
         modelListContainer.appendChild(item);
       });
       modelListContainer.style.display = 'block';
-    } catch (e) {
-      modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">获取失败：' + e.message + '</div>';
-      modelListContainer.style.display = 'block';
-    } finally { btn.textContent = '获取'; btn.disabled = false; }
+    } catch (e) { modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">获取失败：' + e.message + '</div>'; modelListContainer.style.display = 'block'; }
+    finally { btn.textContent = '获取'; btn.disabled = false; }
   });
 
-  // 保存全局配置和当前角色设定
   $('#applyBtn').addEventListener('click', async () => {
-    // 保存当前角色设定到数据库
-    const charName = $('#charName').value.trim() || '新角色';
-    const charPrompt = $('#charPrompt').value.trim();
-    const greeting = $('#greeting').value.trim();
+    const charName = $('#charName').value.trim() || '新角色'; const charPrompt = $('#charPrompt').value.trim(); const greeting = $('#greeting').value.trim();
     $('#headName').textContent = charName;
     await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
-    
-    // 更新本地会话列表显示
-    const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
-    if (el) el.textContent = charName;
-    
-    // 保存全局设置
+    const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`); if (el) el.textContent = charName;
     saveCfg(); await saveGlobalSettings();
-    
-    // 更新消息名字显示
     document.querySelectorAll('.msg.assistant .meta').forEach(el => { el.textContent = charName; });
-    
-    document.body.classList.remove('side-open');
-    alert('设定已保存！');
+    document.body.classList.remove('side-open'); alert('设定已保存！');
   });
 
-  $('#logoutBtn').addEventListener('click', async () => {
-    if(!confirm('确定要退出登录吗？')) return;
-    await supabaseClient.auth.signOut(); window.location.reload();
-  });
+  $('#logoutBtn').addEventListener('click', async () => { if(!confirm('确定要退出登录吗？')) return; await supabaseClient.auth.signOut(); window.location.reload(); });
 
-  // 新建会话
   $('#newConvBtn').addEventListener('click', async () => {
     if (busy) { alert('请等待当前回复完成。'); return; }
     const newConv = await createConversation();
     if (newConv) {
       currentConversationId = newConv.id;
-      const convs = await loadConversations();
-      renderConversationList(convs);
-      updateCurrentConversationUI(newConv);
+      const convs = await loadConversations(); renderConversationList(convs); updateCurrentConversationUI(newConv);
       msgs = []; msgBox.innerHTML = '';
-      if (newConv.greeting) {
-          const aiMsg = { role: 'assistant', content: newConv.greeting, versions: [newConv.greeting], currentVersion: 0, local_id: generateId() };
-          msgs.push(aiMsg); addBubble('assistant', newConv.greeting, 0); saveMessageToCloud(aiMsg);
-      }
+      if (newConv.greeting) { const aiMsg = { role: 'assistant', content: newConv.greeting, versions: [newConv.greeting], currentVersion: 0, local_id: generateId() }; msgs.push(aiMsg); addBubble('assistant', newConv.greeting, 0); saveMessageToCloud(aiMsg); }
       document.body.classList.remove('side-open');
     }
   });
@@ -1069,14 +897,9 @@ function bindEvents(){
   });
 }
 
-/* ---------- 登录/注册 ---------- */
-const authOverlay = $('#auth-overlay');
-const authEmail = $('#auth-email');
-const authPassword = $('#auth-password');
-const authLoginBtn = $('#auth-login-btn');
-const authRegisterBtn = $('#auth-register-btn');
-const authMsg = $('#auth-msg');
-let isRegisterMode = false;
+/* ---------- 登录逻辑 ---------- */
+const authOverlay = $('#auth-overlay'); const authEmail = $('#auth-email'); const authPassword = $('#auth-password');
+const authLoginBtn = $('#auth-login-btn'); const authRegisterBtn = $('#auth-register-btn'); const authMsg = $('#auth-msg');
 
 function toggleAuthMode() {
   isRegisterMode = !isRegisterMode;
@@ -1096,27 +919,17 @@ async function handleAuthAction() {
   try {
     let result = isRegisterMode ? await supabaseClient.auth.signUp({ email, password }) : await supabaseClient.auth.signInWithPassword({ email, password });
     if (result.error) { authMsg.textContent = result.error.message; authMsg.className = 'auth-msg error'; }
-    else {
-      if (isRegisterMode) {
-        authMsg.textContent = '注册成功！请直接登录。'; authMsg.className = 'auth-msg success';
-        if (result.data.session) window.location.reload(); else toggleAuthMode();
-      } else window.location.reload();
-    }
-  } catch (e) { authMsg.textContent = '网络错误'; authMsg.className = 'auth-msg error'; }
-  finally { authLoginBtn.disabled = false; }
+    else { if (isRegisterMode) { authMsg.textContent = '注册成功！请直接登录。'; authMsg.className = 'auth-msg success'; if (result.data.session) window.location.reload(); else toggleAuthMode(); } else window.location.reload(); }
+  } catch (e) { authMsg.textContent = '网络错误'; authMsg.className = 'auth-msg error'; } finally { authLoginBtn.disabled = false; }
 }
 authLoginBtn.addEventListener('click', handleAuthAction);
 
-/* ---------- 启动逻辑 ---------- */
+/* ---------- 启动逻辑与热更新 ---------- */
 async function init() {
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
-      USER_ID = session.user.id;
-      authOverlay.classList.add('hidden');
-      loadUserData();
-    } else {
-      USER_ID = null; authOverlay.classList.remove('hidden');
-    }
+      USER_ID = session.user.id; authOverlay.classList.add('hidden'); loadUserData();
+    } else { USER_ID = null; authOverlay.classList.remove('hidden'); }
   });
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) authOverlay.classList.remove('hidden');
@@ -1126,42 +939,50 @@ async function init() {
 async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
-  
-  cfg = loadCfg(); 
-  initForm(); 
-  bindEvents();
-  
-  // 1. 拉取全局 API 配置
+  cfg = loadCfg(); initForm(); bindEvents();
   await fetchGlobalSettings();
-  
-  // 2. 拉取会话列表
   let convs = await loadConversations();
-  if (convs.length === 0) {
-      // 新用户，创建一个默认会话
-      const newConv = await createConversation();
-      if (newConv) convs = [newConv];
-  }
-  
+  if (convs.length === 0) { const newConv = await createConversation(); if (newConv) convs = [newConv]; }
   renderConversationList(convs);
-  
-  // 3. 默认选中第一个会话
-  if (convs.length > 0) {
-      currentConversationId = convs[0].id;
-      updateCurrentConversationUI(convs[0]);
-      await switchConversation(currentConversationId);
-  }
-  
+  if (convs.length > 0) { currentConversationId = convs[0].id; updateCurrentConversationUI(convs[0]); await switchConversation(currentConversationId); }
   autoResize(); scrollBottom(true);
 }
 init();
 
-/* ---------- 注册 Service Worker ---------- */
+/* ---------- 热更新机制（彻底解决清缓存问题） ---------- */
+let refreshing = false;
+// 监听 controllerchange 事件，当新 SW 接管后，只刷新一次页面
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw-chat.js')
-      .then(reg => console.log('✅ Service Worker 注册成功:', reg.scope))
-      .catch(err => console.log('❌ Service Worker 注册失败:', err));
+    navigator.serviceWorker.register('sw-chat.js').then(reg => {
+      // 监听更新
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          // 当新版本安装完成，且存在旧的 controller 时，说明是版本更新
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateToast(newWorker);
+          }
+        });
+      });
+    }).catch(err => console.log('SW 注册失败:', err));
   });
+}
+
+function showUpdateToast(worker) {
+    const toast = $('#update-toast');
+    toast.style.display = 'flex';
+    $('#update-confirm-btn').onclick = () => {
+        toast.style.display = 'none';
+        // 告诉 SW 跳过等待，立即激活新版本
+        worker.postMessage({ action: 'skipWaiting' });
+    };
 }
 </script>
 </body>
