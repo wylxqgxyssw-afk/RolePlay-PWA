@@ -575,8 +575,8 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-/* ---------- 核心：AI 回复流式接收 ---------- */
-async function fetchAIResponse(contextMsgs) {
+/* ---------- 【核心修复】流式接收：支持进度回调，边收边存 ---------- */
+async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   const payload = { 
       model: cfg.model, messages: buildMessages(contextMsgs), 
       temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), 
@@ -609,7 +609,10 @@ async function fetchAIResponse(contextMsgs) {
       const choice = json.choices && json.choices[0];
       if(!choice) continue;
       const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
-      if(delta) full += delta;
+      if(delta) {
+        full += delta;
+        if (onProgress) onProgress(full); // 关键：每生成一点内容就触发回调
+      }
     }
   }
   return { full, usage };
@@ -627,20 +630,19 @@ async function send(){
   msgs.push(userMsg);
   addBubble('user', text, msgs.length - 1);
   saveHistoryLocal();
-  await saveMessageToCloud(userMsg); // 用户消息立即保存
+  await saveMessageToCloud(userMsg);
   
   const contextMsgs = msgs.slice(0, -1).concat(userMsg);
   await generateAIResponse(contextMsgs);
 }
 
-/* ---------- 【核心修复】生成 AI 回复（先占位保存，异常兜底） ---------- */
+/* ---------- 【核心修复】生成 AI 回复（流式过程中实时保存到云端） ---------- */
 async function generateAIResponse(contextMsgs) {
   busy = true; setBusyUI(true);
   const bubble = addBubble('assistant', '');
   const contentEl = bubble.querySelector('.content');
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  // 先创建占位消息，立刻保存到云端
   const aiMsg = { 
       role: 'assistant', content: '', versions: [''], currentVersion: 0, 
       local_id: generateId(), tokens: null 
@@ -650,10 +652,24 @@ async function generateAIResponse(contextMsgs) {
   bubble.setAttribute('data-msg-index', idx);
   bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
   saveHistoryLocal();
-  await saveMessageToCloud(aiMsg); // 占位保存
+  await saveMessageToCloud(aiMsg);
+
+  let lastCloudSave = 0;
 
   try {
-    const { full, usage } = await fetchAIResponse(contextMsgs);
+    const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
+        contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
+        aiMsg.content = partialText;
+        aiMsg.versions = [partialText];
+        saveHistoryLocal();
+        
+        // 【核心】节流保存：每1秒保存一次云端，防止频繁请求导致卡顿
+        if (Date.now() - lastCloudSave > 1000) {
+            saveMessageToCloud(aiMsg);
+            lastCloudSave = Date.now();
+        }
+    });
+
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
       aiMsg.content = full;
@@ -667,19 +683,18 @@ async function generateAIResponse(contextMsgs) {
           tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
           bubble.querySelector('.msg-actions').appendChild(tokenSpan);
       }
-      await saveMessageToCloud(aiMsg); // 生成完毕更新云端
     }else{
       contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
       aiMsg.content = '（模型返回了空内容）';
       aiMsg.versions = [aiMsg.content];
-      await saveMessageToCloud(aiMsg);
     }
   } catch(err) {
-    contentEl.innerHTML = '<span class="err">请求失败：' + escapeHtml(err.message) + '</span>';
-    aiMsg.content = '请求失败：' + err.message;
+    contentEl.innerHTML = renderContent(aiMsg.content || '') + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
+    if (!aiMsg.content) aiMsg.content = '（请求失败）';
     aiMsg.versions = [aiMsg.content];
-    await saveMessageToCloud(aiMsg); // 【关键】即使失败，也将错误信息保存，防止云端丢失
   } finally {
+    // 无论成功失败，最后强制保存一次，确保数据完整
+    await saveMessageToCloud(aiMsg);
     busy = false; setBusyUI(false); saveHistoryLocal();
   }
 }
@@ -702,8 +717,22 @@ async function regenerateMessage(index) {
   const originalContent = contentEl.innerHTML;
   contentEl.innerHTML = '<span class="cursor"></span>';
 
+  let lastCloudSave = 0;
+
   try {
-    const { full, usage } = await fetchAIResponse(userMsgContext);
+    const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
+        contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
+        msg.content = partialText;
+        msg.versions = msg.versions || [msg.content];
+        if (msg.versions.length === 0) msg.versions = [partialText];
+        else msg.versions[msg.versions.length - 1] = partialText;
+        saveHistoryLocal();
+        if (Date.now() - lastCloudSave > 1000) {
+            saveMessageToCloud(msg);
+            lastCloudSave = Date.now();
+        }
+    });
+
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
       msg.versions.push(full);
@@ -722,11 +751,15 @@ async function regenerateMessage(index) {
           msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
       }
       updateVersionSwitcher(index, msg);
-      await saveMessageToCloud(msg);
-    } else { contentEl.innerHTML = originalContent; }
+    } else { 
+        contentEl.innerHTML = originalContent; 
+    }
   } catch(e) {
     contentEl.innerHTML = originalContent + '<div class="err">重新生成失败：' + escapeHtml(e.message) + '</div>';
-  } finally { busy = false; setBusyUI(false); saveHistoryLocal(); }
+  } finally { 
+    await saveMessageToCloud(msg);
+    busy = false; setBusyUI(false); saveHistoryLocal(); 
+  }
 }
 
 /* ---------- 核心：切换版本 ---------- */
