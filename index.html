@@ -180,6 +180,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </head>
 <body>
 
+<!-- 【新增】错误监控面板，发生任何错误直接显示在屏幕上，防止白屏 -->
+<div id="debug-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:#000; color:#ff8080; padding:20px; overflow:auto; font-family:monospace; white-space:pre-wrap; font-size:14px;"></div>
+<script>
+  window.onerror = function(message, source, lineno, colno, error) {
+    var debug = document.getElementById('debug-overlay');
+    if (debug) {
+      debug.style.display = 'block';
+      debug.textContent += '【错误】' + message + '\n位置: ' + source + ':' + lineno + ':' + colno + '\n\n';
+    }
+  };
+  window.addEventListener('unhandledrejection', function(event) {
+    var debug = document.getElementById('debug-overlay');
+    if (debug) {
+      debug.style.display = 'block';
+      debug.textContent += '【Promise错误】' + (event.reason ? event.reason.message || JSON.stringify(event.reason) : '未知') + '\n\n';
+    }
+  });
+</script>
+
 <div id="auth-overlay" class="hidden">
   <div class="auth-card">
     <h2 id="auth-title">欢迎回来</h2>
@@ -292,7 +311,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     <button id="update-confirm-btn">立即更新</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 【已修改】CDN 替换为 unpkg，防止被墙导致白屏 -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
 /* ---------- Supabase 初始化 ---------- */
