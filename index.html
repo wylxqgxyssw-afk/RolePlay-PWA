@@ -394,7 +394,7 @@ function saveCfg(){
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
 
-/* ---------- 云端：全局配置读写 ---------- */
+/* ---------- 云端：全局配置读写（带防崩溃降级） ---------- */
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
@@ -403,7 +403,13 @@ async function fetchGlobalSettings() {
             .select('api_base, api_key, model, temperature, max_tokens, ctx_limit, user_name, user_prompt')
             .eq('id', USER_ID).maybeSingle();
 
-        if (error) { console.warn('⚠️ 全局配置拉取失败:', error.message); updateCloudStatusUI(false); return false; }
+        if (error) {
+            // 如果是因为列不存在而报错，这里做个降级处理，防止整个程序崩溃
+            console.warn('⚠️ 全局配置拉取失败，将使用本地默认配置:', error.message);
+            updateCloudStatusUI(false);
+            updateGlobalUI(); // 用本地默认值渲染界面
+            return false;
+        }
 
         if (data) {
             console.log('✅ 成功从 Supabase 获取全局配置');
@@ -418,29 +424,25 @@ async function fetchGlobalSettings() {
             
             saveCfg(); updateGlobalUI(); updateCloudStatusUI(true); return true;
         } else {
-            const { error: insertError } = await supabaseClient.from('agent_settings').insert({
-                id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
-                temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
-                user_name: cfg.userName, user_prompt: cfg.userPrompt
-            });
-            if (insertError) { console.error('❌ 写入默认全局配置失败:', insertError.message); updateCloudStatusUI(false); }
+            // 新用户插入默认全局配置（加了 try/catch 防崩溃）
+            try {
+                await supabaseClient.from('agent_settings').insert({
+                    id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
+                    temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
+                    user_name: cfg.userName, user_prompt: cfg.userPrompt
+                });
+            } catch (insertErr) {
+                console.warn('写入默认全局配置失败:', insertErr.message);
+            }
+            updateGlobalUI(); // 用本地默认值渲染界面
             return false;
         }
-    } catch (e) { console.error('❌ 全局配置请求异常:', e); updateCloudStatusUI(false); }
+    } catch (e) { 
+        console.error('❌ 全局配置请求异常:', e); 
+        updateCloudStatusUI(false); 
+        updateGlobalUI(); // 崩溃兜底，保证界面能用
+    }
     return false;
-}
-
-async function saveGlobalSettings() {
-    if (!USER_ID) return;
-    try {
-        const { error } = await supabaseClient.from('agent_settings').upsert({ 
-            id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
-            temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
-            user_name: cfg.userName, user_prompt: cfg.userPrompt
-        });
-        if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
-        else updateCloudStatusUI(true);
-    } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
 }
 
 /* ---------- 云端：会话管理 ---------- */
