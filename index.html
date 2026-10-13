@@ -244,7 +244,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <label>API Key</label>
         <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false">
         <label>模型名</label>
-        <input id="model" placeholder="gpt-4o-mini" spellcheck="false">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input id="model" placeholder="gpt-4o-mini" spellcheck="false" style="flex:1;">
+          <button class="btn sm" id="fetchModelsBtn" style="white-space:nowrap;">获取</button>
+        </div>
+        <!-- 模型列表展示容器（默认隐藏） -->
+        <div id="modelListContainer" style="display:none; margin-top:8px; max-height:150px; overflow-y:auto; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:4px;"></div>
+        
         <label>温度 <span id="tempVal">0.85</span></label>
         <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.85">
         <label>单次最大回复长度（tokens）</label>
@@ -311,10 +317,11 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = s => document.querySelector(s);
 let USER_ID = null;
 
+/* ---------- 默认配置（已清空所有API地址和密钥，需用户自己填写） ---------- */
 const DEFAULTS = {
-  apiBase: 'https://token.xsxc.site/v1',
-  apiKey: 'dp_53d5cdede7ca46e645a4a647624a',
-  model: 'deepseek-v4-pro',
+  apiBase: '', // 用户自己填写，例如 https://api.openai.com/v1
+  apiKey: '',  // 用户自己填写，例如 sk-xxxx
+  model: '',   // 用户自己填写，或者点击“获取”按钮拉取
   temperature: 0.85,
   maxTokens: 1024,
   ctxLimit: 30,
@@ -430,7 +437,7 @@ async function saveMessageToCloud(msg) {
     } catch (e) { console.error('❌ 消息同步异常:', e); }
 }
 
-/* ---------- 【核心修复】云端：拉取历史记录（改为倒序拉取最近300条再反转） ---------- */
+/* ---------- 云端：拉取历史记录（倒序拉取最近300条再反转） ---------- */
 async function loadMessagesFromCloud() {
     if (!USER_ID) return [];
     try {
@@ -438,12 +445,11 @@ async function loadMessagesFromCloud() {
             .from('chat_messages')
             .select('role, content, versions, current_version, local_id, tokens, created_at')
             .eq('user_id', USER_ID)
-            .order('created_at', { ascending: false }) // 【修复】改为倒序，拉取最新的
+            .order('created_at', { ascending: false })
             .limit(300);
             
         if (error) { console.warn('⚠️ 拉取云端聊天记录失败:', error.message); return []; }
         
-        // 反转数组，让最早的消息在前面
         const reversed = data.reverse();
         
         return reversed.map(d => {
@@ -575,7 +581,7 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-/* ---------- 【核心修复】流式接收：支持进度回调，边收边存 ---------- */
+/* ---------- 核心：AI 回复流式接收（边收边存） ---------- */
 async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   const payload = { 
       model: cfg.model, messages: buildMessages(contextMsgs), 
@@ -611,7 +617,7 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
       const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
       if(delta) {
         full += delta;
-        if (onProgress) onProgress(full); // 关键：每生成一点内容就触发回调
+        if (onProgress) onProgress(full);
       }
     }
   }
@@ -636,7 +642,7 @@ async function send(){
   await generateAIResponse(contextMsgs);
 }
 
-/* ---------- 【核心修复】生成 AI 回复（流式过程中实时保存到云端） ---------- */
+/* ---------- 核心：生成 AI 回复（流式过程中实时保存到云端） ---------- */
 async function generateAIResponse(contextMsgs) {
   busy = true; setBusyUI(true);
   const bubble = addBubble('assistant', '');
@@ -663,7 +669,6 @@ async function generateAIResponse(contextMsgs) {
         aiMsg.versions = [partialText];
         saveHistoryLocal();
         
-        // 【核心】节流保存：每1秒保存一次云端，防止频繁请求导致卡顿
         if (Date.now() - lastCloudSave > 1000) {
             saveMessageToCloud(aiMsg);
             lastCloudSave = Date.now();
@@ -693,7 +698,6 @@ async function generateAIResponse(contextMsgs) {
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
     aiMsg.versions = [aiMsg.content];
   } finally {
-    // 无论成功失败，最后强制保存一次，确保数据完整
     await saveMessageToCloud(aiMsg);
     busy = false; setBusyUI(false); saveHistoryLocal();
   }
@@ -883,6 +887,77 @@ function bindEvents(){
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
+
+  // ====== 获取模型列表功能 ======
+  $('#fetchModelsBtn').addEventListener('click', async () => {
+    const btn = $('#fetchModelsBtn');
+    const modelListContainer = $('#modelListContainer');
+    const apiBase = $('#apiBase').value.trim();
+    const apiKey = $('#apiKey').value.trim();
+
+    if (!apiBase) {
+      alert('请先填写 API 地址！');
+      return;
+    }
+
+    let baseUrl = apiBase.replace(/\/+$/, '');
+    if (baseUrl.endsWith('/chat/completions')) {
+      baseUrl = baseUrl.replace('/chat/completions', '');
+    }
+    if (!baseUrl.endsWith('/v1')) {
+        baseUrl += '/v1';
+    }
+    const modelsUrl = baseUrl + '/models';
+
+    btn.textContent = '获取中...';
+    btn.disabled = true;
+    modelListContainer.style.display = 'none';
+    modelListContainer.innerHTML = '';
+
+    try {
+      const res = await fetch(modelsUrl, {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + apiKey }
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+      const data = await res.json();
+      const models = Array.isArray(data) ? data : (data.data || []);
+      
+      if (models.length === 0) {
+        modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">未找到任何模型，请检查API地址或密钥。</div>';
+        modelListContainer.style.display = 'block';
+        return;
+      }
+
+      models.forEach(m => {
+        const modelId = m.id || m.model || m.name || String(m);
+        const item = document.createElement('div');
+        item.textContent = modelId;
+        item.style.cssText = 'padding:6px 10px; font-size:13px; cursor:pointer; border-radius:4px;';
+        item.onmouseover = () => item.style.background = 'var(--border)';
+        item.onmouseout = () => item.style.background = 'transparent';
+        item.onclick = () => {
+          $('#model').value = modelId;
+          cfg.model = modelId;
+          saveCfg();
+          modelListContainer.style.display = 'none';
+        };
+        modelListContainer.appendChild(item);
+      });
+
+      modelListContainer.style.display = 'block';
+
+    } catch (e) {
+      console.error('获取模型失败:', e);
+      modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">获取失败，请检查 API 地址、密钥，或确认该 API 是否允许跨域请求。<br><br>错误详情：' + e.message + '</div>';
+      modelListContainer.style.display = 'block';
+    } finally {
+      btn.textContent = '获取';
+      btn.disabled = false;
+    }
+  });
 
   $('#applyBtn').addEventListener('click', async () => {
     updateHeadName(); saveCfg(); await saveAgentSettings(); 
