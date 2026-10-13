@@ -742,7 +742,7 @@ async function generateAIResponse(contextMsgs) {
     });
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
-      aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage;
+      aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage ? usage.total_tokens : null; // 只保存总 Token 数（数字），防止数据库报错
       if (usage) {
           const tokenSpan = document.createElement('span');
           tokenSpan.className = 'token-display';
