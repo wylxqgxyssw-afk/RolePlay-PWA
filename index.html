@@ -784,7 +784,7 @@ async function regenerateMessage(index) {
     });
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
-      msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full; msg.tokens = usage;
+      msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full;msg.tokens = usage ? usage.total_tokens : null;
       contentEl.innerHTML = renderContent(full);
       const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
       if (usage) {
