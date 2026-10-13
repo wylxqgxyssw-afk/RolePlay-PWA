@@ -64,6 +64,29 @@ button{font-family:inherit;}
   padding:14px 16px;border-bottom:1px solid var(--border);font-weight:600;
 }
 .side-body{flex:1;overflow-y:auto;padding:16px;}
+
+/* 会话列表样式 */
+.conv-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  border: 1px solid transparent;
+  transition: 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.conv-item:hover { background: var(--panel-2); }
+.conv-item.active {
+  background: rgba(124, 108, 255, 0.1);
+  border-color: var(--accent);
+}
+.conv-item .conv-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.conv-item .conv-delete { color: #ff8080; cursor: pointer; padding: 4px; border-radius: 4px; opacity: 0; transition: 0.2s; font-size: 12px;}
+.conv-item:hover .conv-delete { opacity: 1; }
+.conv-item .conv-delete:hover { background: rgba(255,128,128,0.2); }
+
 .side-body section{margin-bottom:22px;}
 .side-body h3{
   font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
@@ -140,38 +163,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 /* 消息操作栏 */
 .msg-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding: 0 4px;
-  font-size: 12px;
-  color: var(--muted);
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 0 4px;
+  font-size: 12px; color: var(--muted); opacity: 0.6; transition: opacity 0.2s; flex-wrap: wrap;
 }
 .msg-actions:hover { opacity: 1; }
 .msg.user .msg-actions { justify-content: flex-end; }
-.action-btn {
-  background: none; border: none; color: var(--muted);
-  cursor: pointer; padding: 2px 4px; font-size: 12px; border-radius: 4px;
-}
+.action-btn { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 4px; font-size: 12px; border-radius: 4px; }
 .action-btn:hover { color: var(--text); background: var(--border); }
 .action-btn.delete-btn { color: #ff8080; }
 .action-btn.delete-btn:hover { background: rgba(255,128,128,0.15); }
 .version-switcher { display: flex; align-items: center; gap: 4px; }
 .version-switcher span { font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
-.version-switcher button {
-  background: none; border: 1px solid var(--border); color: var(--muted);
-  cursor: pointer; border-radius: 3px; padding: 0 4px;
-}
+.version-switcher button { background: none; border: 1px solid var(--border); color: var(--muted); cursor: pointer; border-radius: 3px; padding: 0 4px; }
 .version-switcher button:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
 .version-switcher button:disabled { opacity: 0.3; cursor: not-allowed; }
-.token-display {
-  font-family: monospace; font-size: 11px; color: #6b7280;
-  background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 4px; margin-left: auto;
-}
+.token-display { font-family: monospace; font-size: 11px; color: #6b7280; background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 4px; margin-left: auto; }
 
 .composer{
   display:flex;gap:10px;align-items:flex-end;
@@ -233,12 +239,35 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 <div class="app">
   <aside id="sidebar">
     <div class="side-head">
-      <span>设置</span>
+      <span>多角色会话</span>
       <button class="icon-btn" id="closeSide" title="关闭">✕</button>
     </div>
+    
+    <div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
+      <button class="btn primary" id="newConvBtn" style="width:100%;">➕ 新建角色对话</button>
+    </div>
+
     <div class="side-body">
+      <!-- 会话列表区 -->
       <section>
-        <h3>接口配置</h3>
+        <h3>我的会话</h3>
+        <div id="conversationListContainer"></div>
+      </section>
+
+      <!-- 角色设定区 (针对当前会话) -->
+      <section style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <h3>当前角色设定</h3>
+        <label>角色名</label>
+        <input id="charName" spellcheck="false">
+        <label>角色人设 / 世界观</label>
+        <textarea id="charPrompt" rows="6" spellcheck="false"></textarea>
+        <label>开场白（新对话时使用）</label>
+        <textarea id="greeting" rows="3" spellcheck="false"></textarea>
+      </section>
+
+      <!-- 全局 API 配置区 -->
+      <section style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <h3>全局接口配置</h3>
         <label>API 地址（Base URL）</label>
         <input id="apiBase" placeholder="https://api.openai.com/v1" spellcheck="false">
         <label>API Key</label>
@@ -248,7 +277,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
           <input id="model" placeholder="gpt-4o-mini" spellcheck="false" style="flex:1;">
           <button class="btn sm" id="fetchModelsBtn" style="white-space:nowrap;">获取</button>
         </div>
-        <!-- 模型列表展示容器（默认隐藏） -->
         <div id="modelListContainer" style="display:none; margin-top:8px; max-height:150px; overflow-y:auto; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:4px;"></div>
         
         <label>温度 <span id="tempVal">0.85</span></label>
@@ -258,16 +286,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <label>上下文保留条数</label>
         <input id="ctxLimit" type="number" min="4" max="200" step="2">
       </section>
-      <section>
-        <h3>角色设定</h3>
-        <label>角色名</label>
-        <input id="charName" spellcheck="false">
-        <label>角色人设 / 世界观</label>
-        <textarea id="charPrompt" rows="8" spellcheck="false"></textarea>
-        <label>开场白（新对话时使用）</label>
-        <textarea id="greeting" rows="4" spellcheck="false"></textarea>
-      </section>
-      <section>
+
+      <section style="border-top: 1px solid var(--border); padding-top: 16px;">
         <h3>你的设定</h3>
         <label>你的名字</label>
         <input id="userName" spellcheck="false">
@@ -275,9 +295,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <textarea id="userPrompt" rows="3" spellcheck="false"></textarea>
       </section>
     </div>
+
     <div class="side-foot">
-      <button class="btn primary" id="applyBtn">保存并应用设定</button>
-      <button class="btn btn-clear-chat" id="clearChatBtn">清空聊天记录</button>
+      <button class="btn primary" id="applyBtn">保存并应用当前设定</button>
+      <button class="btn btn-clear-chat" id="clearChatBtn">清空当前会话记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
     </div>
   </aside>
@@ -286,7 +307,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
   <main class="chat">
     <header class="chat-head">
-      <button class="icon-btn" id="menuBtn" title="设置">☰</button>
+      <button class="icon-btn" id="menuBtn" title="设置/会话列表">☰</button>
       <div class="title">
         <span class="n" id="headName">角色</span>
         <span class="sub">角色扮演对话</span>
@@ -316,24 +337,21 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = s => document.querySelector(s);
 let USER_ID = null;
+let currentConversationId = null; // 当前会话ID
 
-/* ---------- 默认配置（已清空所有API地址和密钥，需用户自己填写） ---------- */
+/* ---------- 全局默认配置（API配置不再保存至会话，保存在全局） ---------- */
 const DEFAULTS = {
-  apiBase: '', // 用户自己填写，例如 https://api.openai.com/v1
-  apiKey: '',  // 用户自己填写，例如 sk-xxxx
-  model: '',   // 用户自己填写，或者点击“获取”按钮拉取
+  apiBase: '', 
+  apiKey: '',  
+  model: '',   
   temperature: 0.85,
   maxTokens: 1024,
   ctxLimit: 30,
-  charName: '林澈',
-  charPrompt: '24岁，老城区一家独立书店的店主。\n性格：表面冷淡、话少，实则细心温柔，习惯用行动而非言语表达关心。\n说话风格：短句，偶尔带点调侃，很少用感叹号。\n背景：书店生意清淡，但他从没打算关门。',
-  greeting: '*傍晚，店里只剩一盏暖黄的灯。他头也不抬地翻着书页，直到门铃响起，才慢慢抬眼。*\n\n"……随便看。想喝点什么的话，壶里有茶。"',
   userName: '旅人',
   userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
 };
 
-const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit',
-                  'charName','charPrompt','greeting','userName','userPrompt'];
+const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit','userName','userPrompt'];
 
 let cfg = Object.assign({}, DEFAULTS);
 let msgs = [];
@@ -343,7 +361,7 @@ let abortCtrl = null;
 let hasBoundEvents = false;
 let currentLoadedUserId = null;
 
-/* ---------- 配置读写（按用户ID隔离） ---------- */
+/* ---------- 全局配置读写 ---------- */
 function loadCfg(){
   if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
@@ -355,81 +373,133 @@ function saveCfg(){
   if(!USER_ID) return;
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
-function saveHistoryLocal(){
-  if(!USER_ID) return;
-  try{ localStorage.setItem('rp_history_' + USER_ID, JSON.stringify(msgs.slice(-300))); }catch(e){}
-}
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 
-/* ---------- 云端：从 Supabase 拉取全部配置 ---------- */
-async function fetchAgentSettings() {
+/* ---------- 云端：从 Supabase 拉取全局 API 配置 ---------- */
+async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
-            .select('agent_name, agent_prompt, api_base, api_key, model, temperature, max_tokens, ctx_limit')
+            .select('api_base, api_key, model, temperature, max_tokens, ctx_limit, user_name, user_prompt')
             .eq('id', USER_ID)
             .maybeSingle();
 
-        if (error) { console.warn('⚠️ Supabase 拉取失败:', error.message); return false; }
+        if (error) { console.warn('⚠️ 全局配置拉取失败:', error.message); return false; }
 
         if (data) {
-            console.log('✅ 成功从 Supabase 获取全部配置:', data);
-            if (data.agent_name) cfg.charName = data.agent_name;
-            if (data.agent_prompt) cfg.charPrompt = data.agent_prompt;
+            console.log('✅ 成功从 Supabase 获取全局配置');
             if (data.api_base) cfg.apiBase = data.api_base;
             if (data.api_key) cfg.apiKey = data.api_key;
             if (data.model) cfg.model = data.model;
             if (data.temperature !== null && data.temperature !== undefined) cfg.temperature = data.temperature;
             if (data.max_tokens !== null && data.max_tokens !== undefined) cfg.maxTokens = data.max_tokens;
             if (data.ctx_limit !== null && data.ctx_limit !== undefined) cfg.ctxLimit = data.ctx_limit;
+            if (data.user_name) cfg.userName = data.user_name;
+            if (data.user_prompt) cfg.userPrompt = data.user_prompt;
             
             saveCfg();
-            if ($('#charName')) $('#charName').value = cfg.charName;
-            if ($('#charPrompt')) $('#charPrompt').value = cfg.charPrompt;
-            if ($('#apiBase')) $('#apiBase').value = cfg.apiBase;
-            if ($('#apiKey')) $('#apiKey').value = cfg.apiKey;
-            if ($('#model')) $('#model').value = cfg.model;
-            if ($('#temperature')) $('#temperature').value = cfg.temperature;
-            if ($('#maxTokens')) $('#maxTokens').value = cfg.maxTokens;
-            if ($('#ctxLimit')) $('#ctxLimit').value = cfg.ctxLimit;
-            $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
-            updateHeadName();
+            updateGlobalUI();
             return true;
         } else {
-            console.log('🌱 新用户首次登录，正在向云端写入默认配置...');
+            // 新用户，写入默认全局配置
             const { error: insertError } = await supabaseClient.from('agent_settings').insert({
-                id: USER_ID, agent_name: cfg.charName, agent_prompt: cfg.charPrompt,
-                api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
-                temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit)
+                id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
+                temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
+                user_name: cfg.userName, user_prompt: cfg.userPrompt
             });
-            if (insertError) console.error('❌ 写入默认配置失败:', insertError.message);
+            if (insertError) console.error('❌ 写入默认全局配置失败:', insertError.message);
             return false;
         }
-    } catch (e) { console.error('❌ Supabase 请求异常:', e); }
+    } catch (e) { console.error('❌ 全局配置请求异常:', e); }
     return false;
 }
 
-/* ---------- 云端：向 Supabase 推送并保存全部配置 ---------- */
-async function saveAgentSettings() {
-    if (!USER_ID) { alert('请先登录后再保存设置！'); return; }
-    try {
-        const { error } = await supabaseClient.from('agent_settings').upsert({ 
-            id: USER_ID, agent_name: cfg.charName, agent_prompt: cfg.charPrompt,
-            api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
-            temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit)
-        });
-        if (error) console.error('❌ 保存到云端失败:', error.message);
-        else console.log('✅ 成功保存全部配置到云端!');
-    } catch (e) { console.error('❌ 保存请求异常:', e); }
-}
-
-/* ---------- 云端：保存消息（带强制重试和tokens） ---------- */
-async function saveMessageToCloud(msg) {
+/* ---------- 云端：保存全局配置 ---------- */
+async function saveGlobalSettings() {
     if (!USER_ID) return;
     try {
+        const { error } = await supabaseClient.from('agent_settings').upsert({ 
+            id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
+            temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
+            user_name: cfg.userName, user_prompt: cfg.userPrompt
+        });
+        if (error) console.error('❌ 保存全局配置失败:', error.message);
+    } catch (e) { console.error('❌ 保存全局配置异常:', e); }
+}
+
+/* ---------- 云端：加载会话列表 ---------- */
+async function loadConversations() {
+    if (!USER_ID) return [];
+    try {
+        const { data, error } = await supabaseClient
+            .from('conversations')
+            .select('id, agent_name, agent_prompt, greeting, created_at')
+            .eq('user_id', USER_ID)
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    } catch (e) { console.error('❌ 加载会话列表失败:', e); return []; }
+}
+
+/* ---------- 云端：创建新会话 ---------- */
+async function createConversation() {
+    if (!USER_ID) return null;
+    const defaultName = '新角色';
+    const defaultPrompt = '请在这里输入角色设定...';
+    const defaultGreeting = '你好，我是新角色。';
+    try {
+        const { data, error } = await supabaseClient.from('conversations').insert({
+            user_id: USER_ID, agent_name: defaultName, agent_prompt: defaultPrompt, greeting: defaultGreeting
+        }).select().single();
+        if (error) throw error;
+        return data;
+    } catch (e) { console.error('❌ 创建会话失败:', e); return null; }
+}
+
+/* ---------- 云端：保存会话的角色设定 ---------- */
+async function saveConversationSettings(convId, name, prompt, greet) {
+    if (!USER_ID || !convId) return;
+    try {
+        const { error } = await supabaseClient.from('conversations').update({
+            agent_name: name, agent_prompt: prompt, greeting: greet
+        }).eq('id', convId);
+        if (error) console.error('❌ 保存会话设定失败:', error.message);
+    } catch (e) { console.error('❌ 保存会话设定异常:', e); }
+}
+
+/* ---------- 云端：删除会话 ---------- */
+async function deleteConversation(convId) {
+    if (!USER_ID || !convId) return;
+    if (!confirm('确定要删除这个角色及所有聊天记录吗？')) return;
+    try {
+        await supabaseClient.from('conversations').delete().eq('id', convId);
+        // 注意：chat_messages 表有外键约束，删除会话会自动级联删除聊天记录
+        // 为了保险，手动删一次
+        await supabaseClient.from('chat_messages').delete().eq('conversation_id', convId);
+        // 从界面移除
+        const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
+        if (el) el.remove();
+        // 如果删的是当前会话，切换到第一个
+        if (currentConversationId === convId) {
+            const remaining = document.querySelectorAll('.conv-item');
+            if (remaining.length > 0) {
+                switchConversation(remaining[0].getAttribute('data-id'));
+            } else {
+                const newConv = await createConversation();
+                if (newConv) initUserData();
+            }
+        }
+    } catch (e) { console.error('❌ 删除会话异常:', e); }
+}
+
+/* ---------- 云端：消息读写（绑定 conversation_id） ---------- */
+async function saveMessageToCloud(msg) {
+    if (!USER_ID || !currentConversationId) return;
+    try {
         const payload = {
-            user_id: USER_ID, local_id: msg.local_id, role: msg.role, content: msg.content,
+            user_id: USER_ID, conversation_id: currentConversationId,
+            local_id: msg.local_id, role: msg.role, content: msg.content,
             versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null
         };
         const { error } = await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
@@ -437,22 +507,19 @@ async function saveMessageToCloud(msg) {
     } catch (e) { console.error('❌ 消息同步异常:', e); }
 }
 
-/* ---------- 云端：拉取历史记录（倒序拉取最近300条再反转） ---------- */
 async function loadMessagesFromCloud() {
-    if (!USER_ID) return [];
+    if (!USER_ID || !currentConversationId) return [];
     try {
         const { data, error } = await supabaseClient
             .from('chat_messages')
             .select('role, content, versions, current_version, local_id, tokens, created_at')
             .eq('user_id', USER_ID)
+            .eq('conversation_id', currentConversationId)
             .order('created_at', { ascending: false })
             .limit(300);
             
-        if (error) { console.warn('⚠️ 拉取云端聊天记录失败:', error.message); return []; }
-        
-        const reversed = data.reverse();
-        
-        return reversed.map(d => {
+        if (error) { console.warn('⚠️ 拉取聊天记录失败:', error.message); return []; }
+        return data.reverse().map(d => {
             const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId(), tokens: d.tokens || null };
             if (d.role === 'assistant') {
                 msg.versions = d.versions || [d.content];
@@ -460,7 +527,90 @@ async function loadMessagesFromCloud() {
             }
             return msg;
         });
-    } catch (e) { console.error('❌ 拉取云端聊天记录异常:', e); return []; }
+    } catch (e) { console.error('❌ 拉取聊天记录异常:', e); return []; }
+}
+
+/* ---------- 界面更新 ---------- */
+function updateGlobalUI() {
+  if ($('#apiBase')) $('#apiBase').value = cfg.apiBase || '';
+  if ($('#apiKey')) $('#apiKey').value = cfg.apiKey || '';
+  if ($('#model')) $('#model').value = cfg.model || '';
+  if ($('#temperature')) $('#temperature').value = cfg.temperature;
+  if ($('#maxTokens')) $('#maxTokens').value = cfg.maxTokens;
+  if ($('#ctxLimit')) $('#ctxLimit').value = cfg.ctxLimit;
+  if ($('#userName')) $('#userName').value = cfg.userName;
+  if ($('#userPrompt')) $('#userPrompt').value = cfg.userPrompt;
+  $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
+}
+
+function renderConversationList(convs) {
+    const container = $('#conversationListContainer');
+    container.innerHTML = '';
+    convs.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'conv-item' + (c.id === currentConversationId ? ' active' : '');
+        item.setAttribute('data-id', c.id);
+        item.innerHTML = `
+            <span class="conv-name">${escapeHtml(c.agent_name || '未命名')}</span>
+            <span class="conv-delete" data-id="${c.id}">✕</span>
+        `;
+        item.addEventListener('click', (e) => {
+            if (e.target.classList.contains('conv-delete')) return;
+            switchConversation(c.id);
+        });
+        item.querySelector('.conv-delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteConversation(c.id);
+        });
+        container.appendChild(item);
+    });
+}
+
+function updateCurrentConversationUI(conv) {
+    if (!conv) return;
+    $('#charName').value = conv.agent_name || '';
+    $('#charPrompt').value = conv.agent_prompt || '';
+    $('#greeting').value = conv.greeting || '';
+    $('#headName').textContent = conv.agent_name || '角色';
+    // 高亮当前会话
+    document.querySelectorAll('.conv-item').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-id') === conv.id);
+    });
+}
+
+/* ---------- 切换会话 ---------- */
+async function switchConversation(convId) {
+    if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
+    if (currentConversationId === convId) return;
+    
+    currentConversationId = convId;
+    const conv = { id: convId };
+    
+    // 临时从列表里拿名字
+    const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
+    if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
+    
+    // 重新渲染界面
+    updateCurrentConversationUI(conv);
+    
+    // 清空消息并重新拉取
+    msgs = [];
+    msgBox.innerHTML = '';
+    let cloudMsgs = await loadMessagesFromCloud();
+    if (cloudMsgs.length > 0) {
+        msgs = cloudMsgs;
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+    } else {
+        if (conv.greeting && conv.greeting.trim()) {
+            const aiMsg = { role: 'assistant', content: conv.greeting, versions: [conv.greeting], currentVersion: 0, local_id: generateId() };
+            msgs.push(aiMsg);
+            addBubble('assistant', conv.greeting, 0);
+            saveMessageToCloud(aiMsg);
+        } else {
+            msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">发送一条消息开始对话吧。</div>';
+        }
+    }
+    scrollBottom(true);
 }
 
 /* ---------- 文本处理 ---------- */
@@ -475,25 +625,19 @@ function renderContent(s){
   return h;
 }
 
-/* ---------- 表单初始化 ---------- */
+/* ---------- 表单初始化（仅绑定输入事件，防止全局配置被覆盖） ---------- */
 function initForm(){
   CFG_KEYS.forEach(k => {
     const el = document.getElementById(k);
     if(!el) return;
-    el.value = cfg[k];
-    const handler = () => {
+    el.addEventListener('input', () => {
       if(el.type === 'number' || el.type === 'range') cfg[k] = Number(el.value);
       else cfg[k] = el.value;
       if(k === 'temperature') $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
-      if(k === 'charName') updateHeadName();
       saveCfg();
-    };
-    el.addEventListener('input', handler);
-    el.addEventListener('change', handler);
+    });
   });
-  $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
 }
-function updateHeadName(){ $('#headName').textContent = cfg.charName || '角色'; }
 
 /* ---------- 消息渲染与版本控制 ---------- */
 const msgBox = $('#messages');
@@ -524,7 +668,7 @@ function addBubble(role, content, index = null, tokens = null){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
   if (index !== null) wrap.setAttribute('data-msg-index', index);
-  const name = role === 'user' ? (cfg.userName || '你') : (cfg.charName || '角色');
+  const name = role === 'user' ? (cfg.userName || '你') : ($('#charName').value || '角色');
   
   let actionsHtml = '';
   if (role === 'assistant') actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
@@ -567,9 +711,12 @@ function endpoint(){
 }
 
 function systemPrompt(){
+  const promptText = $('#charPrompt').value.trim();
+  const greetingText = $('#greeting').value.trim();
+  const charName = $('#charName').value.trim() || '角色';
   const parts = [];
   parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
-  parts.push('【你的角色】' + (cfg.charName || '角色') + (cfg.charPrompt ? '\n' + cfg.charPrompt : ''));
+  parts.push('【你的角色】' + charName + (promptText ? '\n' + promptText : ''));
   parts.push('【对话对象】' + (cfg.userName || '用户') + (cfg.userPrompt ? '\n' + cfg.userPrompt : ''));
   parts.push('动作、神态、环境描写用 *星号* 包裹。回复长度贴合语境，像真人聊天一样自然。');
   return parts.join('\n\n');
@@ -581,7 +728,7 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-/* ---------- 核心：AI 回复流式接收（边收边存） ---------- */
+/* ---------- 核心：流式接收 ---------- */
 async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   const payload = { 
       model: cfg.model, messages: buildMessages(contextMsgs), 
@@ -593,7 +740,7 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
     body: JSON.stringify(payload)
   });
   if(!res.ok){ const txt = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ' ' + res.statusText + (txt ? '\n' + txt.slice(0, 500) : '')); }
-  if(!res.body) throw new Error('该接口未返回可读流（可能不支持 stream）');
+  if(!res.body) throw new Error('该接口未返回可读流');
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder('utf-8');
@@ -615,18 +762,15 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
       const choice = json.choices && json.choices[0];
       if(!choice) continue;
       const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
-      if(delta) {
-        full += delta;
-        if (onProgress) onProgress(full);
-      }
+      if(delta) { full += delta; if (onProgress) onProgress(full); }
     }
   }
   return { full, usage };
 }
 
-/* ---------- 核心：普通发送消息 ---------- */
+/* ---------- 发送与生成 ---------- */
 async function send(){
-  if(busy) return;
+  if(busy || !currentConversationId) return;
   const input = $('#input');
   const text = input.value.trim();
   if(!text) return;
@@ -637,22 +781,16 @@ async function send(){
   addBubble('user', text, msgs.length - 1);
   saveHistoryLocal();
   await saveMessageToCloud(userMsg);
-  
-  const contextMsgs = msgs.slice(0, -1).concat(userMsg);
-  await generateAIResponse(contextMsgs);
+  await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
 }
 
-/* ---------- 核心：生成 AI 回复（流式过程中实时保存到云端） ---------- */
 async function generateAIResponse(contextMsgs) {
   busy = true; setBusyUI(true);
   const bubble = addBubble('assistant', '');
   const contentEl = bubble.querySelector('.content');
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  const aiMsg = { 
-      role: 'assistant', content: '', versions: [''], currentVersion: 0, 
-      local_id: generateId(), tokens: null 
-  };
+  const aiMsg = { role: 'assistant', content: '', versions: [''], currentVersion: 0, local_id: generateId(), tokens: null };
   msgs.push(aiMsg);
   const idx = msgs.length - 1;
   bubble.setAttribute('data-msg-index', idx);
@@ -661,26 +799,16 @@ async function generateAIResponse(contextMsgs) {
   await saveMessageToCloud(aiMsg);
 
   let lastCloudSave = 0;
-
   try {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
-        aiMsg.content = partialText;
-        aiMsg.versions = [partialText];
+        aiMsg.content = partialText; aiMsg.versions = [partialText];
         saveHistoryLocal();
-        
-        if (Date.now() - lastCloudSave > 1000) {
-            saveMessageToCloud(aiMsg);
-            lastCloudSave = Date.now();
-        }
+        if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(aiMsg); lastCloudSave = Date.now(); }
     });
-
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
-      aiMsg.content = full;
-      aiMsg.versions = [full];
-      aiMsg.tokens = usage;
-      
+      aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage;
       if (usage) {
           const tokenSpan = document.createElement('span');
           tokenSpan.className = 'token-display';
@@ -688,10 +816,9 @@ async function generateAIResponse(contextMsgs) {
           tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
           bubble.querySelector('.msg-actions').appendChild(tokenSpan);
       }
-    }else{
+    } else {
       contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
-      aiMsg.content = '（模型返回了空内容）';
-      aiMsg.versions = [aiMsg.content];
+      aiMsg.content = '（模型返回了空内容）'; aiMsg.versions = [aiMsg.content];
     }
   } catch(err) {
     contentEl.innerHTML = renderContent(aiMsg.content || '') + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
@@ -703,12 +830,10 @@ async function generateAIResponse(contextMsgs) {
   }
 }
 
-/* ---------- 核心：单条消息重新生成 ---------- */
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
-
   let userMsgContext = [];
   for (let i = index - 1; i >= 0; i--) {
     if (msgs[i].role === 'user') { userMsgContext = msgs.slice(0, i + 1); break; }
@@ -722,7 +847,6 @@ async function regenerateMessage(index) {
   contentEl.innerHTML = '<span class="cursor"></span>';
 
   let lastCloudSave = 0;
-
   try {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
@@ -731,19 +855,11 @@ async function regenerateMessage(index) {
         if (msg.versions.length === 0) msg.versions = [partialText];
         else msg.versions[msg.versions.length - 1] = partialText;
         saveHistoryLocal();
-        if (Date.now() - lastCloudSave > 1000) {
-            saveMessageToCloud(msg);
-            lastCloudSave = Date.now();
-        }
+        if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(msg); lastCloudSave = Date.now(); }
     });
-
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
-      msg.versions.push(full);
-      msg.currentVersion = msg.versions.length - 1;
-      msg.content = full;
-      msg.tokens = usage;
-
+      msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full; msg.tokens = usage;
       contentEl.innerHTML = renderContent(full);
       const oldToken = msgRow.querySelector('.token-display');
       if (oldToken) oldToken.remove();
@@ -755,26 +871,18 @@ async function regenerateMessage(index) {
           msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
       }
       updateVersionSwitcher(index, msg);
-    } else { 
-        contentEl.innerHTML = originalContent; 
-    }
+    } else { contentEl.innerHTML = originalContent; }
   } catch(e) {
     contentEl.innerHTML = originalContent + '<div class="err">重新生成失败：' + escapeHtml(e.message) + '</div>';
-  } finally { 
-    await saveMessageToCloud(msg);
-    busy = false; setBusyUI(false); saveHistoryLocal(); 
-  }
+  } finally { await saveMessageToCloud(msg); busy = false; setBusyUI(false); saveHistoryLocal(); }
 }
 
-/* ---------- 核心：切换版本 ---------- */
 function switchVersion(index, direction) {
   const msg = msgs[index];
   if (!msg || !msg.versions || msg.versions.length <= 1) return;
   let newVer = msg.currentVersion + direction;
   if (newVer < 0 || newVer >= msg.versions.length) return;
-  msg.currentVersion = newVer;
-  msg.content = msg.versions[newVer];
-
+  msg.currentVersion = newVer; msg.content = msg.versions[newVer];
   const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
   if (msgRow) {
     const contentEl = msgRow.querySelector('.content');
@@ -784,42 +892,34 @@ function switchVersion(index, direction) {
   saveHistoryLocal(); saveMessageToCloud(msg);
 }
 
-/* ---------- 核心：编辑用户消息并重发 ---------- */
 function editUserMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'user') return;
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
-
   msgs = msgs.slice(0, index + 1);
   msg.content = newContent;
   msgBox.innerHTML = '';
   msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
   saveHistoryLocal();
-  const contextMsgs = msgs.slice(0, index + 1);
-  generateAIResponse(contextMsgs);
+  generateAIResponse(msgs.slice(0, index + 1));
 }
 
-/* ---------- 核心：删除单条消息 ---------- */
 async function deleteMessage(index) {
     if (busy) return;
     if (!confirm('确定要删除这条消息吗？删除后无法恢复。')) return;
     const msg = msgs[index];
     if (!msg) return;
-
     msgs.splice(index, 1);
     msgBox.innerHTML = '';
     msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
     saveHistoryLocal();
-
     if (USER_ID && msg.local_id) {
-        const { error } = await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
-        if (error) console.error('❌ 云端删除失败:', error.message);
+        await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
     }
 }
 
-/* ---------- UI 状态 ---------- */
 function setBusyUI(b){
   const btn = $('#sendBtn');
   btn.textContent = b ? '停止' : '发送';
@@ -827,44 +927,6 @@ function setBusyUI(b){
   $('#newBtn').disabled = b;
 }
 
-/* ---------- 交互动作 ---------- */
-function newChat(){
-  if(busy) return;
-  msgs = []; msgBox.innerHTML = '';
-  if(cfg.greeting && cfg.greeting.trim()){
-    const aiMsg = { role: 'assistant', content: cfg.greeting, versions: [cfg.greeting], currentVersion: 0, local_id: generateId() };
-    msgs.push(aiMsg);
-    addBubble('assistant', cfg.greeting, 0);
-    saveMessageToCloud(aiMsg);
-  }else{
-    msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">在左侧设置好 API 与角色，然后开始对话吧。</div>';
-  }
-  saveHistoryLocal();
-}
-
-async function clearChat() {
-  if(!confirm('确定要清空所有聊天记录吗？此操作不可恢复。')) return;
-  msgs = []; msgBox.innerHTML = ''; saveHistoryLocal();
-  if (USER_ID) {
-    const { error } = await supabaseClient.from('chat_messages').delete().eq('user_id', USER_ID);
-    if (error) console.error('❌ 清空云端记录失败:', error.message);
-  }
-  newChat();
-}
-
-function exportChat(){
-  if(!msgs.length){ alert('还没有对话内容'); return; }
-  const nameOf = r => r === 'user' ? (cfg.userName || '我') : (cfg.charName || '角色');
-  const text = msgs.map(m => nameOf(m.role) + '：\n' + m.content).join('\n\n---\n\n');
-  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = (cfg.charName || 'chat') + '-' + new Date().toISOString().slice(0,10) + '.txt';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-}
-
-const inputEl = $('#input');
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
 /* ---------- 事件绑定 ---------- */
@@ -872,65 +934,69 @@ function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
-  $('#sendBtn').addEventListener('click', () => {
-    if(busy){ abortCtrl && abortCtrl.abort(); return; }
-    send();
-  });
+  $('#sendBtn').addEventListener('click', () => { if(busy){ abortCtrl && abortCtrl.abort(); return; } send(); });
   inputEl.addEventListener('input', autoResize);
   inputEl.addEventListener('keydown', e => {
     if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!busy) send(); }
   });
 
-  $('#newBtn').addEventListener('click', () => { if(msgs.length && !confirm('确定要清空当前对话，重新开始吗？')) return; newChat(); });
-  $('#exportBtn').addEventListener('click', exportChat);
-  $('#clearChatBtn').addEventListener('click', clearChat);
+  $('#newBtn').addEventListener('click', () => {
+    if (busy) { alert('请等待回复完成。'); return; }
+    if (msgs.length && !confirm('确定要清空当前对话，重新开始吗？')) return;
+    msgs = []; msgBox.innerHTML = '';
+    if ($('#greeting').value.trim()) {
+        const aiMsg = { role: 'assistant', content: $('#greeting').value.trim(), versions: [$('#greeting').value.trim()], currentVersion: 0, local_id: generateId() };
+        msgs.push(aiMsg);
+        addBubble('assistant', $('#greeting').value.trim(), 0);
+        saveMessageToCloud(aiMsg);
+    }
+  });
+  
+  $('#exportBtn').addEventListener('click', () => {
+      if(!msgs.length){ alert('还没有对话内容'); return; }
+      const nameOf = r => r === 'user' ? (cfg.userName || '我') : ($('#charName').value || '角色');
+      const text = msgs.map(m => nameOf(m.role) + '：\n' + m.content).join('\n\n---\n\n');
+      const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = ($('#charName').value || 'chat') + '-' + new Date().toISOString().slice(0,10) + '.txt';
+      a.click();
+  });
+  
+  $('#clearChatBtn').addEventListener('click', async () => {
+      if(!confirm('确定要清空当前会话的聊天记录吗？此操作不可恢复。')) return;
+      msgs = []; msgBox.innerHTML = ''; saveHistoryLocal();
+      if (USER_ID && currentConversationId) {
+        await supabaseClient.from('chat_messages').delete().eq('conversation_id', currentConversationId);
+      }
+  });
+
   $('#menuBtn').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
 
-  // ====== 获取模型列表功能 ======
+  // 获取模型列表
   $('#fetchModelsBtn').addEventListener('click', async () => {
     const btn = $('#fetchModelsBtn');
     const modelListContainer = $('#modelListContainer');
     const apiBase = $('#apiBase').value.trim();
     const apiKey = $('#apiKey').value.trim();
-
-    if (!apiBase) {
-      alert('请先填写 API 地址！');
-      return;
-    }
-
+    if (!apiBase) { alert('请先填写 API 地址！'); return; }
     let baseUrl = apiBase.replace(/\/+$/, '');
-    if (baseUrl.endsWith('/chat/completions')) {
-      baseUrl = baseUrl.replace('/chat/completions', '');
-    }
-    if (!baseUrl.endsWith('/v1')) {
-        baseUrl += '/v1';
-    }
+    if (baseUrl.endsWith('/chat/completions')) baseUrl = baseUrl.replace('/chat/completions', '');
+    if (!baseUrl.endsWith('/v1')) baseUrl += '/v1';
     const modelsUrl = baseUrl + '/models';
-
-    btn.textContent = '获取中...';
-    btn.disabled = true;
-    modelListContainer.style.display = 'none';
-    modelListContainer.innerHTML = '';
-
+    btn.textContent = '获取中...'; btn.disabled = true;
+    modelListContainer.style.display = 'none'; modelListContainer.innerHTML = '';
     try {
-      const res = await fetch(modelsUrl, {
-        method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + apiKey }
-      });
-
+      const res = await fetch(modelsUrl, { method: 'GET', headers: { 'Authorization': 'Bearer ' + apiKey } });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-
       const data = await res.json();
       const models = Array.isArray(data) ? data : (data.data || []);
-      
       if (models.length === 0) {
-        modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">未找到任何模型，请检查API地址或密钥。</div>';
-        modelListContainer.style.display = 'block';
-        return;
+        modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">未找到任何模型。</div>';
+        modelListContainer.style.display = 'block'; return;
       }
-
       models.forEach(m => {
         const modelId = m.id || m.model || m.name || String(m);
         const item = document.createElement('div');
@@ -938,38 +1004,60 @@ function bindEvents(){
         item.style.cssText = 'padding:6px 10px; font-size:13px; cursor:pointer; border-radius:4px;';
         item.onmouseover = () => item.style.background = 'var(--border)';
         item.onmouseout = () => item.style.background = 'transparent';
-        item.onclick = () => {
-          $('#model').value = modelId;
-          cfg.model = modelId;
-          saveCfg();
-          modelListContainer.style.display = 'none';
-        };
+        item.onclick = () => { $('#model').value = modelId; cfg.model = modelId; saveCfg(); modelListContainer.style.display = 'none'; };
         modelListContainer.appendChild(item);
       });
-
       modelListContainer.style.display = 'block';
-
     } catch (e) {
-      console.error('获取模型失败:', e);
-      modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">获取失败，请检查 API 地址、密钥，或确认该 API 是否允许跨域请求。<br><br>错误详情：' + e.message + '</div>';
+      modelListContainer.innerHTML = '<div style="padding:8px; font-size:12px; color:#ff8080;">获取失败：' + e.message + '</div>';
       modelListContainer.style.display = 'block';
-    } finally {
-      btn.textContent = '获取';
-      btn.disabled = false;
-    }
+    } finally { btn.textContent = '获取'; btn.disabled = false; }
   });
 
+  // 保存全局配置和当前角色设定
   $('#applyBtn').addEventListener('click', async () => {
-    updateHeadName(); saveCfg(); await saveAgentSettings(); 
-    document.querySelectorAll('.msg.assistant .meta').forEach(el => { el.textContent = cfg.charName || '角色'; });
-    document.querySelectorAll('.msg.user .meta').forEach(el => { el.textContent = cfg.userName || '你'; });
+    // 保存当前角色设定到数据库
+    const charName = $('#charName').value.trim() || '新角色';
+    const charPrompt = $('#charPrompt').value.trim();
+    const greeting = $('#greeting').value.trim();
+    $('#headName').textContent = charName;
+    await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
+    
+    // 更新本地会话列表显示
+    const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
+    if (el) el.textContent = charName;
+    
+    // 保存全局设置
+    saveCfg(); await saveGlobalSettings();
+    
+    // 更新消息名字显示
+    document.querySelectorAll('.msg.assistant .meta').forEach(el => { el.textContent = charName; });
+    
     document.body.classList.remove('side-open');
-    alert('设定已保存！AI将继续基于新设定和当前记录回复。');
+    alert('设定已保存！');
   });
 
   $('#logoutBtn').addEventListener('click', async () => {
     if(!confirm('确定要退出登录吗？')) return;
     await supabaseClient.auth.signOut(); window.location.reload();
+  });
+
+  // 新建会话
+  $('#newConvBtn').addEventListener('click', async () => {
+    if (busy) { alert('请等待当前回复完成。'); return; }
+    const newConv = await createConversation();
+    if (newConv) {
+      currentConversationId = newConv.id;
+      const convs = await loadConversations();
+      renderConversationList(convs);
+      updateCurrentConversationUI(newConv);
+      msgs = []; msgBox.innerHTML = '';
+      if (newConv.greeting) {
+          const aiMsg = { role: 'assistant', content: newConv.greeting, versions: [newConv.greeting], currentVersion: 0, local_id: generateId() };
+          msgs.push(aiMsg); addBubble('assistant', newConv.greeting, 0); saveMessageToCloud(aiMsg);
+      }
+      document.body.classList.remove('side-open');
+    }
   });
 
   msgBox.addEventListener('click', async (e) => {
@@ -981,10 +1069,8 @@ function bindEvents(){
   });
 }
 
-/* ---------- 登录/注册 UI 逻辑 ---------- */
+/* ---------- 登录/注册 ---------- */
 const authOverlay = $('#auth-overlay');
-const authTitle = $('#auth-title');
-const authSubtitle = $('#auth-subtitle');
 const authEmail = $('#auth-email');
 const authPassword = $('#auth-password');
 const authLoginBtn = $('#auth-login-btn');
@@ -994,8 +1080,8 @@ let isRegisterMode = false;
 
 function toggleAuthMode() {
   isRegisterMode = !isRegisterMode;
-  authTitle.textContent = isRegisterMode ? '创建账号' : '欢迎回来';
-  authSubtitle.textContent = isRegisterMode ? '注册一个新账号开始使用' : '登录以同步您的角色与聊天记录';
+  $('#auth-title').textContent = isRegisterMode ? '创建账号' : '欢迎回来';
+  $('#auth-subtitle').textContent = isRegisterMode ? '注册一个新账号开始使用' : '登录以同步您的角色与聊天记录';
   authLoginBtn.textContent = isRegisterMode ? '注册' : '登录';
   authRegisterBtn.textContent = isRegisterMode ? '已有账号？点击登录' : '没有账号？点击注册';
   authMsg.textContent = '';
@@ -1008,9 +1094,7 @@ async function handleAuthAction() {
   if (password.length < 6) { authMsg.textContent = '密码至少需要6位'; authMsg.className = 'auth-msg error'; return; }
   authLoginBtn.disabled = true; authMsg.textContent = '处理中...'; authMsg.className = 'auth-msg';
   try {
-    let result;
-    if (isRegisterMode) result = await supabaseClient.auth.signUp({ email, password });
-    else result = await supabaseClient.auth.signInWithPassword({ email, password });
+    let result = isRegisterMode ? await supabaseClient.auth.signUp({ email, password }) : await supabaseClient.auth.signInWithPassword({ email, password });
     if (result.error) { authMsg.textContent = result.error.message; authMsg.className = 'auth-msg error'; }
     else {
       if (isRegisterMode) {
@@ -1018,7 +1102,7 @@ async function handleAuthAction() {
         if (result.data.session) window.location.reload(); else toggleAuthMode();
       } else window.location.reload();
     }
-  } catch (e) { authMsg.textContent = '网络错误，请重试'; authMsg.className = 'auth-msg error'; }
+  } catch (e) { authMsg.textContent = '网络错误'; authMsg.className = 'auth-msg error'; }
   finally { authLoginBtn.disabled = false; }
 }
 authLoginBtn.addEventListener('click', handleAuthAction);
@@ -1029,13 +1113,11 @@ async function init() {
     if (session && session.user) {
       USER_ID = session.user.id;
       authOverlay.classList.add('hidden');
-      console.log('✅ 用户已登录:', USER_ID);
       loadUserData();
     } else {
-      USER_ID = null; authOverlay.classList.remove('hidden'); console.log('⛔ 用户未登录');
+      USER_ID = null; authOverlay.classList.remove('hidden');
     }
   });
-
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) authOverlay.classList.remove('hidden');
   else { USER_ID = session.user.id; authOverlay.classList.add('hidden'); loadUserData(); }
@@ -1044,30 +1126,31 @@ async function init() {
 async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
-  msgs = []; msgBox.innerHTML = '';
-  cfg = loadCfg(); initForm(); bindEvents();
-  await fetchAgentSettings();
-
-  let cloudMsgs = await loadMessagesFromCloud();
-  if (cloudMsgs.length > 0) {
-    msgs = cloudMsgs;
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-    saveHistoryLocal();
-  } else {
-    let restored = false;
-    try{
-      const raw = localStorage.getItem('rp_history_' + USER_ID);
-      if(raw){
-        const arr = JSON.parse(raw);
-        if(Array.isArray(arr) && arr.length){
-          msgs = arr; msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-          restored = true;
-          for (let m of arr) await saveMessageToCloud(m);
-        }
-      }
-    }catch(e){}
-    if(!restored) newChat();
+  
+  cfg = loadCfg(); 
+  initForm(); 
+  bindEvents();
+  
+  // 1. 拉取全局 API 配置
+  await fetchGlobalSettings();
+  
+  // 2. 拉取会话列表
+  let convs = await loadConversations();
+  if (convs.length === 0) {
+      // 新用户，创建一个默认会话
+      const newConv = await createConversation();
+      if (newConv) convs = [newConv];
   }
+  
+  renderConversationList(convs);
+  
+  // 3. 默认选中第一个会话
+  if (convs.length > 0) {
+      currentConversationId = convs[0].id;
+      updateCurrentConversationUI(convs[0]);
+      await switchConversation(currentConversationId);
+  }
+  
   autoResize(); scrollBottom(true);
 }
 init();
