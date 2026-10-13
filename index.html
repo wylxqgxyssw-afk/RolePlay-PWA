@@ -454,7 +454,18 @@ async function loadConversations() {
         updateCloudStatusUI(true); return data || [];
     } catch (e) { console.error('❌ 加载会话列表失败:', e); updateCloudStatusUI(false); return []; }
 }
-
+async function saveGlobalSettings() {
+    if (!USER_ID) return;
+    try {
+        const { error } = await supabaseClient.from('agent_settings').upsert({ 
+            id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
+            temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
+            user_name: cfg.userName, user_prompt: cfg.userPrompt
+        });
+        if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
+        else updateCloudStatusUI(true);
+    } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
+}
 async function createConversation() {
     if (!USER_ID) return null;
     try {
