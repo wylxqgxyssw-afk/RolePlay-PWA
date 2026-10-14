@@ -723,7 +723,11 @@ async function generateAIResponse(contextMsgs) {
   try {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
-        aiMsg.content = partialText; aiMsg.versions = [partialText];
+               if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+            saveMessageToCloud(aiMsg);
+            lastCloudSave = Date.now();
+            aiMsg.lastSavedLength = partialText.length;
+        }
         if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(aiMsg); lastCloudSave = Date.now(); }
     });
     if(full.trim()){
