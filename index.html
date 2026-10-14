@@ -1039,26 +1039,27 @@ authLoginBtn.addEventListener('click', handleAuthAction);
 
 /* ---------- 启动逻辑与热更新 ---------- */
 async function init() {
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (session && session.user) {
-      USER_ID = session.user.id; authOverlay.classList.add('hidden'); loadUserData();
-    } else { USER_ID = null; authOverlay.classList.remove('hidden'); }
-  });
+  // 1. 先获取 Session，确保 Supabase SDK 内部环境与 JWT 令牌完全就绪
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) authOverlay.classList.remove('hidden');
-  else { USER_ID = session.user.id; authOverlay.classList.add('hidden'); loadUserData(); }
-}
-/* ---------- 【修复】表单初始化：绑定左侧全局设置的输入事件 ---------- */
-function initForm(){
-  CFG_KEYS.forEach(k => {
-    const el = document.getElementById(k);
-    if(!el) return;
-    el.addEventListener('input', () => {
-      if(el.type === 'number' || el.type === 'range') cfg[k] = Number(el.value);
-      else cfg[k] = el.value;
-      if(k === 'temperature') $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
-      saveCfg();
-    });
+  if (!session) {
+    authOverlay.classList.remove('hidden');
+  } else {
+    USER_ID = session.user.id;
+    authOverlay.classList.add('hidden');
+    await loadUserData(); 
+  }
+
+  // 2. 监听后续的登录/登出事件（防止初始挂载时双重触发）
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      USER_ID = null;
+      currentLoadedUserId = null;
+      authOverlay.classList.remove('hidden');
+    } else if (event === 'SIGNED_IN' && session && session.user && USER_ID !== session.user.id) {
+      USER_ID = session.user.id;
+      authOverlay.classList.add('hidden');
+      loadUserData();
+    }
   });
 }
 async function loadUserData() {
