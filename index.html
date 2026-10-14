@@ -1065,10 +1065,11 @@ async function loadUserData() {
   if (convs.length === 0) { const newConv = await createConversation(); if (newConv) convs = [newConv]; }
   renderConversationList(convs);
   if (convs.length > 0) { 
-      // 【核心修复】只更新 UI，绝对不要在 switchConversation 之前设置 currentConversationId！
       updateCurrentConversationUI(convs[0]); 
       msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
-      await switchConversation(convs[0].id); // 把 ID 传给函数，由函数内部去赋值
+      // 【核心修复】延迟 500ms 再执行，等待 Supabase 认证令牌完全加载，防止首次加载返回空数据
+      await new Promise(r => setTimeout(r, 500));
+      await switchConversation(convs[0].id); 
   }
   autoResize(); scrollBottom(true);
 }
