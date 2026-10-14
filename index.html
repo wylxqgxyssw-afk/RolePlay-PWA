@@ -1061,12 +1061,24 @@ navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
 });
 
+let refreshing = false;
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw-chat.js').then(reg => {
+      // 【新增】每分钟主动检查一次更新，确保弹窗能及时触发
+      setInterval(() => { reg.update(); }, 60000); 
+
+      // 监听更新
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
+          // 当新版本安装完成，且存在旧的 controller 时，说明是版本更新
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
             showUpdateToast(newWorker);
           }
@@ -1076,6 +1088,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+function showUpdateToast(worker) {
+    const toast = $('#update-toast');
+    toast.style.display = 'flex';
+    $('#update-confirm-btn').onclick = () => {
+        toast.style.display = 'none';
+        // 告诉 SW 跳过等待，立即激活新版本
+        worker.postMessage({ action: 'skipWaiting' });
+    };
+}
 function showUpdateToast(worker) {
     const toast = $('#update-toast');
     toast.style.display = 'flex';
