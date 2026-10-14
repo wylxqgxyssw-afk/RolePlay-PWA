@@ -582,11 +582,14 @@ function updateCurrentConversationUI(conv) {
     document.querySelectorAll('.conv-item').forEach(el => { el.classList.toggle('active', el.getAttribute('data-id') === conv.id); });
 }
 
-/* ---------- 切换会话 ---------- */
+/* ---------- 切换会话（修复空白问题） ---------- */
+let isFetchingMessages = false;
 async function switchConversation(convId) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
     if (currentConversationId === convId) return;
+    if (isFetchingMessages) return; // 防止并发拉取冲突
     
+    isFetchingMessages = true;
     currentConversationId = convId;
     const conv = { id: convId };
     const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
@@ -594,20 +597,27 @@ async function switchConversation(convId) {
     
     updateCurrentConversationUI(conv);
     
-    msgs = []; msgBox.innerHTML = '';
+    // 【关键修复】不清空界面，而是加上“加载中”提示
+    msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在加载聊天记录...</div>';
+    
     let cloudMsgs = await loadMessagesFromCloud();
     if (cloudMsgs.length > 0) {
         msgs = cloudMsgs;
+        msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
     } else {
-        const greetingText = $('#modalGreeting').value.trim(); // 从弹窗读取（如果有）
+        msgBox.innerHTML = '';
+        const greetingText = $('#modalGreeting').value.trim();
         if (greetingText) {
             const aiMsg = { role: 'assistant', content: greetingText, versions: [greetingText], currentVersion: 0, local_id: generateId() };
-            msgs.push(aiMsg); addBubble('assistant', greetingText, 0); saveMessageToCloud(aiMsg);
+            msgs = [aiMsg]; 
+            addBubble('assistant', greetingText, 0); 
+            await saveMessageToCloud(aiMsg);
         } else {
             msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">发送一条消息开始对话吧。</div>';
         }
     }
+    isFetchingMessages = false;
     scrollBottom(true);
 }
 
