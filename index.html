@@ -769,7 +769,11 @@ async function regenerateMessage(index) {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
         msg.content = partialText; msg.versions = msg.versions || [msg.content];
-        if (msg.versions.length === 0) msg.versions = [partialText]; else msg.versions[msg.versions.length - 1] = partialText;
+               if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+            saveMessageToCloud(msg);
+            lastCloudSave = Date.now();
+            msg.lastSavedLength = partialText.length;
+        }
         if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(msg); lastCloudSave = Date.now(); }
     });
     if (full.trim()) {
