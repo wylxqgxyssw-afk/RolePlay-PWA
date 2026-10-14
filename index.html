@@ -512,7 +512,43 @@ async function loadMessagesFromCloud() {
         });
     } catch (e) { console.error('❌ 拉取聊天记录异常:', e); updateCloudStatusUI(false); return []; }
 }
+/* ---------- 刷新当前聊天界面的函数 ---------- */
+async function refreshCurrentChat() {
+    if (busy || !currentConversationId) return; // 如果正在打字，先不打断
+    const cloudMsgs = await loadMessagesFromCloud();
+    // 如果云端记录比本地多或相等，则覆盖渲染
+    if (cloudMsgs.length >= msgs.length) {
+        msgs = cloudMsgs;
+        msgBox.innerHTML = '';
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+        scrollBottom(true);
+    }
+}
 
+/* ---------- 建立 Realtime 实时监听 ---------- */
+let realtimeChannel = null;
+function setupRealtimeListener() {
+    if (!USER_ID) return;
+    // 如果之前有监听，先移除
+    if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+
+    realtimeChannel = supabaseClient
+        .channel('public:chat_messages')
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${USER_ID}` }, 
+            (payload) => {
+                // 只有当手机端发来的新消息属于当前电脑端正在看的会话时，才去刷新
+                if (payload.new && payload.new.conversation_id === currentConversationId) {
+                    refreshCurrentChat();
+                }
+            }
+        )
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('📡 实时同步已开启');
+            }
+        });
+}
 /* ---------- UI 更新函数 ---------- */
 function updateGlobalUI() {
   if ($('#apiBase')) $('#apiBase').value = cfg.apiBase || '';
