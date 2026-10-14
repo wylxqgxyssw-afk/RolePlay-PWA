@@ -1058,7 +1058,12 @@ async function loadUserData() {
   let convs = await loadConversations();
   if (convs.length === 0) { const newConv = await createConversation(); if (newConv) convs = [newConv]; }
   renderConversationList(convs);
-  if (convs.length > 0) { currentConversationId = convs[0].id; updateCurrentConversationUI(convs[0]); await switchConversation(currentConversationId); }
+  if (convs.length > 0) { 
+      currentConversationId = convs[0].id; 
+      updateCurrentConversationUI(convs[0]); 
+      msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
+      await switchConversation(currentConversationId); 
+  }
   autoResize(); scrollBottom(true);
 }
 init();
