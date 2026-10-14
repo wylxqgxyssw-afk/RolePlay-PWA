@@ -1061,7 +1061,7 @@ navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
 });
 
-let refreshing = false;
+
 navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     refreshing = true;
