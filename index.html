@@ -586,11 +586,13 @@ function updateCurrentConversationUI(conv) {
 let currentFetchId = 0;
 async function switchConversation(convId) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
-    // 如果 ID 相同且已经有消息了，才跳过；如果 ID 相同但没有消息（首次进入），必须继续加载！
-    if (currentConversationId === convId && msgs.length > 0) return; 
     
     const fetchId = ++currentFetchId;
     currentConversationId = convId; 
+    
+    // 【核心修复】切换会话时，必须清空本地消息，防止旧数据干扰与误判！
+    msgs = []; 
+    
     const conv = { id: convId };
     const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
     if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
@@ -601,7 +603,7 @@ async function switchConversation(convId) {
     try {
         let cloudMsgs = await loadMessagesFromCloud();
         
-        // 【核心修复】如果用户已经切换到了其他会话，忽略此请求的结果，防止界面错乱
+        // 如果用户已切换至其他会话，则忽略本次请求结果
         if (fetchId !== currentFetchId) return;
         
         if (cloudMsgs.length > 0) {
@@ -609,6 +611,7 @@ async function switchConversation(convId) {
             msgBox.innerHTML = '';
             msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
         } else {
+            // 真·新会话，才写入开场白
             msgBox.innerHTML = '';
             const greetingText = $('#modalGreeting').value.trim();
             if (greetingText) {
