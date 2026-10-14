@@ -1054,56 +1054,36 @@ async function loadUserData() {
 init();
 
 /* ---------- 热更新机制 ---------- */
+/* ---------- 热更新机制（修复双重监听与死锁） ---------- */
 let refreshing = false;
 navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     refreshing = true;
-    window.location.reload();
-});
-
-
-navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.location.reload();
+    // 延迟 300ms 再刷新，给 SW 缓存留出缓冲时间，避免瞬间死锁
+    setTimeout(() => { window.location.reload(); }, 300);
 });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw-chat.js').then(reg => {
-      // 【新增】每分钟主动检查一次更新，确保弹窗能及时触发
-      setInterval(() => { reg.update(); }, 60000); 
+      // 每 5 分钟检查一次更新，避免频繁请求
+      setInterval(() => { reg.update(); }, 300000); 
 
-      // 监听更新
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
-          // 当新版本安装完成，且存在旧的 controller 时，说明是版本更新
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateToast(newWorker);
+            const toast = $('#update-toast');
+            toast.style.display = 'flex';
+            $('#update-confirm-btn').onclick = () => {
+                toast.style.display = 'none';
+                newWorker.postMessage({ action: 'skipWaiting' });
+            };
           }
         });
       });
     }).catch(err => console.log('SW 注册失败:', err));
   });
-}
-
-function showUpdateToast(worker) {
-    const toast = $('#update-toast');
-    toast.style.display = 'flex';
-    $('#update-confirm-btn').onclick = () => {
-        toast.style.display = 'none';
-        // 告诉 SW 跳过等待，立即激活新版本
-        worker.postMessage({ action: 'skipWaiting' });
-    };
-}
-function showUpdateToast(worker) {
-    const toast = $('#update-toast');
-    toast.style.display = 'flex';
-    $('#update-confirm-btn').onclick = () => {
-        toast.style.display = 'none';
-        worker.postMessage({ action: 'skipWaiting' });
-    };
 }
 </script>
 </body>
