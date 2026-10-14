@@ -1059,14 +1059,13 @@ async function loadUserData() {
   if (convs.length === 0) { const newConv = await createConversation(); if (newConv) convs = [newConv]; }
   renderConversationList(convs);
   if (convs.length > 0) { 
-      currentConversationId = convs[0].id; 
+      // 【核心修复】只更新 UI，绝对不要在 switchConversation 之前设置 currentConversationId！
       updateCurrentConversationUI(convs[0]); 
       msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
-      await switchConversation(currentConversationId); 
+      await switchConversation(convs[0].id); // 把 ID 传给函数，由函数内部去赋值
   }
   autoResize(); scrollBottom(true);
 }
-init();
 
 /* ---------- 热更新机制 ---------- */
 /* ---------- 热更新机制（修复双重监听与死锁） ---------- */
