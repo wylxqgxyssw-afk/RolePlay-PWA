@@ -353,7 +353,7 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;',
 function renderContent(s){
   let h = escapeHtml(s || '');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // h = h.replace(/\*(.+?)\*/g, '<em>$1</em>'); // 【已删除】不再让星号动作变色
   h = h.replace(/\n/g, '<br>');
   return h;
 }
