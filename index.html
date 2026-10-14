@@ -816,8 +816,10 @@ async function deleteMessage(index) {
 }
 
 function setBusyUI(b){
-  const btn = $('#sendBtn'); btn.textContent = b ? '停止' : '发送';
-  btn.classList.toggle('stop', b); $('#newBtn').disabled = b;
+  const btn = $('#sendBtn');
+  btn.textContent = b ? '停止' : '发送';
+  btn.classList.toggle('stop', b);
+  $('#newBtn').disabled = b;
 }
 
 /* ---------- 事件绑定与热更新机制 ---------- */
