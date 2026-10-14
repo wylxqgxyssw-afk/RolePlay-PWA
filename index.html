@@ -983,7 +983,19 @@ async function init() {
   if (!session) authOverlay.classList.remove('hidden');
   else { USER_ID = session.user.id; authOverlay.classList.add('hidden'); loadUserData(); }
 }
-
+/* ---------- 【修复】表单初始化：绑定左侧全局设置的输入事件 ---------- */
+function initForm(){
+  CFG_KEYS.forEach(k => {
+    const el = document.getElementById(k);
+    if(!el) return;
+    el.addEventListener('input', () => {
+      if(el.type === 'number' || el.type === 'range') cfg[k] = Number(el.value);
+      else cfg[k] = el.value;
+      if(k === 'temperature') $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
+      saveCfg();
+    });
+  });
+}
 async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
