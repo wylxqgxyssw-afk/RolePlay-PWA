@@ -1073,8 +1073,7 @@ async function loadUserData() {
   if (convs.length > 0) { 
       updateCurrentConversationUI(convs[0]); 
       msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
-      // 【核心修复】延迟 500ms 再执行，等待 Supabase 认证令牌完全加载，防止首次加载返回空数据
-      await new Promise(r => setTimeout(r, 500));
+      // 无需延迟，因为 init() 中已经通过 getSession() 确保令牌就绪
       await switchConversation(convs[0].id); 
   }
   autoResize(); scrollBottom(true);
