@@ -180,7 +180,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </head>
 <body>
 
-<!-- 【新增】错误监控面板 -->
+<!-- 错误监控面板 -->
 <div id="debug-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:#000; color:#ff8080; padding:20px; overflow:auto; font-family:monospace; white-space:pre-wrap; font-size:14px;"></div>
 <script>
   window.onerror = function(message, source, lineno, colno, error) {
@@ -212,7 +212,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="icon-btn" id="closeSide" title="关闭">✕</button>
     </div>
     
-    <!-- 云端连接状态指示器 -->
     <div id="cloud-status-bar" class="online">
         <span class="status-dot"></span>
         <span id="cloud-status-text">云端已连接</span>
@@ -289,7 +288,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </main>
 </div>
 
-<!-- 【新增】角色设定弹窗 -->
 <div id="char-settings-modal">
     <div class="char-settings-card">
         <h3>🎭 角色设定（仅对当前对话生效）</h3>
@@ -312,7 +310,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     </div>
 </div>
 
-<!-- 热更新提示框 -->
 <div id="update-toast">
     <span>✨ 发现新版本，是否更新？</span>
     <button id="update-confirm-btn">立即更新</button>
@@ -332,6 +329,8 @@ const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
 let currentConversationId = null;
+let currentConversation = null;   // 当前会话完整对象
+let conversationsCache = [];      // 会话列表缓存
 let cfg = {};
 let msgs = [];
 let busy = false;
@@ -345,7 +344,6 @@ const DEFAULTS = {
   apiBase: '', apiKey: '', model: '', temperature: 0.85, maxTokens: 1024, ctxLimit: 30,
   userName: '旅人', userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
 };
-const CFG_KEYS = ['apiBase','apiKey','model','temperature','maxTokens','ctxLimit','userName','userPrompt'];
 
 /* ---------- 工具函数 ---------- */
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
@@ -353,7 +351,6 @@ function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;',
 function renderContent(s){
   let h = escapeHtml(s || '');
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // h = h.replace(/\*(.+?)\*/g, '<em>$1</em>'); // 【已删除】不再让星号动作变色
   h = h.replace(/\n/g, '<br>');
   return h;
 }
@@ -363,6 +360,7 @@ function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Mat
 function updateCloudStatusUI(isOnline) {
     const bar = $('#cloud-status-bar');
     const text = $('#cloud-status-text');
+    if (!bar || !text) return;
     if (isOnline) { bar.className = 'online'; text.textContent = '云端已连接'; }
     else { bar.className = 'offline'; text.textContent = '云端未连接，数据可能无法同步'; }
 }
@@ -392,7 +390,7 @@ function saveCfg(){
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
 
-/* ---------- 云端：全局配置读写（带防崩溃降级） ---------- */
+/* ---------- 云端：全局配置读写 ---------- */
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
@@ -402,12 +400,11 @@ async function fetchGlobalSettings() {
             .eq('id', USER_ID).maybeSingle();
 
         if (error) {
-            console.warn('⚠️ 全局配置拉取失败，将使用本地默认配置:', error.message);
+            console.warn('⚠️ 全局配置拉取失败:', error.message);
             updateCloudStatusUI(false); updateGlobalUI(); return false;
         }
 
         if (data) {
-            console.log('✅ 成功从 Supabase 获取全局配置');
             if (data.api_base) cfg.apiBase = data.api_base;
             if (data.api_key) cfg.apiKey = data.api_key;
             if (data.model) cfg.model = data.model;
@@ -448,7 +445,10 @@ async function saveGlobalSettings() {
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
-        const { data, error } = await supabaseClient.from('conversations').select('id, agent_name, agent_prompt, greeting, created_at').eq('user_id', USER_ID).order('created_at', { ascending: false });
+        const { data, error } = await supabaseClient.from('conversations')
+            .select('id, agent_name, agent_prompt, greeting, created_at')
+            .eq('user_id', USER_ID)
+            .order('created_at', { ascending: false });
         if (error) throw error;
         updateCloudStatusUI(true); return data || [];
     } catch (e) { console.error('❌ 加载会话列表失败:', e); updateCloudStatusUI(false); return []; }
@@ -467,8 +467,18 @@ async function createConversation() {
 async function saveConversationSettings(convId, name, prompt, greet) {
     if (!USER_ID || !convId) return;
     try {
-        const { error } = await supabaseClient.from('conversations').update({ agent_name: name, agent_prompt: prompt, greeting: greet }).eq('id', convId);
+        const { error } = await supabaseClient.from('conversations')
+            .update({ agent_name: name, agent_prompt: prompt, greeting: greet })
+            .eq('id', convId);
         if (error) console.error('❌ 保存会话设定失败:', error.message);
+        // 同步缓存
+        const c = conversationsCache.find(x => x.id === convId);
+        if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; }
+        if (currentConversation && currentConversation.id === convId) {
+            currentConversation.agent_name = name;
+            currentConversation.agent_prompt = prompt;
+            currentConversation.greeting = greet;
+        }
     } catch (e) { console.error('❌ 保存会话设定异常:', e); }
 }
 
@@ -478,12 +488,23 @@ async function deleteConversation(convId) {
     try {
         await supabaseClient.from('conversations').delete().eq('id', convId);
         await supabaseClient.from('chat_messages').delete().eq('conversation_id', convId);
+        conversationsCache = conversationsCache.filter(c => c.id !== convId);
         const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
         if (el) el.remove();
         if (currentConversationId === convId) {
-            const remaining = document.querySelectorAll('.conv-item');
-            if (remaining.length > 0) switchConversation(remaining[0].getAttribute('data-id'));
-            else { const newConv = await createConversation(); if (newConv) initUserData(); }
+            const remaining = await loadConversations();
+            conversationsCache = remaining;
+            renderConversationList(remaining);
+            if (remaining.length > 0) {
+                switchConversation(remaining[0].id, remaining[0]);
+            } else {
+                const newConv = await createConversation();
+                if (newConv) {
+                    conversationsCache = [newConv];
+                    renderConversationList([newConv]);
+                    switchConversation(newConv.id, newConv);
+                }
+            }
         }
     } catch (e) { console.error('❌ 删除会话异常:', e); updateCloudStatusUI(false); }
 }
@@ -494,33 +515,44 @@ async function saveMessageToCloud(msg) {
     try {
         const payload = { user_id: USER_ID, conversation_id: currentConversationId, local_id: msg.local_id, role: msg.role, content: msg.content, versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null };
         const { error } = await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
-        if (error) { console.error('❌ 消息同步到云端失败:', error.message); updateCloudStatusUI(false); }
+        if (error) { console.error('❌ 消息同步失败:', error.message); updateCloudStatusUI(false); }
         else updateCloudStatusUI(true);
     } catch (e) { console.error('❌ 消息同步异常:', e); updateCloudStatusUI(false); }
 }
 
+/* ---------- 关键修复：失败要抛错，不再静默返回 [] ---------- */
 async function loadMessagesFromCloud() {
     if (!USER_ID || !currentConversationId) return [];
-    try {
-        const { data, error } = await supabaseClient.from('chat_messages').select('role, content, versions, current_version, local_id, tokens, created_at').eq('user_id', USER_ID).eq('conversation_id', currentConversationId).order('created_at', { ascending: false }).limit(300);
-        if (error) { console.warn('⚠️ 拉取聊天记录失败:', error.message); updateCloudStatusUI(false); return []; }
-        return data.reverse().map(d => {
-            const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId(), tokens: d.tokens || null };
-            if (d.role === 'assistant') { msg.versions = d.versions || [d.content]; msg.currentVersion = d.current_version || 0; }
-            return msg;
-        });
-    } catch (e) { console.error('❌ 拉取聊天记录异常:', e); updateCloudStatusUI(false); return []; }
+    const { data, error } = await supabaseClient.from('chat_messages')
+        .select('role, content, versions, current_version, local_id, tokens, created_at')
+        .eq('user_id', USER_ID)
+        .eq('conversation_id', currentConversationId)
+        .order('created_at', { ascending: false })
+        .limit(300);
+    if (error) {
+        updateCloudStatusUI(false);
+        throw new Error('拉取记录失败: ' + error.message);
+    }
+    return (data || []).reverse().map(d => {
+        const msg = { role: d.role, content: d.content, local_id: d.local_id || generateId(), tokens: d.tokens || null };
+        if (d.role === 'assistant') { msg.versions = d.versions || [d.content]; msg.currentVersion = d.current_version || 0; }
+        return msg;
+    });
 }
-/* ---------- 刷新当前聊天界面的函数 ---------- */
+
+/* ---------- 刷新当前聊天界面（带错误处理） ---------- */
 async function refreshCurrentChat() {
-    if (busy || !currentConversationId) return; // 如果正在打字，先不打断
-    const cloudMsgs = await loadMessagesFromCloud();
-    // 如果云端记录比本地多或相等，则覆盖渲染
-    if (cloudMsgs.length >= msgs.length) {
-        msgs = cloudMsgs;
-        msgBox.innerHTML = '';
-        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-        scrollBottom(true);
+    if (busy || !currentConversationId) return;
+    try {
+        const cloudMsgs = await loadMessagesFromCloud();
+        if (cloudMsgs.length >= msgs.length) {
+            msgs = cloudMsgs;
+            msgBox.innerHTML = '';
+            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+            scrollBottom(true);
+        }
+    } catch (e) {
+        console.warn('实时刷新失败:', e);
     }
 }
 
@@ -528,7 +560,6 @@ async function refreshCurrentChat() {
 let realtimeChannel = null;
 function setupRealtimeListener() {
     if (!USER_ID) return;
-    // 如果之前有监听，先移除
     if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
 
     realtimeChannel = supabaseClient
@@ -536,18 +567,16 @@ function setupRealtimeListener() {
         .on('postgres_changes', 
             { event: '*', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${USER_ID}` }, 
             (payload) => {
-                // 只有当手机端发来的新消息属于当前电脑端正在看的会话时，才去刷新
                 if (payload.new && payload.new.conversation_id === currentConversationId) {
                     refreshCurrentChat();
                 }
             }
         )
         .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('📡 实时同步已开启');
-            }
+            if (status === 'SUBSCRIBED') console.log('📡 实时同步已开启');
         });
 }
+
 /* ---------- UI 更新函数 ---------- */
 function updateGlobalUI() {
   if ($('#apiBase')) $('#apiBase').value = cfg.apiBase || '';
@@ -558,7 +587,7 @@ function updateGlobalUI() {
   if ($('#ctxLimit')) $('#ctxLimit').value = cfg.ctxLimit;
   if ($('#userName')) $('#userName').value = cfg.userName;
   if ($('#userPrompt')) $('#userPrompt').value = cfg.userPrompt;
-  $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
+  if ($('#tempVal')) $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
 }
 
 function renderConversationList(convs) {
@@ -569,7 +598,7 @@ function renderConversationList(convs) {
         item.className = 'conv-item' + (c.id === currentConversationId ? ' active' : '');
         item.setAttribute('data-id', c.id);
         item.innerHTML = `<span class="conv-name">${escapeHtml(c.agent_name || '未命名')}</span><span class="conv-delete" data-id="${c.id}">✕</span>`;
-        item.addEventListener('click', (e) => { if (!e.target.classList.contains('conv-delete')) switchConversation(c.id); });
+        item.addEventListener('click', (e) => { if (!e.target.classList.contains('conv-delete')) switchConversation(c.id, c); });
         item.querySelector('.conv-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteConversation(c.id); });
         container.appendChild(item);
     });
@@ -577,47 +606,67 @@ function renderConversationList(convs) {
 
 function updateCurrentConversationUI(conv) {
     if (!conv) return;
-    // 更新右上角的聊天标题
     $('#headName').textContent = conv.agent_name || '角色';
     document.querySelectorAll('.conv-item').forEach(el => { el.classList.toggle('active', el.getAttribute('data-id') === conv.id); });
 }
 
-/* ---------- 切换会话（彻底修复必须手动切换才显示的问题） ---------- */
+/* ---------- 切换会话：带 3 次重试 + 从会话对象取 greeting ---------- */
 let currentFetchId = 0;
-async function switchConversation(convId) {
+async function switchConversation(convId, convObj = null) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
-    
+
     const fetchId = ++currentFetchId;
-    currentConversationId = convId; 
-    
-    // 【核心修复】切换会话时，必须清空本地消息，防止旧数据干扰与误判！
-    msgs = []; 
-    
-    const conv = { id: convId };
-    const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
-    if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
-    
+    currentConversationId = convId;
+    if (USER_ID) { try { localStorage.setItem('rp_last_conv_' + USER_ID, convId); } catch(e){} }
+
+    // 清空本地消息，避免旧数据干扰
+    msgs = [];
+
+    const conv = convObj
+        || conversationsCache.find(c => c.id === convId)
+        || { id: convId, agent_name: '角色', greeting: '' };
+    if (!conv.agent_name) {
+        const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
+        if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
+    }
+    currentConversation = conv;
+
     updateCurrentConversationUI(conv);
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在加载聊天记录...</div>';
-    
+
     try {
-        let cloudMsgs = await loadMessagesFromCloud();
-        
-        // 如果用户已切换至其他会话，则忽略本次请求结果
+        // 关键修复：失败重试 3 次，等 Supabase 令牌/RLS 就绪
+        let cloudMsgs = [];
+        let lastErr = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            if (fetchId !== currentFetchId) return;
+            try {
+                cloudMsgs = await loadMessagesFromCloud();
+                lastErr = null;
+                break;
+            } catch (e) {
+                lastErr = e;
+                console.warn(`[switchConversation] 第 ${attempt + 1} 次加载失败:`, e.message);
+                await new Promise(r => setTimeout(r, 300 * (attempt + 1)));
+            }
+        }
+
         if (fetchId !== currentFetchId) return;
-        
+
+        if (lastErr) throw lastErr;
+
         if (cloudMsgs.length > 0) {
             msgs = cloudMsgs;
             msgBox.innerHTML = '';
             msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
         } else {
-            // 真·新会话，才写入开场白
+            // 真正的新会话：用会话对象里的 greeting，而不是弹窗的
             msgBox.innerHTML = '';
-            const greetingText = $('#modalGreeting').value.trim();
+            const greetingText = (conv.greeting || '').trim();
             if (greetingText) {
                 const aiMsg = { role: 'assistant', content: greetingText, versions: [greetingText], currentVersion: 0, local_id: generateId() };
-                msgs = [aiMsg]; 
-                addBubble('assistant', greetingText, 0); 
+                msgs = [aiMsg];
+                addBubble('assistant', greetingText, 0);
                 await saveMessageToCloud(aiMsg);
             } else {
                 msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">发送一条消息开始对话吧。</div>';
@@ -626,12 +675,13 @@ async function switchConversation(convId) {
     } catch (e) {
         console.error("切换会话加载异常:", e);
         if (fetchId === currentFetchId) {
-            msgBox.innerHTML = '<div class="err">加载失败，请检查网络。</div>';
+            msgBox.innerHTML = '<div class="err" style="text-align:center;margin:auto;">加载失败：' + escapeHtml(e.message) +
+                '<br><button class="btn sm" id="retryLoadBtn" style="margin-top:10px;">重试</button></div>';
+            const rb = $('#retryLoadBtn');
+            if (rb) rb.onclick = () => switchConversation(convId, conv);
         }
     } finally {
-        if (fetchId === currentFetchId) {
-            scrollBottom(true);
-        }
+        if (fetchId === currentFetchId) scrollBottom(true);
     }
 }
 
@@ -701,8 +751,8 @@ function endpoint(){
 }
 
 function systemPrompt(){
-  const promptText = $('#modalCharPrompt').value.trim();
-  const charName = $('#modalCharName').value.trim() || '角色';
+  const promptText = ($('#modalCharPrompt') ? $('#modalCharPrompt').value.trim() : '') || (currentConversation && currentConversation.agent_prompt) || '';
+  const charName = ($('#modalCharName') ? $('#modalCharName').value.trim() : '') || (currentConversation && currentConversation.agent_name) || '角色';
   const parts = [];
   parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
   parts.push('【你的角色】' + charName + (promptText ? '\n' + promptText : ''));
@@ -782,12 +832,12 @@ async function generateAIResponse(contextMsgs) {
   try {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
-               if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+        if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+            aiMsg.content = partialText;
             saveMessageToCloud(aiMsg);
             lastCloudSave = Date.now();
             aiMsg.lastSavedLength = partialText.length;
         }
-        if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(aiMsg); lastCloudSave = Date.now(); }
     });
     if(full.trim()){
       contentEl.innerHTML = renderContent(full);
@@ -827,13 +877,12 @@ async function regenerateMessage(index) {
   try {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
         contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
-        msg.content = partialText; msg.versions = msg.versions || [msg.content];
-               if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+        msg.content = partialText;
+        if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
             saveMessageToCloud(msg);
             lastCloudSave = Date.now();
             msg.lastSavedLength = partialText.length;
         }
-        if (Date.now() - lastCloudSave > 1000) { saveMessageToCloud(msg); lastCloudSave = Date.now(); }
     });
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
@@ -858,7 +907,11 @@ function switchVersion(index, direction) {
   if (newVer < 0 || newVer >= msg.versions.length) return;
   msg.currentVersion = newVer; msg.content = msg.versions[newVer];
   const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
-  if (msgRow) { contentEl.innerHTML = renderContent(msg.content); updateVersionSwitcher(index, msg); }
+  if (msgRow) {
+    const contentEl = msgRow.querySelector('.content');
+    if (contentEl) contentEl.innerHTML = renderContent(msg.content);
+    updateVersionSwitcher(index, msg);
+  }
   saveMessageToCloud(msg);
 }
 
@@ -885,10 +938,11 @@ async function deleteMessage(index) {
 function setBusyUI(b){
   const btn = $('#sendBtn'); 
   if(btn) { btn.textContent = b ? '停止' : '发送'; btn.classList.toggle('stop', b); }
-  const newBtn = $('#newBtn'); 
-  if(newBtn) newBtn.disabled = b; // 【修复】安全判断，防止因按钮不存在而崩溃
+  const newBtn = $('#newConvBtn'); 
+  if(newBtn) newBtn.disabled = b;
 }
-/* ---------- 事件绑定与热更新机制 ---------- */
+
+/* ---------- 事件绑定 ---------- */
 function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
@@ -941,24 +995,24 @@ function bindEvents(){
     finally { btn.textContent = '获取'; btn.disabled = false; }
   });
 
-  // 保存全局设置（不再处理角色设定）
+  // 保存全局设置
   $('#applyBtn').addEventListener('click', async () => {
+    cfg.apiBase = $('#apiBase').value.trim();
+    cfg.apiKey = $('#apiKey').value.trim();
+    cfg.model = $('#model').value.trim();
+    cfg.temperature = Number($('#temperature').value);
+    cfg.maxTokens = Number($('#maxTokens').value);
+    cfg.ctxLimit = Number($('#ctxLimit').value);
+    cfg.userName = $('#userName').value.trim();
+    cfg.userPrompt = $('#userPrompt').value.trim();
     saveCfg(); await saveGlobalSettings();
     document.body.classList.remove('side-open'); alert('全局设置已保存！');
   });
 
   // 打开角色设定弹窗
-  $('#openCharSettingsBtn').addEventListener('click', () => {
-      // 将当前会话的人设填充到弹窗
-      const conv = { id: currentConversationId };
-      const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"]`);
-      if (el) {
-          conv.agent_name = el.querySelector('.conv-name').textContent;
-          // 从本地状态或云端拉取（此处为了简化，直接读取弹窗的默认值或上次输入的值）
-          // 更好的做法是保留一份当前会话的配置对象在内存中
-      }
-      // 因为我们在 updateCurrentConversationUI 里没有把 prompt 存下来，我们在这里需要重新获取
-      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting').eq('id', currentConversationId).single().then(({data}) => {
+  $('#openCharSettingsBtn').addEventListener('click', async () => {
+      if (!currentConversationId) { alert('请先选择一个会话'); return; }
+      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting').eq('id', currentConversationId).single().then(({data, error}) => {
           if (data) {
               $('#modalCharName').value = data.agent_name || '';
               $('#modalCharPrompt').value = data.agent_prompt || '';
@@ -978,13 +1032,10 @@ function bindEvents(){
       const charPrompt = $('#modalCharPrompt').value.trim();
       const greeting = $('#modalGreeting').value.trim();
 
-      // 更新标题
       $('#headName').textContent = charName;
-      // 更新左侧列表名字
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
 
-      // 保存到云端
       await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
       $('#char-settings-modal').classList.remove('show');
       alert('角色设定已保存！下次生成将使用新设定。');
@@ -996,10 +1047,9 @@ function bindEvents(){
     if (busy) { alert('请等待当前回复完成。'); return; }
     const newConv = await createConversation();
     if (newConv) {
-      currentConversationId = newConv.id;
-      const convs = await loadConversations(); renderConversationList(convs); updateCurrentConversationUI(newConv);
-      msgs = []; msgBox.innerHTML = '';
-      if (newConv.greeting) { const aiMsg = { role: 'assistant', content: newConv.greeting, versions: [newConv.greeting], currentVersion: 0, local_id: generateId() }; msgs.push(aiMsg); addBubble('assistant', newConv.greeting, 0); saveMessageToCloud(aiMsg); }
+      conversationsCache.unshift(newConv);
+      renderConversationList(conversationsCache);
+      await switchConversation(newConv.id, newConv);
       document.body.classList.remove('side-open');
     }
   });
@@ -1040,64 +1090,78 @@ async function handleAuthAction() {
 }
 authLoginBtn.addEventListener('click', handleAuthAction);
 
-/* ---------- 启动逻辑与热更新 ---------- */
+/* ---------- 启动逻辑 ---------- */
 async function init() {
-  // 1. 先获取 Session，确保 Supabase SDK 内部环境与 JWT 令牌完全就绪
+  // 1. 先拿 session（Supabase v2 的 getSession 会自动刷新过期 token）
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) {
-    authOverlay.classList.remove('hidden');
-  } else {
+  if (session && session.user) {
     USER_ID = session.user.id;
     authOverlay.classList.add('hidden');
-    await loadUserData(); 
+    // 给 SDK 一小段缓冲，确保后续请求带上正确 JWT
+    await new Promise(r => setTimeout(r, 80));
+    await loadUserData();
+  } else {
+    authOverlay.classList.remove('hidden');
   }
 
-  // 2. 监听后续的登录/登出事件（防止初始挂载时双重触发）
+  // 2. 监听登录/登出/刷新
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       USER_ID = null;
       currentLoadedUserId = null;
       authOverlay.classList.remove('hidden');
-    } else if (event === 'SIGNED_IN' && session && session.user && USER_ID !== session.user.id) {
+    } else if (session && session.user && USER_ID !== session.user.id) {
       USER_ID = session.user.id;
       authOverlay.classList.add('hidden');
       loadUserData();
     }
   });
 }
+
 async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
-  cfg = loadCfg(); initForm(); bindEvents();
+  cfg = loadCfg();
+  updateGlobalUI();     // 修复：原代码调用不存在的 initForm()
+  bindEvents();
   await fetchGlobalSettings();
   let convs = await loadConversations();
-  if (convs.length === 0) { const newConv = await createConversation(); if (newConv) convs = [newConv]; }
+  if (convs.length === 0) {
+    const newConv = await createConversation();
+    if (newConv) convs = [newConv];
+  }
+  conversationsCache = convs;
   renderConversationList(convs);
-  if (convs.length > 0) { 
-      updateCurrentConversationUI(convs[0]); 
-      msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
-      // 无需延迟，因为 init() 中已经通过 getSession() 确保令牌就绪
-      await switchConversation(convs[0].id); 
+
+  if (convs.length > 0) {
+    // 优先打开上次看过的会话，否则第一个
+    let target = null;
+    try {
+      const lastId = localStorage.getItem('rp_last_conv_' + USER_ID);
+      if (lastId) target = convs.find(c => c.id === lastId) || null;
+    } catch(e){}
+    if (!target) target = convs[0];
+
+    updateCurrentConversationUI(target);
+    msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在进入会话...</div>';
+    await switchConversation(target.id, target);
   }
   autoResize(); scrollBottom(true);
+  setupRealtimeListener();
 }
 
 /* ---------- 热更新机制 ---------- */
-/* ---------- 热更新机制（修复双重监听与死锁） ---------- */
 let refreshing = false;
-navigator.serviceWorker.addEventListener('controllerchange', () => {
+navigator.serviceWorker && navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     refreshing = true;
-    // 延迟 300ms 再刷新，给 SW 缓存留出缓冲时间，避免瞬间死锁
     setTimeout(() => { window.location.reload(); }, 300);
 });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw-chat.js').then(reg => {
-      // 每 5 分钟检查一次更新，避免频繁请求
       setInterval(() => { reg.update(); }, 300000); 
-
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
@@ -1114,6 +1178,9 @@ if ('serviceWorker' in navigator) {
     }).catch(err => console.log('SW 注册失败:', err));
   });
 }
+
+/* ---------- 启动 ---------- */
+init();
 </script>
 </body>
 </html>
