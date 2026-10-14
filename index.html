@@ -583,25 +583,27 @@ function updateCurrentConversationUI(conv) {
 }
 
 /* ---------- 切换会话（彻底修复必须手动切换才显示的问题） ---------- */
-let isFetchingMessages = false;
+let currentFetchId = 0;
 async function switchConversation(convId) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
-    // 【核心修复】如果 ID 相同且已经有消息了，才跳过；如果 ID 相同但没有消息（首次进入），必须继续加载！
+    // 如果 ID 相同且已经有消息了，才跳过；如果 ID 相同但没有消息（首次进入），必须继续加载！
     if (currentConversationId === convId && msgs.length > 0) return; 
-    if (isFetchingMessages) return; 
     
-    isFetchingMessages = true;
-    currentConversationId = convId; // 在这里赋值
+    const fetchId = ++currentFetchId;
+    currentConversationId = convId; 
     const conv = { id: convId };
     const el = document.querySelector(`.conv-item[data-id="${convId}"]`);
     if (el) conv.agent_name = el.querySelector('.conv-name').textContent;
     
     updateCurrentConversationUI(conv);
-    
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在加载聊天记录...</div>';
     
     try {
         let cloudMsgs = await loadMessagesFromCloud();
+        
+        // 【核心修复】如果用户已经切换到了其他会话，忽略此请求的结果，防止界面错乱
+        if (fetchId !== currentFetchId) return;
+        
         if (cloudMsgs.length > 0) {
             msgs = cloudMsgs;
             msgBox.innerHTML = '';
@@ -620,10 +622,13 @@ async function switchConversation(convId) {
         }
     } catch (e) {
         console.error("切换会话加载异常:", e);
-        msgBox.innerHTML = '<div class="err">加载失败，请检查网络。</div>';
+        if (fetchId === currentFetchId) {
+            msgBox.innerHTML = '<div class="err">加载失败，请检查网络。</div>';
+        }
     } finally {
-        isFetchingMessages = false; 
-        scrollBottom(true);
+        if (fetchId === currentFetchId) {
+            scrollBottom(true);
+        }
     }
 }
 
