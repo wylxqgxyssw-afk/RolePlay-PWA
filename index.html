@@ -374,6 +374,11 @@ const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ---------- 全局变量集中声明 ---------- */
+  function autoResize(){
+  if (!inputEl) return;
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px';
+}
 const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
