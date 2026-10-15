@@ -400,11 +400,22 @@ function generateId() { return Date.now().toString(36) + Math.random().toString(
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function renderContent(s){
   let h = escapeHtml(s || '');
+  // 1. 处理代码块 (```code```)
+  h = h.replace(/```([\s\S]*?)```/g, '<pre style="background:#1e1e1e; padding:10px; border-radius:6px; overflow-x:auto; margin:8px 0;"><code>$1</code></pre>');
+  // 2. 处理行内代码 (`code`)
+  h = h.replace(/\x60(.+?)\x60/g, '<code style="background:#2a2a2a; padding:2px 4px; border-radius:4px;">$1</code>');
+  // 3. 处理加粗 (**text**)
   h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // 4. 处理无序列表 (- item)
+  h = h.replace(/^\s*[-*]\s+(.+)$/gm, '<ul style="margin:4px 0 4px 20px; list-style-type: disc;"><li>$1</li></ul>');
+  // 5. 处理有序列表 (1. item)
+  h = h.replace(/^\s*\d+\.\s+(.+)$/gm, '<ol style="margin:4px 0 4px 20px; list-style-type: decimal;"><li>$1</li></ol>');
+  // 6. 处理引用 (> text)
+  h = h.replace(/^\s*>\s+(.+)$/gm, '<blockquote style="border-left:3px solid #555; padding-left:10px; color:#aaa; margin:8px 0;">$1</blockquote>');
+  // 7. 处理换行
   h = h.replace(/\n/g, '<br>');
   return h;
 }
-function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
 /* ---------- 云端连接状态监控 ---------- */
 function updateCloudStatusUI(isOnline) {
