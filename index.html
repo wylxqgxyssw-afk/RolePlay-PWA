@@ -405,8 +405,8 @@ function generateId() { return Date.now().toString(36) + Math.random().toString(
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function renderContent(s){
   let h = escapeHtml(s || '');
-  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  h = h.replace(/\n/g, '<br>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); // 支持加粗
+  h = h.replace(/\n/g, '<br>'); // 支持换行
   return h;
 }
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
