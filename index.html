@@ -937,11 +937,12 @@ async function generateAIResponse(contextMsgs) {
       // 【修改】完整结束，关闭容错，使用完整 Markdown 解析
       contentEl.innerHTML = renderContent(full, false);
       aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage ? usage.total_tokens : null;
-      if (usage) {
+           // 【修复】如果 API 没有返回 usage 或者 total_tokens 为假值，就不显示 T: 0
+      if (usage && usage.total_tokens) {
           const tokenSpan = document.createElement('span');
           tokenSpan.className = 'token-display';
-          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens || 0}`;
-          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`;
+          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens}`;
+          tokenSpan.textContent = `T: ${usage.total_tokens}`;
           bubble.querySelector('.msg-actions').appendChild(tokenSpan);
       }
     } else { contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; aiMsg.content = '（模型返回了空内容）'; aiMsg.versions = [aiMsg.content]; }
