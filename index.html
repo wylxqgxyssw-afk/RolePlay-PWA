@@ -6,6 +6,9 @@
 <title>角色扮演 · RolePlay Chat</title>
 <link rel="manifest" href="manifest-chat.json">
 <meta name="theme-color" content="#000000">
+<!-- 【新增】引入专业 Markdown 解析库和安全过滤库 -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <style>
 *{box-sizing:border-box;}
 :root{
@@ -142,6 +145,33 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   word-break: break-word;
   overflow-wrap: anywhere;
 }
+
+/* 【新增】反引号包裹的代码块/动作样式（浅灰字） */
+.msg.assistant .content code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a0a0a0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+.msg.assistant .content pre {
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 10px 0;
+}
+.msg.assistant .content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.msg.assistant .content ul, .msg.assistant .content ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
 /* 名字标识（保留原本风格） */
 .msg .meta {
   font-size: 11.5px;
@@ -374,18 +404,13 @@ const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* ---------- 全局变量集中声明 ---------- */
-  function autoResize(){
-  if (!inputEl) return;
-  inputEl.style.height = 'auto';
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px';
-}
 const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
 let currentConversationId = null;
-let currentConversation = null;   // 当前会话完整对象
-let conversationsCache = [];      // 会话列表缓存
+let currentConversation = null;
+let conversationsCache = [];
 let cfg = {};
 let msgs = [];
 let busy = false;
@@ -403,12 +428,29 @@ const DEFAULTS = {
 /* ---------- 工具函数 ---------- */
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function renderContent(s){
-  let h = escapeHtml(s || '');
-  h = h.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'); // 支持加粗
-  h = h.replace(/\n/g, '<br>'); // 支持换行
-  return h;
+
+// 【修改】专业的 Markdown 渲染函数，带流式容错
+function renderContent(s, isStreaming = false){
+  if (!s) return '';
+  // 流式传输时的容错机制：如果存在未闭合的标签（反引号或双星号），先按纯文本渲染，防止排版乱飞
+  if (isStreaming) {
+      const backticks = (s.match(/`/g) || []).length;
+      const asterisks = (s.match(/\*\*/g) || []).length;
+      if (backticks % 2 !== 0 || asterisks % 2 !== 0) {
+          return escapeHtml(s).replace(/\n/g, '<br>');
+      }
+  }
+  try {
+      // 使用 marked 解析 Markdown
+      let rawHtml = marked.parse(s, { breaks: true, gfm: true });
+      // 使用 DOMPurify 过滤防止 XSS 攻击
+      return DOMPurify.sanitize(rawHtml);
+  } catch (e) {
+      console.error('Markdown 解析失败:', e);
+      return escapeHtml(s).replace(/\n/g, '<br>');
+  }
 }
+
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
 /* ---------- 云端连接状态监控 ---------- */
@@ -526,7 +568,6 @@ async function saveConversationSettings(convId, name, prompt, greet) {
             .update({ agent_name: name, agent_prompt: prompt, greeting: greet })
             .eq('id', convId);
         if (error) console.error('❌ 保存会话设定失败:', error.message);
-        // 同步缓存
         const c = conversationsCache.find(x => x.id === convId);
         if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; }
         if (currentConversation && currentConversation.id === convId) {
@@ -575,7 +616,6 @@ async function saveMessageToCloud(msg) {
     } catch (e) { console.error('❌ 消息同步异常:', e); updateCloudStatusUI(false); }
 }
 
-/* ---------- 关键修复：失败要抛错，不再静默返回 [] ---------- */
 async function loadMessagesFromCloud() {
     if (!USER_ID || !currentConversationId) return [];
     const { data, error } = await supabaseClient.from('chat_messages')
@@ -595,7 +635,7 @@ async function loadMessagesFromCloud() {
     });
 }
 
-/* ---------- 刷新当前聊天界面（带错误处理） ---------- */
+/* ---------- 刷新当前聊天界面 ---------- */
 async function refreshCurrentChat() {
     if (busy || !currentConversationId) return;
     try {
@@ -665,7 +705,7 @@ function updateCurrentConversationUI(conv) {
     document.querySelectorAll('.conv-item').forEach(el => { el.classList.toggle('active', el.getAttribute('data-id') === conv.id); });
 }
 
-/* ---------- 切换会话：带 3 次重试 + 从会话对象取 greeting ---------- */
+/* ---------- 切换会话 ---------- */
 let currentFetchId = 0;
 async function switchConversation(convId, convObj = null) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
@@ -674,7 +714,6 @@ async function switchConversation(convId, convObj = null) {
     currentConversationId = convId;
     if (USER_ID) { try { localStorage.setItem('rp_last_conv_' + USER_ID, convId); } catch(e){} }
 
-    // 清空本地消息，避免旧数据干扰
     msgs = [];
 
     const conv = convObj
@@ -690,7 +729,6 @@ async function switchConversation(convId, convObj = null) {
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在加载聊天记录...</div>';
 
     try {
-        // 关键修复：失败重试 3 次，等 Supabase 令牌/RLS 就绪
         let cloudMsgs = [];
         let lastErr = null;
         for (let attempt = 0; attempt < 3; attempt++) {
@@ -707,7 +745,6 @@ async function switchConversation(convId, convObj = null) {
         }
 
         if (fetchId !== currentFetchId) return;
-
         if (lastErr) throw lastErr;
 
         if (cloudMsgs.length > 0) {
@@ -715,7 +752,6 @@ async function switchConversation(convId, convObj = null) {
             msgBox.innerHTML = '';
             msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
         } else {
-            // 真正的新会话：用会话对象里的 greeting，而不是弹窗的
             msgBox.innerHTML = '';
             const greetingText = (conv.greeting || '').trim();
             if (greetingText) {
@@ -778,7 +814,8 @@ function addBubble(role, content, index = null, tokens = null){
   if (tokens) tokenHtml = `<span class="token-display" title="完成 Token: ${tokens.completion_tokens || 0} / 总 Token: ${tokens.total_tokens || 0}">T: ${tokens.total_tokens || 0}</span>`;
 
   wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
-  wrap.querySelector('.content').innerHTML = renderContent(content);
+  // 【修改】初始渲染（非流式）
+  wrap.querySelector('.content').innerHTML = renderContent(content, false);
   msgBox.appendChild(wrap);
 
   if (role === 'assistant' && index !== null) {
@@ -812,7 +849,8 @@ function systemPrompt(){
   parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
   parts.push('【你的角色】' + charName + (promptText ? '\n' + promptText : ''));
   parts.push('【对话对象】' + (cfg.userName || '用户') + (cfg.userPrompt ? '\n' + cfg.userPrompt : ''));
-   parts.push('动作、神态和环境描写请直接自然融入文本叙述中，绝对禁止使用 * 星号包裹动作。请像现代小说或日常聊天一样自然输出，合理分段。');
+  // 【修改】提示词更新，允许 AI 使用 Markdown，但禁止用星号包裹动作
+  parts.push('请使用标准 Markdown 格式来组织你的回复（如加粗、列表、代码块），合理分段。动作、神态和环境描写请直接自然融入文本叙述中，绝对禁止使用 * 星号包裹动作。请像现代小说或日常聊天一样自然输出。');
   return parts.join('\n\n');
 }
 
@@ -886,7 +924,8 @@ async function generateAIResponse(contextMsgs) {
   let lastCloudSave = 0;
   try {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
-        contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
+        // 【修改】流式传输开启容错渲染
+        contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
         if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
             aiMsg.content = partialText;
             saveMessageToCloud(aiMsg);
@@ -895,7 +934,8 @@ async function generateAIResponse(contextMsgs) {
         }
     });
     if(full.trim()){
-      contentEl.innerHTML = renderContent(full);
+      // 【修改】完整结束，关闭容错，使用完整 Markdown 解析
+      contentEl.innerHTML = renderContent(full, false);
       aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage ? usage.total_tokens : null;
       if (usage) {
           const tokenSpan = document.createElement('span');
@@ -906,7 +946,7 @@ async function generateAIResponse(contextMsgs) {
       }
     } else { contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; aiMsg.content = '（模型返回了空内容）'; aiMsg.versions = [aiMsg.content]; }
   } catch(err) {
-    contentEl.innerHTML = renderContent(aiMsg.content || '') + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
+    contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）'; aiMsg.versions = [aiMsg.content];
   } finally {
     await saveMessageToCloud(aiMsg);
@@ -931,7 +971,8 @@ async function regenerateMessage(index) {
   let lastCloudSave = 0;
   try {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
-        contentEl.innerHTML = renderContent(partialText) + '<span class="cursor"></span>';
+        // 【修改】流式传输开启容错渲染
+        contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
         msg.content = partialText;
         if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
             saveMessageToCloud(msg);
@@ -942,7 +983,8 @@ async function regenerateMessage(index) {
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
       msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full; msg.tokens = usage ? usage.total_tokens : null;
-      contentEl.innerHTML = renderContent(full);
+      // 【修改】完整结束，使用完整 Markdown 解析
+      contentEl.innerHTML = renderContent(full, false);
       const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
       if (usage) {
           const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
@@ -964,7 +1006,8 @@ function switchVersion(index, direction) {
   const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
   if (msgRow) {
     const contentEl = msgRow.querySelector('.content');
-    if (contentEl) contentEl.innerHTML = renderContent(msg.content);
+    // 【修改】版本切换，非流式，使用完整 Markdown 解析
+    if (contentEl) contentEl.innerHTML = renderContent(msg.content, false);
     updateVersionSwitcher(index, msg);
   }
   saveMessageToCloud(msg);
@@ -1147,19 +1190,16 @@ authLoginBtn.addEventListener('click', handleAuthAction);
 
 /* ---------- 启动逻辑 ---------- */
 async function init() {
-  // 1. 先拿 session（Supabase v2 的 getSession 会自动刷新过期 token）
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session && session.user) {
     USER_ID = session.user.id;
     authOverlay.classList.add('hidden');
-    // 给 SDK 一小段缓冲，确保后续请求带上正确 JWT
     await new Promise(r => setTimeout(r, 80));
     await loadUserData();
   } else {
     authOverlay.classList.remove('hidden');
   }
 
-  // 2. 监听登录/登出/刷新
   supabaseClient.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       USER_ID = null;
@@ -1177,7 +1217,7 @@ async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
   cfg = loadCfg();
-  updateGlobalUI();     // 修复：原代码调用不存在的 initForm()
+  updateGlobalUI();
   bindEvents();
   await fetchGlobalSettings();
   let convs = await loadConversations();
@@ -1189,7 +1229,6 @@ async function loadUserData() {
   renderConversationList(convs);
 
   if (convs.length > 0) {
-    // 优先打开上次看过的会话，否则第一个
     let target = null;
     try {
       const lastId = localStorage.getItem('rp_last_conv_' + USER_ID);
