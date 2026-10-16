@@ -987,11 +987,12 @@ async function regenerateMessage(index) {
       // 【修改】完整结束，使用完整 Markdown 解析
       contentEl.innerHTML = renderContent(full, false);
       const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
-      if (usage) {
-          const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
-          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens || 0}`;
-          tokenSpan.textContent = `T: ${usage.total_tokens || 0}`; msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
-      }
+        // 【修复】这里使用的是 msgRow 而不是 bubble
+    if (usage && usage.total_tokens) {
+        const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
+        tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens}`;
+        tokenSpan.textContent = `T: ${usage.total_tokens}`; msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
+    }
       updateVersionSwitcher(index, msg);
     } else { contentEl.innerHTML = originalContent; }
   } catch(e) { contentEl.innerHTML = originalContent + '<div class="err">重新生成失败：' + escapeHtml(e.message) + '</div>'; }
