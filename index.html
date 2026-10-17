@@ -874,7 +874,7 @@ function systemPrompt(){
              '4. 对话内容直接输出，不需要任何符号包裹。');
   
   return parts.join('\n\n');
-
+ }
 function buildMessages(contextMsgs){
   const limit = Math.max(2, Number(cfg.ctxLimit) || 30);
   const hist = contextMsgs.slice(-limit).map(m => ({role: m.role, content: m.content}));
