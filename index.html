@@ -856,12 +856,20 @@ function endpoint(){
 function systemPrompt(){
   const promptText = ($('#modalCharPrompt') ? $('#modalCharPrompt').value.trim() : '') || (currentConversation && currentConversation.agent_prompt) || '';
   const charName = ($('#modalCharName') ? $('#modalCharName').value.trim() : '') || (currentConversation && currentConversation.agent_name) || '角色';
+  
   const parts = [];
-  parts.push('你正在进行沉浸式的角色扮演对话。请始终保持角色，用第一人称自然地说话，不要以 AI 助手的身份回应，不要解释规则，不要跳出角色。');
-  parts.push('【你的角色】' + charName + (promptText ? '\n' + promptText : ''));
+  // 1. 基础框架：只做通道，不强制风格
+  parts.push('你正在进行对话。请严格按照下方的【角色及行为规则】执行，不要以 AI 助手的身份回应，不要解释规则。');
+  
+  // 2. 核心逻辑：把最高权重交给用户填写的设定框！
+  // 你如果是写RP，AI就演戏；你如果是写复读机指令，AI就变复读机。
+  parts.push('【最高优先级指令：你的角色及行为规则（必须100%严格遵守）】\n' + (promptText || '你是一个友好的对话助手。'));
+  
   parts.push('【对话对象】' + (cfg.userName || '用户') + (cfg.userPrompt ? '\n' + cfg.userPrompt : ''));
-  // 【修改】提示词更新，允许 AI 使用 Markdown，但禁止用星号包裹动作
-  parts.push('请使用标准 Markdown 格式来组织你的回复（如加粗、列表、代码块），合理分段。动作、神态和环境描写请直接自然融入文本叙述中，绝对禁止使用 * 星号包裹动作。请像现代小说或日常聊天一样自然输出。');
+  
+  // 3. 基础排版要求（只限制排版格式，不限制内容发挥）
+  parts.push('请使用标准 Markdown 格式来组织你的回复，合理分段。绝对禁止使用 * 星号包裹动作。');
+  
   return parts.join('\n\n');
 }
 
