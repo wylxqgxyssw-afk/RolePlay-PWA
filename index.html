@@ -810,9 +810,20 @@ function addBubble(role, content, index = null, tokens = null){
   else actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
   actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
   
-  let tokenHtml = '';
-  if (tokens) tokenHtml = `<span class="token-display" title="完成 Token: ${tokens.completion_tokens || 0} / 总 Token: ${tokens.total_tokens || 0}">T: ${tokens.total_tokens || 0}</span>`;
-
+   let tokenHtml = '';
+  if (tokens) {
+      let totalVal = 0;
+      // 兼容对象格式和纯数字格式
+      if (typeof tokens === 'object' && tokens !== null) {
+          totalVal = tokens.total_tokens || 0;
+      } else if (typeof tokens === 'number') {
+          totalVal = tokens;
+      }
+      // 只有大于 0 才显示
+      if (totalVal > 0) {
+          tokenHtml = `<span class="token-display" title="总 Token: ${totalVal}">T: ${totalVal}</span>`;
+      }
+  }
   wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   // 【修改】初始渲染（非流式）
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
