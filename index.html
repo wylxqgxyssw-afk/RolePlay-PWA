@@ -215,20 +215,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   overflow-wrap: anywhere;
 }
 
-/* ============================================================
-   AI 消息：大字号 + 大间距 + 顶部头像
-   ============================================================ */
+/* AI 消息：顶部带头像和名字，正文全宽 */
 .msg.assistant {
   align-self: flex-start;
   max-width: 100%;
 }
-
-/* 顶部：头像和名字 */
 .msg.assistant .msg-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px; /* 名字和正文拉开距离 */
+  margin-bottom: 12px;
 }
 .msg.assistant .avatar {
   width: 36px; /* 头像放大 */
@@ -244,28 +240,30 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   flex-shrink: 0;
   user-select: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  overflow: hidden; /* 保证图片头像不溢出圆形 */
+}
+.msg.assistant .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .msg.assistant .meta {
   margin: 0;
   padding: 0;
-  font-size: 14px; /* 名字放大加粗 */
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
 }
-
-/* 正文：字号变大、行高变松散 */
 .msg.assistant .content {
   background: transparent;
   border: none;
   padding: 0;
   color: var(--text);
-  font-size: 16.5px; /* 【核心】字号加大 */
-  line-height: 1.9;  /* 【核心】行高加大，极其松散 */
+  font-size: 16.5px;
+  line-height: 1.9;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
-
-/* 【核心】段落之间加大间距，彻底解决“挤在一起”的感觉 */
 .msg.assistant .content p {
   margin-top: 0;
   margin-bottom: 16px; 
@@ -353,7 +351,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     width: 100%; max-width: 500px; background: var(--panel);
     border: 1px solid var(--border); border-radius: 16px;
     padding: 24px; box-shadow:0 10px 40px rgba(0,0,0,0.2);
-    max-height: 90vh; display: flex; flex-direction: column;
+    max-height: 90vh; display: flex; flex-direction: column; overflow-y: auto;
 }
 .char-settings-card h3 { font-size: 18px; margin: 0 0 16px 0; font-weight: 600; }
 .char-settings-card .form-group { margin-bottom: 14px; }
@@ -527,6 +525,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
             <label>开场白</label>
             <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
         </div>
+        <!-- 新增：头像设置 -->
+        <div class="form-group">
+            <label>角色头像（Emoji 或 图片链接）</label>
+            <input id="modalAvatar" placeholder="例如：🤖 或 https://..." spellcheck="false">
+        </div>
         <div class="actions">
             <button class="btn" id="cancelCharSettingsBtn">取消</button>
             <button class="btn primary" id="saveCharSettingsBtn">保存设定</button>
@@ -574,6 +577,19 @@ const DEFAULTS = {
 /* ---------- 工具函数 ---------- */
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// 获取当前会话的头像 HTML
+function getAvatarHtml(convId) {
+    let avatar = '🤖';
+    try {
+        const saved = localStorage.getItem('rp_avatar_' + convId);
+        if (saved) avatar = saved;
+    } catch(e){}
+    if (avatar.startsWith('http') || avatar.startsWith('data:image')) {
+        return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
+    }
+    return escapeHtml(avatar);
+}
 
 function renderContent(s, isStreaming = false){
   if (!s) return '';
@@ -988,7 +1004,7 @@ function addBubble(role, content, index = null, tokens = null){
       // AI消息：头像和名字在上方，正文完全在下方，撑满全宽
       wrap.innerHTML = `
         <div class="msg-header">
-          <div class="avatar">🤖</div>
+          <div class="avatar">${getAvatarHtml(currentConversationId)}</div>
           <div class="meta">${escapeHtml(name)}</div>
         </div>
         <div class="content"></div>
@@ -1284,6 +1300,10 @@ function bindEvents(){
               $('#modalCharPrompt').value = data.agent_prompt || '';
               $('#modalGreeting').value = data.greeting || '';
           }
+          // 读取并填充本地头像
+          const savedAvatar = localStorage.getItem('rp_avatar_' + currentConversationId) || '';
+          $('#modalAvatar').value = savedAvatar;
+          
           $('#char-settings-modal').classList.add('show');
       });
   });
@@ -1294,10 +1314,25 @@ function bindEvents(){
       const charName = $('#modalCharName').value.trim() || '新角色';
       const charPrompt = $('#modalCharPrompt').value.trim();
       const greeting = $('#modalGreeting').value.trim();
+      const newAvatar = $('#modalAvatar').value.trim();
+
+      // 保存头像到本地
+      if (newAvatar) {
+          localStorage.setItem('rp_avatar_' + currentConversationId, newAvatar);
+      } else {
+          localStorage.removeItem('rp_avatar_' + currentConversationId);
+      }
+
       $('#headName').textContent = charName;
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
+
       await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
+      
+      // 刷新界面使新头像/新名字生效
+      msgBox.innerHTML = '';
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+
       $('#char-settings-modal').classList.remove('show');
   });
 
