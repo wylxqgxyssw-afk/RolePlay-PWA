@@ -227,7 +227,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   margin-bottom: 12px;
 }
 .msg.assistant .avatar {
-  width: 36px; /* 头像放大 */
+  width: 36px;
   height: 36px;
   border-radius: 50%;
   background: var(--accent);
@@ -240,7 +240,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   flex-shrink: 0;
   user-select: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  overflow: hidden; /* 保证图片头像不溢出圆形 */
+  overflow: hidden;
 }
 .msg.assistant .avatar img {
   width: 100%;
@@ -358,6 +358,45 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .char-settings-card label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
 .char-settings-card textarea { min-height: 80px; }
 .char-settings-card .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+/* 头像上传样式 */
+.avatar-upload-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.avatar-preview {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 2px dashed var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    transition: border-color 0.2s;
+}
+.avatar-preview:hover {
+    border-color: var(--accent);
+}
+.avatar-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.avatar-preview span {
+    font-size: 28px;
+}
+.avatar-upload-text {
+    font-size: 12px;
+    color: var(--accent);
+    margin-top: 8px;
+    cursor: pointer;
+}
 
 @media(max-width:860px){
   #menuBtn{display:block;}
@@ -513,6 +552,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 <div id="char-settings-modal">
     <div class="char-settings-card">
         <h3>🎭 角色设定（仅对当前对话生效）</h3>
+        
+        <div class="avatar-upload-container">
+            <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
+                <span>🤖</span>
+            </div>
+            <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+        </div>
+
         <div class="form-group">
             <label>角色名</label>
             <input id="modalCharName" spellcheck="false">
@@ -525,11 +573,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
             <label>开场白</label>
             <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
         </div>
-        <!-- 新增：头像设置 -->
-        <div class="form-group">
-            <label>角色头像（Emoji 或 图片链接）</label>
-            <input id="modalAvatar" placeholder="例如：🤖 或 https://..." spellcheck="false">
-        </div>
+        
         <div class="actions">
             <button class="btn" id="cancelCharSettingsBtn">取消</button>
             <button class="btn primary" id="saveCharSettingsBtn">保存设定</button>
@@ -567,6 +611,7 @@ let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
 let themeSyncInflight = false;
+let tempAvatarBase64 = null;
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -578,15 +623,15 @@ const DEFAULTS = {
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// 获取当前会话的头像 HTML
+// 获取当前会话的头像 HTML (优先从内存缓存中读取)
 function getAvatarHtml(convId) {
     let avatar = '🤖';
-    try {
-        const saved = localStorage.getItem('rp_avatar_' + convId);
-        if (saved) avatar = saved;
-    } catch(e){}
-    if (avatar.startsWith('http') || avatar.startsWith('data:image')) {
-        return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
+    const conv = conversationsCache.find(c => c.id === convId);
+    if (conv && conv.avatar) {
+        avatar = conv.avatar;
+    }
+    if (avatar.startsWith('data:image')) {
+        return `<img src="${avatar}" alt="avatar">`;
     }
     return escapeHtml(avatar);
 }
@@ -814,8 +859,9 @@ async function saveGlobalSettings() {
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
+        // 这里加了 avatar 字段的读取
         const { data, error } = await supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at')
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar')
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -833,14 +879,25 @@ async function createConversation() {
     } catch (e) { return null; }
 }
 
-async function saveConversationSettings(convId, name, prompt, greet) {
+async function saveConversationSettings(convId, name, prompt, greet, avatarBase64) {
     if (!USER_ID || !convId) return;
     try {
+        // 这里将 avatar 存入了数据库
         await supabaseClient.from('conversations')
-            .update({ agent_name: name, agent_prompt: prompt, greeting: greet })
+            .update({ 
+                agent_name: name, 
+                agent_prompt: prompt, 
+                greeting: greet,
+                avatar: avatarBase64 
+            })
             .eq('id', convId);
         const c = conversationsCache.find(x => x.id === convId);
-        if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; }
+        if (c) { 
+            c.agent_name = name; 
+            c.agent_prompt = prompt; 
+            c.greeting = greet; 
+            c.avatar = avatarBase64;
+        }
     } catch (e) { }
 }
 
@@ -1001,7 +1058,6 @@ function addBubble(role, content, index = null, tokens = null){
   }
 
   if (role === 'assistant') {
-      // AI消息：头像和名字在上方，正文完全在下方，撑满全宽
       wrap.innerHTML = `
         <div class="msg-header">
           <div class="avatar">${getAvatarHtml(currentConversationId)}</div>
@@ -1010,7 +1066,6 @@ function addBubble(role, content, index = null, tokens = null){
         <div class="content"></div>
         <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   } else {
-      // 用户消息：维持原样
       wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   }
 
@@ -1294,19 +1349,55 @@ function bindEvents(){
 
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
-      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting').eq('id', currentConversationId).single().then(({data}) => {
+      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting, avatar').eq('id', currentConversationId).single().then(({data}) => {
           if (data) {
               $('#modalCharName').value = data.agent_name || '';
               $('#modalCharPrompt').value = data.agent_prompt || '';
               $('#modalGreeting').value = data.greeting || '';
+              tempAvatarBase64 = data.avatar || null;
           }
-          // 读取并填充本地头像
-          const savedAvatar = localStorage.getItem('rp_avatar_' + currentConversationId) || '';
-          $('#modalAvatar').value = savedAvatar;
-          
+          updateAvatarPreview(tempAvatarBase64);
           $('#char-settings-modal').classList.add('show');
       });
   });
+
+  $('#avatarPreview').addEventListener('click', () => { $('#avatarFileInput').click(); });
+  $('#avatarUploadText').addEventListener('click', () => { $('#avatarFileInput').click(); });
+
+  $('#avatarFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const size = 200; 
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSize = Math.min(img.width, img.height);
+              const sx = (img.width - minSize) / 2;
+              const sy = (img.height - minSize) / 2;
+              ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
+              tempAvatarBase64 = canvas.toDataURL('image/jpeg', 0.8);
+              updateAvatarPreview(tempAvatarBase64);
+              e.target.value = '';
+          };
+          img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+  });
+
+  function updateAvatarPreview(base64Str) {
+      const preview = $('#avatarPreview');
+      if (base64Str) {
+          preview.innerHTML = `<img src="${base64Str}" alt="avatar">`;
+      } else {
+          preview.innerHTML = `<span>🤖</span>`;
+      }
+  }
 
   $('#cancelCharSettingsBtn').addEventListener('click', () => $('#char-settings-modal').classList.remove('show'));
 
@@ -1314,20 +1405,13 @@ function bindEvents(){
       const charName = $('#modalCharName').value.trim() || '新角色';
       const charPrompt = $('#modalCharPrompt').value.trim();
       const greeting = $('#modalGreeting').value.trim();
-      const newAvatar = $('#modalAvatar').value.trim();
-
-      // 保存头像到本地
-      if (newAvatar) {
-          localStorage.setItem('rp_avatar_' + currentConversationId, newAvatar);
-      } else {
-          localStorage.removeItem('rp_avatar_' + currentConversationId);
-      }
 
       $('#headName').textContent = charName;
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
 
-      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
+      // 调用更新函数，传入头像数据
+      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64);
       
       // 刷新界面使新头像/新名字生效
       msgBox.innerHTML = '';
