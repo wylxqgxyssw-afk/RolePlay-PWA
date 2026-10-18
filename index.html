@@ -215,20 +215,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   overflow-wrap: anywhere;
 }
 
-/* AI 消息：带左侧圆形头像和名字 */
+/* AI 消息：顶部带头像和名字，正文全宽 */
 .msg.assistant {
   align-self: flex-start;
   max-width: 100%;
 }
-.msg.assistant .msg-wrapper {
+.msg.assistant .msg-header {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  width: 100%;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .msg.assistant .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
@@ -240,18 +240,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   flex-shrink: 0;
   user-select: none;
 }
-.msg.assistant .msg-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.msg.assistant .meta {
+  margin: 0;
+  padding: 0;
 }
 .msg.assistant .content {
   background: transparent;
   border: none;
   padding: 0;
   color: var(--text);
-  line-height: 1.75;
+  line-height: 1.8; /* 调大行高，看起来更松散舒展 */
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -967,18 +965,16 @@ function addBubble(role, content, index = null, tokens = null){
   }
 
   if (role === 'assistant') {
-      // 对面（AI）回复：左侧加圆形头像，右侧上方放名字
+      // AI消息：头像和名字在上方，正文完全在下方，撑满全宽
       wrap.innerHTML = `
-        <div class="msg-wrapper">
+        <div class="msg-header">
           <div class="avatar">🤖</div>
-          <div class="msg-body">
-            <div class="meta">${escapeHtml(name)}</div>
-            <div class="content"></div>
-            <div class="msg-actions">${actionsHtml}${tokenHtml}</div>
-          </div>
-        </div>`;
+          <div class="meta">${escapeHtml(name)}</div>
+        </div>
+        <div class="content"></div>
+        <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   } else {
-      // 用户消息：保持原有的纯右侧气泡样式
+      // 用户消息：维持原样
       wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   }
 
