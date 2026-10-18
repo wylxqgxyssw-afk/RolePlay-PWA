@@ -6,14 +6,16 @@
 <title>角色扮演 · RolePlay Chat</title>
 <link rel="manifest" href="manifest-chat.json">
 <meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="light dark">
 <!-- 【主题引导内联脚本】防白屏/黑闪 -->
 <script>
 (function(){
   try {
     var pref = localStorage.getItem('rp_theme') || 'auto';
     var isDark = pref === 'dark' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    var theme = isDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.style.colorScheme = theme;
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', isDark ? '#000000' : '#ffffff');
   } catch (e) {}
@@ -25,8 +27,7 @@
 *{box-sizing:border-box;}
 
 /* ============================================================
-   主题变量：彻底剥离 :root，只在 html[data-theme] 上定义
-   规避部分 WebView 的优先级识别 Bug
+   保留 CSS 变量，作为正常环境的基准
    ============================================================ */
 html[data-theme="dark"]{
   --bg:#121212; --panel:#1e1e1e; --panel-2:#2a2a2a; --border:#3a3a3a;
@@ -469,7 +470,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-clear-chat" id="clearChatBtn">清空当前会话记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
-      <!-- 侧栏底部栏：三点菜单入口 -->
       <div class="side-bottom-bar">
         <span class="side-foot-meta">RolePlay · v1.1</span>
         <button class="more-btn" type="button" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
@@ -597,7 +597,7 @@ function renderContent(s, isStreaming = false){
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
 /* ================================================================
-   主题系统
+   主题系统（终极兜底版）
    ================================================================ */
 const THEME_KEY = 'rp_theme';
 const THEME_VALUES = ['auto', 'light', 'dark'];
@@ -614,11 +614,12 @@ function effectiveTheme(pref){
   return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
 }
 
-// 纯视觉应用：强制重绘，确保所有变量生效
+// 核心：利用内联样式打穿所有 WebView 的渲染 Bug
 function applyThemeVisual(pref){
   const eff = effectiveTheme(pref);
   document.documentElement.setAttribute('data-theme', eff);
   document.documentElement.style.colorScheme = eff;
+  
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', eff === 'dark' ? '#000000' : '#ffffff');
   
@@ -626,7 +627,16 @@ function applyThemeVisual(pref){
     el.classList.toggle('selected', el.getAttribute('data-theme-value') === pref);
   });
 
-  // 强制重排，解决某些安卓 WebView 不刷新颜色的 Bug
+  // 【必做点】双保险：强行覆盖 body 的背景和文字颜色
+  if (eff === 'dark') {
+      document.body.style.backgroundColor = '#121212';
+      document.body.style.color = '#ececec';
+  } else {
+      document.body.style.backgroundColor = '#ffffff';
+      document.body.style.color = '#1a1d21';
+  }
+
+  // 强制重绘
   document.body.offsetHeight; 
 }
 
