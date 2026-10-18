@@ -215,43 +215,63 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   overflow-wrap: anywhere;
 }
 
-/* AI 消息：顶部带头像和名字，正文全宽 */
+/* ============================================================
+   AI 消息：大字号 + 大间距 + 顶部头像
+   ============================================================ */
 .msg.assistant {
   align-self: flex-start;
   max-width: 100%;
 }
+
+/* 顶部：头像和名字 */
 .msg.assistant .msg-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 12px; /* 名字和正文拉开距离 */
 }
 .msg.assistant .avatar {
-  width: 30px;
-  height: 30px;
+  width: 36px; /* 头像放大 */
+  height: 36px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: bold;
   flex-shrink: 0;
   user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .msg.assistant .meta {
   margin: 0;
   padding: 0;
+  font-size: 14px; /* 名字放大加粗 */
+  font-weight: 600;
+  color: var(--text);
 }
+
+/* 正文：字号变大、行高变松散 */
 .msg.assistant .content {
   background: transparent;
   border: none;
   padding: 0;
   color: var(--text);
-  line-height: 1.8; /* 调大行高，看起来更松散舒展 */
+  font-size: 16.5px; /* 【核心】字号加大 */
+  line-height: 1.9;  /* 【核心】行高加大，极其松散 */
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+/* 【核心】段落之间加大间距，彻底解决“挤在一起”的感觉 */
+.msg.assistant .content p {
+  margin-top: 0;
+  margin-bottom: 16px; 
+}
+.msg.assistant .content p:last-child {
+  margin-bottom: 0;
 }
 
 .msg.assistant .content code {
@@ -296,9 +316,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .cursor{display:inline-block;width:7px;height:1em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
 
-.msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 4px;padding: 0 4px;font-size: 12px;color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
+.msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 8px;padding: 0;font-size: 12px;color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
 .msg-actions:hover { opacity: 1; }
-.msg.user .msg-actions { justify-content: flex-end; }
+.msg.user .msg-actions { justify-content: flex-end; padding: 0 4px; }
 .action-btn {background: none; border: none; color: var(--muted);cursor: pointer; padding: 2px 4px; font-size: 12px; border-radius: 4px;}
 .action-btn:hover { color: var(--text); background: var(--border); }
 .action-btn.delete-btn { color: var(--danger); }
