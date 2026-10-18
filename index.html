@@ -604,14 +604,15 @@ let currentConversation = null;
 let conversationsCache = [];
 let cfg = {};
 let msgs = [];
-let busy = false;
-let abortCtrl = null;
 let hasBoundEvents = false;
 let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
 let themeSyncInflight = false;
 let tempAvatarBase64 = null;
+
+// 【核心改动】后台并发生成控制器字典，记录每个会话的生成状态
+const activeGenerations = new Map(); // { convId: abortController }
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -623,7 +624,7 @@ const DEFAULTS = {
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// 获取当前会话的头像 HTML (优先从内存缓存中读取)
+// 获取当前会话的头像 HTML
 function getAvatarHtml(convId) {
     let avatar = '🤖';
     const conv = conversationsCache.find(c => c.id === convId);
@@ -859,7 +860,6 @@ async function saveGlobalSettings() {
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
-        // 这里加了 avatar 字段的读取
         const { data, error } = await supabaseClient.from('conversations')
             .select('id, agent_name, agent_prompt, greeting, created_at, avatar')
             .eq('user_id', USER_ID)
@@ -882,7 +882,6 @@ async function createConversation() {
 async function saveConversationSettings(convId, name, prompt, greet, avatarBase64) {
     if (!USER_ID || !convId) return;
     try {
-        // 这里将 avatar 存入了数据库
         await supabaseClient.from('conversations')
             .update({ 
                 agent_name: name, 
@@ -909,6 +908,13 @@ async function deleteConversation(convId) {
         await supabaseClient.from('chat_messages').delete().eq('conversation_id', convId);
         conversationsCache = conversationsCache.filter(c => c.id !== convId);
         renderConversationList(conversationsCache);
+        
+        // 如果删除的是正在生成的会话，顺便中断
+        if(activeGenerations.has(convId)){
+            activeGenerations.get(convId).abort();
+            activeGenerations.delete(convId);
+        }
+
         if (currentConversationId === convId) {
             if (conversationsCache.length > 0) switchConversation(conversationsCache[0].id, conversationsCache[0]);
             else {
@@ -920,20 +926,21 @@ async function deleteConversation(convId) {
 }
 
 /* ---------- 云端：消息读写 ---------- */
-async function saveMessageToCloud(msg) {
-    if (!USER_ID || !currentConversationId) return;
+// 【核心改动】必须明确指定 convId，保证后台生成时不串台
+async function saveMessageToCloud(msg, targetConvId) {
+    if (!USER_ID || !targetConvId) return;
     try {
-        const payload = { user_id: USER_ID, conversation_id: currentConversationId, local_id: msg.local_id, role: msg.role, content: msg.content, versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null };
+        const payload = { user_id: USER_ID, conversation_id: targetConvId, local_id: msg.local_id, role: msg.role, content: msg.content, versions: msg.versions || null, current_version: msg.currentVersion || 0, tokens: msg.tokens || null };
         await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
     } catch (e) { }
 }
 
-async function loadMessagesFromCloud() {
-    if (!USER_ID || !currentConversationId) return [];
+async function loadMessagesFromCloud(targetConvId) {
+    if (!USER_ID || !targetConvId) return [];
     const { data, error } = await supabaseClient.from('chat_messages')
         .select('role, content, versions, current_version, local_id, tokens')
         .eq('user_id', USER_ID)
-        .eq('conversation_id', currentConversationId)
+        .eq('conversation_id', targetConvId)
         .order('created_at', { ascending: false })
         .limit(300);
     if (error) return [];
@@ -980,7 +987,7 @@ function updateCurrentConversationUI(conv) {
 /* ---------- 切换会话 ---------- */
 let currentFetchId = 0;
 async function switchConversation(convId, convObj = null) {
-    if (busy) return;
+    // 【核心改动】删除了 if(busy) return; 彻底解锁，想切就切
     const fetchId = ++currentFetchId;
     currentConversationId = convId;
     if (USER_ID) { try { localStorage.setItem('rp_last_conv_' + USER_ID, convId); } catch(e){} }
@@ -992,7 +999,8 @@ async function switchConversation(convId, convObj = null) {
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;">加载中...</div>';
 
     try {
-        let cloudMsgs = await loadMessagesFromCloud();
+        // 传入明确的 convId
+        let cloudMsgs = await loadMessagesFromCloud(convId);
         if (fetchId !== currentFetchId) return;
         if (cloudMsgs.length > 0) {
             msgs = cloudMsgs;
@@ -1005,11 +1013,23 @@ async function switchConversation(convId, convObj = null) {
                 const aiMsg = { role: 'assistant', content: greetingText, versions: [greetingText], currentVersion: 0, local_id: generateId() };
                 msgs = [aiMsg];
                 addBubble('assistant', greetingText, 0);
-                await saveMessageToCloud(aiMsg);
+                await saveMessageToCloud(aiMsg, convId);
             } else {
                 msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;">发送一条消息开始对话吧。</div>';
             }
         }
+        
+        // 刷新按钮状态：如果该会话正在后台生成，显示“停止”，否则显示“发送”
+        setBusyUI(activeGenerations.has(convId));
+
+        // 如果该会话正在后台生成，给最后一条 AI 消息加上光标
+        if (activeGenerations.has(convId)) {
+            const lastMsg = msgBox.querySelector('.msg.assistant:last-child .content');
+            if (lastMsg && !lastMsg.innerHTML.includes('cursor')) {
+                lastMsg.innerHTML += '<span class="cursor"></span>';
+            }
+        }
+
     } catch (e) {
         if (fetchId === currentFetchId) msgBox.innerHTML = '<div class="err">加载失败</div>';
     } finally {
@@ -1112,11 +1132,12 @@ function buildMessages(contextMsgs){
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
 
-async function fetchAIResponseStreaming(contextMsgs, onProgress) {
+async function fetchAIResponseStreaming(contextMsgs, onProgress, signal) {
   const payload = { model: cfg.model, messages: buildMessages(contextMsgs), temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), stream: true, stream_options: { include_usage: true } };
   const res = await fetch(endpoint(), {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (cfg.apiKey || '') },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal: signal
   });
   if(!res.ok){ const txt = await res.text().catch(() => ''); throw new Error('HTTP ' + res.status + ' ' + (txt ? txt.slice(0, 100) : '')); }
   if(!res.body) throw new Error('该接口未返回可读流');
@@ -1147,21 +1168,35 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   return { full, usage };
 }
 
-/* ---------- 核心业务 ---------- */
+/* ---------- 核心业务：彻底解耦后台并发 ---------- */
 async function send(){
-  if(busy || !currentConversationId) return;
+  // 当前会话如果在生成，则拦截
+  if (activeGenerations.has(currentConversationId)) return;
+  
   const input = $('#input');
   const text = input.value.trim();
   if(!text) return;
   input.value = ''; autoResize();
 
+  // 【核心】获取当前对话快照
+  const targetConvId = currentConversationId;
+
   const userMsg = { role: 'user', content: text, local_id: generateId() };
-  msgs.push(userMsg); addBubble('user', text, msgs.length - 1); await saveMessageToCloud(userMsg);
-  await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
+  msgs.push(userMsg); addBubble('user', text, msgs.length - 1); 
+  await saveMessageToCloud(userMsg, targetConvId);
+  
+  // 传给生成函数时，必须带上 targetConvId
+  await generateAIResponse(msgs.slice(0, -1).concat(userMsg), targetConvId);
 }
 
-async function generateAIResponse(contextMsgs) {
-  busy = true; setBusyUI(true);
+async function generateAIResponse(contextMsgs, targetConvId) {
+  // 为当前请求创建独立的控制器，存入并发字典
+  const abortController = new AbortController();
+  activeGenerations.set(targetConvId, abortController);
+
+  // 如果此时界面刚好就在这个会话，才更新按钮
+  if (currentConversationId === targetConvId) setBusyUI(true);
+
   const bubble = addBubble('assistant', '');
   const contentEl = bubble.querySelector('.content');
   contentEl.innerHTML = '<span class="cursor"></span>';
@@ -1171,47 +1206,81 @@ async function generateAIResponse(contextMsgs) {
   const idx = msgs.length - 1;
   bubble.setAttribute('data-msg-index', idx);
   bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
-  await saveMessageToCloud(aiMsg);
+  await saveMessageToCloud(aiMsg, targetConvId);
 
   let lastCloudSave = 0;
   try {
     const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
-        contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
+        aiMsg.content = partialText;
+        
+        // 【核心】流式回调里，只更新属于 targetConvId 的 DOM
+        if (currentConversationId === targetConvId) {
+            // 去界面上找当前的打字气泡
+            const currentBubble = msgBox.querySelector(`.msg[data-msg-index="${idx}"] .content`);
+            if (currentBubble) {
+                currentBubble.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
+            }
+        }
+        
+        // 存库必须写死 targetConvId
         if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
-            aiMsg.content = partialText;
-            saveMessageToCloud(aiMsg);
+            saveMessageToCloud(aiMsg, targetConvId);
             lastCloudSave = Date.now();
             aiMsg.lastSavedLength = partialText.length;
         }
-    });
+    }, abortController.signal);
+    
     if(full.trim()){
-      contentEl.innerHTML = renderContent(full, false);
       aiMsg.content = full; aiMsg.versions = [full]; aiMsg.tokens = usage ? usage.total_tokens : null;
-      if (usage && usage.total_tokens) {
-          const tokenSpan = document.createElement('span');
-          tokenSpan.className = 'token-display';
-          tokenSpan.textContent = `T: ${usage.total_tokens}`;
-          bubble.querySelector('.msg-actions').appendChild(tokenSpan);
+      
+      if (currentConversationId === targetConvId) {
+          contentEl.innerHTML = renderContent(full, false);
+          if (usage && usage.total_tokens) {
+              const tokenSpan = document.createElement('span');
+              tokenSpan.className = 'token-display';
+              tokenSpan.textContent = `T: ${usage.total_tokens}`;
+              bubble.querySelector('.msg-actions').appendChild(tokenSpan);
+          }
       }
-    } else { contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; aiMsg.content = '（空）'; aiMsg.versions = [aiMsg.content]; }
+    } else { 
+        aiMsg.content = '（空）'; aiMsg.versions = [aiMsg.content];
+        if (currentConversationId === targetConvId) contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; 
+    }
   } catch(err) {
-    contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">失败：' + escapeHtml(err.message) + '</div>';
+    if (currentConversationId === targetConvId) {
+        contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">失败：' + escapeHtml(err.message) + '</div>';
+    }
     if (!aiMsg.content) aiMsg.content = '（请求失败）'; aiMsg.versions = [aiMsg.content];
   } finally {
-    await saveMessageToCloud(aiMsg);
-    busy = false; setBusyUI(false);
+    await saveMessageToCloud(aiMsg, targetConvId);
+    // 清理并发字典
+    activeGenerations.delete(targetConvId);
+    
+    // 如果此时界面还在这个会话，恢复按钮，去掉光标
+    if (currentConversationId === targetConvId) {
+        setBusyUI(false);
+        const lastMsg = msgBox.querySelector(`.msg[data-msg-index="${idx}"] .content`);
+        if (lastMsg && !lastMsg.innerHTML.includes('err')) {
+            lastMsg.innerHTML = renderContent(aiMsg.content, false);
+        }
+    }
   }
 }
 
 async function regenerateMessage(index) {
-  if (busy) return;
+  if (activeGenerations.has(currentConversationId)) return;
+  
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
   let userMsgContext = [];
   for (let i = index - 1; i >= 0; i--) { if (msgs[i].role === 'user') { userMsgContext = msgs.slice(0, i + 1); break; } }
   if (userMsgContext.length === 0) return;
 
-  busy = true; setBusyUI(true);
+  const targetConvId = currentConversationId;
+  const abortController = new AbortController();
+  activeGenerations.set(targetConvId, abortController);
+  setBusyUI(true);
+
   const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
   const contentEl = msgRow.querySelector('.content');
   const originalContent = contentEl.innerHTML;
@@ -1220,25 +1289,38 @@ async function regenerateMessage(index) {
   let lastCloudSave = 0;
   try {
     const { full, usage } = await fetchAIResponseStreaming(userMsgContext, (partialText) => {
-        contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
         msg.content = partialText;
-        if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
-            saveMessageToCloud(msg); lastCloudSave = Date.now(); msg.lastSavedLength = partialText.length;
+        if (currentConversationId === targetConvId) {
+            contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
         }
-    });
+        if (partialText.length > (msg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+            saveMessageToCloud(msg, targetConvId); lastCloudSave = Date.now(); msg.lastSavedLength = partialText.length;
+        }
+    }, abortController.signal);
+    
     if (full.trim()) {
       if (!msg.versions) { msg.versions = [msg.content]; msg.currentVersion = 0; }
       msg.versions.push(full); msg.currentVersion = msg.versions.length - 1; msg.content = full; msg.tokens = usage ? usage.total_tokens : null;
-      contentEl.innerHTML = renderContent(full, false);
-      const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
-      if (usage && usage.total_tokens) {
-        const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
-        tokenSpan.textContent = `T: ${usage.total_tokens}`; msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
+      
+      if (currentConversationId === targetConvId) {
+          contentEl.innerHTML = renderContent(full, false);
+          const oldToken = msgRow.querySelector('.token-display'); if (oldToken) oldToken.remove();
+          if (usage && usage.total_tokens) {
+            const tokenSpan = document.createElement('span'); tokenSpan.className = 'token-display';
+            tokenSpan.textContent = `T: ${usage.total_tokens}`; msgRow.querySelector('.msg-actions').appendChild(tokenSpan);
+          }
+          updateVersionSwitcher(index, msg);
       }
-      updateVersionSwitcher(index, msg);
-    } else { contentEl.innerHTML = originalContent; }
-  } catch(e) { contentEl.innerHTML = originalContent + '<div class="err">失败：' + escapeHtml(e.message) + '</div>'; }
-  finally { await saveMessageToCloud(msg); busy = false; setBusyUI(false); }
+    } else { 
+        if (currentConversationId === targetConvId) contentEl.innerHTML = originalContent; 
+    }
+  } catch(e) { 
+      if (currentConversationId === targetConvId) contentEl.innerHTML = originalContent + '<div class="err">失败：' + escapeHtml(e.message) + '</div>'; 
+  } finally { 
+      await saveMessageToCloud(msg, targetConvId); 
+      activeGenerations.delete(targetConvId);
+      if (currentConversationId === targetConvId) setBusyUI(false);
+  }
 }
 
 function switchVersion(index, direction) {
@@ -1252,22 +1334,22 @@ function switchVersion(index, direction) {
     msgRow.querySelector('.content').innerHTML = renderContent(msg.content, false);
     updateVersionSwitcher(index, msg);
   }
-  saveMessageToCloud(msg);
+  saveMessageToCloud(msg, currentConversationId);
 }
 
 function editUserMessage(index) {
-  if (busy) return;
+  if (activeGenerations.has(currentConversationId)) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'user') return;
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
   msgs = msgs.slice(0, index + 1); msg.content = newContent;
   msgBox.innerHTML = ''; msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-  generateAIResponse(msgs.slice(0, index + 1));
+  generateAIResponse(msgs.slice(0, index + 1), currentConversationId);
 }
 
 async function deleteMessage(index) {
-    if (busy) return;
+    if (activeGenerations.has(currentConversationId)) return;
     if (!confirm('确定删除？')) return;
     const msg = msgs[index];
     if (!msg) return;
@@ -1278,8 +1360,9 @@ async function deleteMessage(index) {
 function setBusyUI(b){
   const btn = $('#sendBtn'); 
   if(btn) { btn.textContent = b ? '停止' : '发送'; btn.classList.toggle('stop', b); }
+  // 【核心】新建按钮不再被锁定
   const newBtn = $('#newConvBtn'); 
-  if(newBtn) newBtn.disabled = b;
+  if(newBtn) newBtn.disabled = false;
 }
 
 /* ---------- 事件绑定 ---------- */
@@ -1287,9 +1370,18 @@ function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
-  $('#sendBtn').addEventListener('click', () => { if(busy){ abortCtrl && abortCtrl.abort(); return; } send(); });
+  $('#sendBtn').addEventListener('click', () => { 
+      if(activeGenerations.has(currentConversationId)){
+          activeGenerations.get(currentConversationId).abort();
+          activeGenerations.delete(currentConversationId);
+          setBusyUI(false);
+          return; 
+      } 
+      send(); 
+  });
+  
   inputEl.addEventListener('input', autoResize);
-  inputEl.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!busy) send(); } });
+  inputEl.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!activeGenerations.has(currentConversationId)) send(); } });
 
   $('#exportBtn').addEventListener('click', () => {
       if(!msgs.length){ alert('还没有对话内容'); return; }
@@ -1410,10 +1502,8 @@ function bindEvents(){
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
 
-      // 调用更新函数，传入头像数据
       await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64);
       
-      // 刷新界面使新头像/新名字生效
       msgBox.innerHTML = '';
       msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
 
@@ -1423,7 +1513,7 @@ function bindEvents(){
   $('#logoutBtn').addEventListener('click', async () => { if(!confirm('确定退出？')) return; await supabaseClient.auth.signOut(); window.location.reload(); });
 
   $('#newConvBtn').addEventListener('click', async () => {
-    if (busy) return;
+    // 【核心】随时可以新建，不再检查 busy
     const newConv = await createConversation();
     if (newConv) {
       conversationsCache.unshift(newConv);
