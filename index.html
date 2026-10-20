@@ -6,7 +6,7 @@
 <title>角色扮演 · RolePlay Chat</title>
 <link rel="manifest" href="manifest-chat.json">
 <meta name="theme-color" content="#000000">
-<!-- 【新增】主题引导内联脚本：必须放在 CSS 之前，防止浅色用户打开时黑闪 -->
+<!-- 主题引导内联脚本：防止黑闪 -->
 <script>
 (function(){
   try {
@@ -25,79 +25,42 @@
 *{box-sizing:border-box;}
 
 /* ============================================================
-   主题变量：深色（默认）+ 浅色。所有颜色统一走语义变量，
-   后续新增主题只需追加 html[data-theme="xxx"] { ... } 块。
+   主题变量
    ============================================================ */
 :root,
 html[data-theme="dark"]{
   --bg:#121212; --panel:#1e1e1e; --panel-2:#2a2a2a; --border:#3a3a3a;
   --text:#ececec; --muted:#9e9e9e; --accent:#4d6bfe;
-
-  --bubble-user-bg:#2a2a2a;
-  --bubble-user-fg:#ffffff;
-  --bubble-user-em:#e2e8ff;
-  --head-bg:rgba(20,24,36,.72);
-  --code-bg:rgba(255,255,255,0.1);
-  --code-fg:#a0a0a0;
-  --pre-bg:#1e1e1e;
-
-  --danger:#ff8080;
-  --danger-bg:rgba(255,128,128,0.2);
-  --danger-bg-soft:rgba(255,128,128,0.1);
-  --danger-bg-soft2:rgba(255,128,128,0.15);
-  --success:#6bff8b;
-
-  --overlay-bg:rgba(0,0,0,0.6);
-  --auth-overlay-bg:rgba(13,15,22,0.98);
-  --backdrop-bg:rgba(0,0,0,.5);
-  --shadow-lg:0 10px 40px rgba(0,0,0,0.5);
-  --shadow-md:0 10px 30px rgba(0,0,0,0.5);
-
-  --cloud-bg:rgba(0,0,0,0.2);
-  --cloud-fg:#6b7280;
-  --token-bg:rgba(0,0,0,0.2);
-  --token-fg:#6b7280;
-  --toast-bg:#1c2130;
-  --stop-bg:#e05252;
-
-  --scrollbar-thumb:#2a3040;
-  --scrollbar-thumb-hover:#3a4256;
+  --bubble-user-bg:#2a2a2a; --bubble-user-fg:#ffffff;
+  --bubble-user-em:#e2e8ff; --head-bg:rgba(20,24,36,.72);
+  --code-bg:rgba(255,255,255,0.1); --code-fg:#a0a0a0; --pre-bg:#1e1e1e;
+  --danger:#ff8080; --danger-bg:rgba(255,128,128,0.2);
+  --danger-bg-soft:rgba(255,128,128,0.1); --danger-bg-soft2:rgba(255,128,128,0.15);
+  --success:#6bff8b; --overlay-bg:rgba(0,0,0,0.6);
+  --auth-overlay-bg:rgba(13,15,22,0.98); --backdrop-bg:rgba(0,0,0,.5);
+  --shadow-lg:0 10px 40px rgba(0,0,0,0.5); --shadow-md:0 10px 30px rgba(0,0,0,0.5);
+  --cloud-bg:rgba(0,0,0,0.2); --cloud-fg:#6b7280;
+  --token-bg:rgba(0,0,0,0.2); --token-fg:#6b7280;
+  --toast-bg:#1c2130; --stop-bg:#e05252;
+  --scrollbar-thumb:#2a3040; --scrollbar-thumb-hover:#3a4256;
   --conv-active-bg:rgba(124,108,255,0.1);
 }
 
 html[data-theme="light"]{
   --bg:#ffffff; --panel:#f7f8fa; --panel-2:#eef0f3; --border:#e3e5e8;
   --text:#1a1d21; --muted:#6b7280; --accent:#4d6bfe;
-
-  --bubble-user-bg:#eef1f6;
-  --bubble-user-fg:#1a1d21;
-  --bubble-user-em:#33407a;
-  --head-bg:rgba(255,255,255,.8);
-  --code-bg:rgba(0,0,0,0.06);
-  --code-fg:#6b7280;
-  --pre-bg:#f6f7f9;
-
-  --danger:#d92d20;
-  --danger-bg:rgba(217,45,32,0.12);
-  --danger-bg-soft:rgba(217,45,32,0.06);
-  --danger-bg-soft2:rgba(217,45,32,0.1);
-  --success:#16a34a;
-
-  --overlay-bg:rgba(15,20,30,0.35);
-  --auth-overlay-bg:rgba(250,251,252,0.98);
-  --backdrop-bg:rgba(0,0,0,.25);
-  --shadow-lg:0 10px 40px rgba(15,20,30,0.08);
-  --shadow-md:0 10px 30px rgba(15,20,30,0.08);
-
-  --cloud-bg:rgba(0,0,0,0.03);
-  --cloud-fg:#6b7280;
-  --token-bg:rgba(0,0,0,0.05);
-  --token-fg:#6b7280;
-  --toast-bg:#ffffff;
-  --stop-bg:#d92d20;
-
-  --scrollbar-thumb:#d1d5db;
-  --scrollbar-thumb-hover:#9ca3af;
+  --bubble-user-bg:#eef1f6; --bubble-user-fg:#1a1d21;
+  --bubble-user-em:#33407a; --head-bg:rgba(255,255,255,.8);
+  --code-bg:rgba(0,0,0,0.06); --code-fg:#6b7280; --pre-bg:#f6f7f9;
+  --danger:#d92d20; --danger-bg:rgba(217,45,32,0.12);
+  --danger-bg-soft:rgba(217,45,32,0.06); --danger-bg-soft2:rgba(217,45,32,0.1);
+  --success:#16a34a; --overlay-bg:rgba(15,20,30,0.35);
+  --auth-overlay-bg:rgba(250,251,252,0.98); --backdrop-bg:rgba(0,0,0,.25);
+  --shadow-lg:0 10px 40px rgba(15,20,30,0.08); --shadow-md:0 10px 30px rgba(15,20,30,0.08);
+  --cloud-bg:rgba(0,0,0,0.03); --cloud-fg:#6b7280;
+  --token-bg:rgba(0,0,0,0.05); --token-fg:#6b7280;
+  --toast-bg:#ffffff; --stop-bg:#d92d20;
+  --scrollbar-thumb:#d1d5db; --scrollbar-thumb-hover:#9ca3af;
   --conv-active-bg:rgba(77,107,254,0.08);
 }
 
@@ -165,7 +128,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .btn-clear-chat{background:transparent;color:var(--danger);border:1px solid var(--danger);margin-top:6px;}
 .btn-clear-chat:hover{background:var(--danger-bg-soft);}
 
-/* ---------- 【新增】侧栏底部「更多」区 ---------- */
+/* ---------- 侧栏底部「更多」区 ---------- */
 .side-bottom-bar{
   position:relative;
   display:flex;align-items:center;justify-content:space-between;
@@ -181,37 +144,81 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   padding:0;
 }
 .more-btn:hover{background:var(--panel-2);color:var(--text);border-color:var(--border);}
-.more-btn.open{background:var(--panel-2);color:var(--text);border-color:var(--border);}
 
-.more-menu{
-  position:absolute;right:0;bottom:calc(100% + 8px);
-  min-width:176px;
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:12px;
-  box-shadow:var(--shadow-lg);
-  padding:6px;
-  opacity:0;transform:translateY(6px);pointer-events:none;
-  transition:opacity .18s ease, transform .18s ease;
-  z-index:60;
+/* ============================================================
+   DeepSeek 风格：设置面板层级滑动（重构版）
+   ============================================================ */
+#settings-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
 }
-.more-menu.show{opacity:1;transform:none;pointer-events:auto;}
-.more-menu-header{
-  font-size:11px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--muted);padding:6px 10px 4px;font-weight:600;
+#settings-overlay.show { opacity: 1; pointer-events: auto; }
+
+/* 关键修复：这里固定了高度为 70vh */
+#settings-panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    height: 70vh; /* 固定高度防止塌陷 */
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
 }
-.more-menu-item{
-  display:flex;align-items:center;gap:8px;
-  width:100%;background:transparent;border:none;color:var(--text);
-  padding:8px 10px;border-radius:8px;
-  font-size:13.5px;cursor:pointer;text-align:left;transition:.12s;
+#settings-overlay.show #settings-panel { transform: translateY(0); }
+
+.settings-view {
+    position: absolute; inset: 0; background: var(--panel);
+    display: flex; flex-direction: column;
+    transition: transform 0.3s ease;
+    will-change: transform;
 }
-.more-menu-item:hover{background:var(--panel-2);}
-.more-menu-item .check{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:14px;height:14px;font-size:12px;color:var(--accent);flex:0 0 auto;
+#settings-main { transform: translateX(0); z-index: 2; }
+#settings-appearance { transform: translateX(100%); z-index: 3; }
+
+#settings-panel.show-sub #settings-main { transform: translateX(-30%); }
+#settings-panel.show-sub #settings-appearance { transform: translateX(0); }
+
+.settings-header {
+    display: flex; align-items: center; padding: 16px 20px;
+    font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
-.more-menu-item.selected .check::before{content:"✓";font-weight:700;}
+.settings-header .back-btn {
+    background: none; border: none; font-size: 20px; cursor: pointer;
+    color: var(--text); margin-right: 12px; padding: 0;
+}
+.settings-header .close-btn {
+    margin-left: auto; background: none; border: none; font-size: 18px;
+    cursor: pointer; color: var(--muted); padding: 4px;
+}
+.settings-body { flex: 1; overflow-y: auto; padding: 10px 0 30px; }
+
+/* 列表项 */
+.settings-list-item {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 16px 20px; background: transparent; border: none;
+    color: var(--text); font-size: 15px; text-align: left; cursor: pointer;
+    transition: background 0.2s;
+}
+.settings-list-item:hover { background: var(--panel-2); }
+.settings-list-item .arrow { color: var(--muted); font-size: 18px; }
+
+/* 表单区域 */
+.settings-group { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.settings-group:last-child { border-bottom: none; }
+.settings-group-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+
+/* 主题切换按钮组 */
+.theme-btn-group { display: flex; gap: 8px; margin-top: 8px; }
+.theme-btn {
+    flex: 1; padding: 10px 0; border-radius: 8px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 13px; cursor: pointer; transition: 0.2s;
+}
+.theme-btn.active {
+    background: rgba(77,107,254,0.1); border-color: var(--accent); color: var(--accent);
+}
 
 /* ---------- 按钮 ---------- */
 .btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:13.5px;transition:.15s;}
@@ -250,6 +257,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+
 /* 用户消息：保留右侧气泡 */
 .msg.user {
   align-self: flex-end;
@@ -267,7 +275,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 }
 
 /* ============================================================
-   AI 消息：新增顶部头像区域，正文完全不受影响
+   AI 消息：头像在顶部，文字完美全宽，不破坏排版
    ============================================================ */
 .msg.assistant {
   align-self: flex-start;
@@ -405,7 +413,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     width: 100%; max-width: 500px; background: var(--panel);
     border: 1px solid var(--border); border-radius: 16px;
     padding: 24px; box-shadow: var(--shadow-lg);
-    max-height: 90vh; display: flex; flex-direction: column;
+    max-height: 90vh; display: flex; flex-direction: column; overflow-y: auto;
 }
 .char-settings-card h3 { font-size: 18px; margin: 0 0 16px 0; font-weight: 600; }
 .char-settings-card .form-group { margin-bottom: 14px; }
@@ -413,7 +421,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .char-settings-card textarea { min-height: 80px; }
 .char-settings-card .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
 
-/* 新增：头像上传样式 */
+/* 头像上传样式 */
 .avatar-upload-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
 .avatar-preview {
     width: 80px; height: 80px; border-radius: 50%; background: var(--panel-2);
@@ -530,20 +538,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v1.1</span>
+        <span class="side-foot-meta">RolePlay · v1.2</span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
-        <div class="more-menu" id="moreMenu">
-          <div class="more-menu-header">外观</div>
-          <button class="more-menu-item" data-theme-value="auto">
-            <span class="check"></span><span>跟随系统</span>
-          </button>
-          <button class="more-menu-item" data-theme-value="light">
-            <span class="check"></span><span>浅色</span>
-          </button>
-          <button class="more-menu-item" data-theme-value="dark">
-            <span class="check"></span><span>深色</span>
-          </button>
-        </div>
       </div>
     </div>
   </aside>
@@ -572,11 +568,65 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </main>
 </div>
 
+<!-- ============================================================
+     DeepSeek 风格设置面板
+     ============================================================ -->
+<div id="settings-overlay">
+    <div id="settings-panel">
+        
+        <!-- 一级菜单 -->
+        <div id="settings-main" class="settings-view">
+            <div class="settings-header">
+                <span>设置</span>
+                <button class="close-btn" id="closeSettingsBtn">✕</button>
+            </div>
+            <div class="settings-body">
+                <button class="settings-list-item" id="goToAppearance">
+                    <span>外观</span>
+                    <span class="arrow">›</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 二级菜单：外观 -->
+        <div id="settings-appearance" class="settings-view">
+            <div class="settings-header">
+                <button class="back-btn" id="backToMainBtn">‹</button>
+                <span>外观</span>
+            </div>
+            <div class="settings-body">
+                <!-- 主题 -->
+                <div class="settings-group">
+                    <div class="settings-group-title">主题</div>
+                    <div class="theme-btn-group">
+                        <button class="theme-btn" data-theme-value="light">浅色</button>
+                        <button class="theme-btn" data-theme-value="dark">深色</button>
+                        <button class="theme-btn" data-theme-value="auto">跟随系统</button>
+                    </div>
+                </div>
+                
+                <!-- 默认头像 -->
+                <div class="settings-group">
+                    <div class="settings-group-title">全局默认头像（未单独设置的角色使用）</div>
+                    <div class="avatar-upload-container" style="margin-top: 10px;">
+                        <div class="avatar-preview" id="globalAvatarPreview" title="点击更换默认头像">
+                            <span>🤖</span>
+                        </div>
+                        <div class="avatar-upload-text" id="globalAvatarUploadText">点击更换默认头像</div>
+                        <input type="file" id="globalAvatarFileInput" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
 <div id="char-settings-modal">
     <div class="char-settings-card">
         <h3>🎭 角色设定（仅对当前对话生效）</h3>
         
-        <!-- 新增：头像上传区域 -->
+        <!-- 单角色头像上传 -->
         <div class="avatar-upload-container">
             <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
                 <span>🤖</span>
@@ -634,6 +684,7 @@ let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
 let tempAvatarBase64 = null;
+let globalDefaultAvatar = null;
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -645,23 +696,27 @@ const DEFAULTS = {
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// 获取当前会话的头像 HTML
+// 获取当前对话的头像 HTML (单角色优先，其次全局默认)
 function getAvatarHtml(convId) {
     let avatar = '🤖';
     const conv = conversationsCache.find(c => c.id === convId);
+    
+    // 优先使用单独设置的头像
     if (conv && conv.avatar) {
         avatar = conv.avatar;
+    } else if (globalDefaultAvatar) {
+        // 如果没有单独设置，使用全局默认头像
+        avatar = globalDefaultAvatar;
     }
+
     if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
         return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
     }
     return escapeHtml(avatar);
 }
 
-// 专业的 Markdown 渲染函数，带流式容错
 function renderContent(s, isStreaming = false){
   if (!s) return '';
-  // 流式传输时的容错机制：如果存在未闭合的标签（反引号或双星号），先按纯文本渲染，防止排版乱飞
   if (isStreaming) {
       const backticks = (s.match(/`/g) || []).length;
       const asterisks = (s.match(/\*\*/g) || []).length;
@@ -680,7 +735,9 @@ function renderContent(s, isStreaming = false){
 
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
-/* ---------- 【新增】主题切换核心 ---------- */
+/* ================================================================
+   主题与外观系统
+   ================================================================ */
 const THEME_KEY = 'rp_theme';
 
 function getThemePref(){
@@ -697,24 +754,46 @@ function applyTheme(pref){
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', eff === 'dark' ? '#000000' : '#ffffff');
   try { localStorage.setItem(THEME_KEY, pref); } catch(e){}
-  // 同步菜单选中态
-  document.querySelectorAll('.more-menu-item').forEach(el => {
-    el.classList.toggle('selected', el.getAttribute('data-theme-value') === pref);
+  
+  document.querySelectorAll('.theme-btn').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-theme-value') === pref);
   });
 }
-function closeMoreMenu(){
-  const menu = $('#moreMenu'); const btn = $('#moreBtn');
-  if (menu) menu.classList.remove('show');
-  if (btn) btn.classList.remove('open');
+
+function applyGlobalAvatar(base64) {
+    globalDefaultAvatar = base64;
+    const preview = $('#globalAvatarPreview');
+    if (base64) {
+        preview.innerHTML = `<img src="${base64}" alt="avatar">`;
+    } else {
+        preview.innerHTML = `<span>🤖</span>`;
+    }
 }
+
+// 同步外观（主题 + 默认头像）到云端
+async function syncAppearanceToCloud() {
+    if (!USER_ID) return;
+    try {
+        const appearanceData = { theme: getThemePref() };
+        if (globalDefaultAvatar) {
+            appearanceData.defaultAvatar = globalDefaultAvatar;
+        }
+        
+        await supabaseClient.from('agent_settings').upsert({
+            id: USER_ID,
+            appearance: appearanceData
+        });
+    } catch (e) { console.warn('同步外观设置失败:', e); }
+}
+
 function setupThemeUI(){
   if (hasBoundThemeUI) return;
   hasBoundThemeUI = true;
 
-  // 首次应用主题（同步选中态，闪黑防护已在 head 内联脚本完成）
+  // 初始化主题和头像
   applyTheme(getThemePref());
+  applyGlobalAvatar(globalDefaultAvatar);
 
-  // 系统深浅色变化时，auto 模式实时跟随
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = () => { if (getThemePref() === 'auto') applyTheme('auto'); };
@@ -722,34 +801,60 @@ function setupThemeUI(){
     else if (mq.addListener) mq.addListener(handler);
   }
 
-  const moreBtn = $('#moreBtn');
-  const moreMenu = $('#moreMenu');
-  if (moreBtn && moreMenu) {
-    moreBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const willOpen = !moreMenu.classList.contains('show');
-      moreMenu.classList.toggle('show', willOpen);
-      moreBtn.classList.toggle('open', willOpen);
-    });
-    moreMenu.addEventListener('click', (e) => {
-      const item = e.target.closest('.more-menu-item');
-      if (!item) return;
-      applyTheme(item.getAttribute('data-theme-value'));
-      closeMoreMenu();
-    });
-    // 点击外部关闭
-    document.addEventListener('click', (e) => {
-      if (moreMenu.classList.contains('show')
-          && !moreMenu.contains(e.target)
-          && e.target !== moreBtn) {
-        closeMoreMenu();
-      }
-    });
-    // ESC 关闭
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeMoreMenu();
-    });
-  }
+  // 面板控制逻辑
+  const overlay = $('#settings-overlay');
+  const panel = $('#settings-panel');
+  
+  $('#moreBtn').addEventListener('click', () => {
+      overlay.classList.add('show');
+      panel.classList.remove('show-sub');
+  });
+  
+  const closePanel = () => overlay.classList.remove('show');
+  $('#closeSettingsBtn').addEventListener('click', closePanel);
+  overlay.addEventListener('click', (e) => { if(e.target === overlay) closePanel(); });
+
+  $('#goToAppearance').addEventListener('click', () => panel.classList.add('show-sub'));
+  $('#backToMainBtn').addEventListener('click', () => panel.classList.remove('show-sub'));
+
+  // 主题切换
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+          applyTheme(btn.getAttribute('data-theme-value'));
+          syncAppearanceToCloud();
+      });
+  });
+
+  // 全局默认头像上传
+  $('#globalAvatarPreview').addEventListener('click', () => $('#globalAvatarFileInput').click());
+  $('#globalAvatarUploadText').addEventListener('click', () => $('#globalAvatarFileInput').click());
+  $('#globalAvatarFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const size = 200; 
+              canvas.width = size; canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSize = Math.min(img.width, img.height);
+              const sx = (img.width - minSize) / 2;
+              const sy = (img.height - minSize) / 2;
+              ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
+              const base64 = canvas.toDataURL('image/jpeg', 0.8);
+              applyGlobalAvatar(base64);
+              syncAppearanceToCloud();
+              // 刷新当前聊天框的头像
+              msgBox.innerHTML = '';
+              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+              e.target.value = '';
+          };
+          img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+  });
 }
 
 /* ---------- 云端连接状态监控 ---------- */
@@ -792,7 +897,7 @@ async function fetchGlobalSettings() {
     try {
         const { data, error } = await supabaseClient
             .from('agent_settings')
-            .select('api_base, api_key, model, temperature, max_tokens, ctx_limit, user_name, user_prompt')
+            .select('api_base, api_key, model, temperature, max_tokens, ctx_limit, user_name, user_prompt, appearance')
             .eq('id', USER_ID).maybeSingle();
 
         if (error) {
@@ -809,13 +914,27 @@ async function fetchGlobalSettings() {
             if (data.ctx_limit !== null && data.ctx_limit !== undefined) cfg.ctxLimit = data.ctx_limit;
             if (data.user_name) cfg.userName = data.user_name;
             if (data.user_prompt) cfg.userPrompt = data.user_prompt;
+
+            // 解析外观设置
+            if (data.appearance) {
+                const cloudTheme = data.appearance.theme;
+                if (cloudTheme && ['auto','light','dark'].includes(cloudTheme)) {
+                    applyTheme(cloudTheme);
+                }
+                const cloudAvatar = data.appearance.defaultAvatar;
+                if (cloudAvatar) {
+                    applyGlobalAvatar(cloudAvatar);
+                }
+            }
+
             saveCfg(); updateGlobalUI(); updateCloudStatusUI(true); return true;
         } else {
             try {
                 await supabaseClient.from('agent_settings').insert({
                     id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
                     temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
-                    user_name: cfg.userName, user_prompt: cfg.userPrompt
+                    user_name: cfg.userName, user_prompt: cfg.userPrompt,
+                    appearance: { theme: getThemePref() }
                 });
             } catch (insertErr) { console.warn('写入默认全局配置失败:', insertErr.message); }
             updateGlobalUI(); return false;
@@ -830,7 +949,8 @@ async function saveGlobalSettings() {
         const { error } = await supabaseClient.from('agent_settings').upsert({ 
             id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
             temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
-            user_name: cfg.userName, user_prompt: cfg.userPrompt
+            user_name: cfg.userName, user_prompt: cfg.userPrompt,
+            appearance: { theme: getThemePref(), defaultAvatar: globalDefaultAvatar }
         });
         if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
         else updateCloudStatusUI(true);
@@ -842,7 +962,7 @@ async function loadConversations() {
     if (!USER_ID) return [];
     try {
         const { data, error } = await supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at, avatar') /* 增加 avatar */
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar')
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: false });
         if (error) throw error;
