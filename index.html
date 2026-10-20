@@ -6,7 +6,7 @@
 <title>角色扮演 · RolePlay Chat</title>
 <link rel="manifest" href="manifest-chat.json">
 <meta name="theme-color" content="#000000">
-<!-- 【新增】主题引导内联脚本：必须放在 CSS 之前，防止浅色用户打开时黑闪 -->
+<!-- 主题引导内联脚本：防止黑闪 -->
 <script>
 (function(){
   try {
@@ -25,79 +25,42 @@
 *{box-sizing:border-box;}
 
 /* ============================================================
-   主题变量：深色（默认）+ 浅色。所有颜色统一走语义变量，
-   后续新增主题只需追加 html[data-theme="xxx"] { ... } 块。
+   主题变量
    ============================================================ */
 :root,
 html[data-theme="dark"]{
   --bg:#121212; --panel:#1e1e1e; --panel-2:#2a2a2a; --border:#3a3a3a;
   --text:#ececec; --muted:#9e9e9e; --accent:#4d6bfe;
-
-  --bubble-user-bg:#2a2a2a;
-  --bubble-user-fg:#ffffff;
-  --bubble-user-em:#e2e8ff;
-  --head-bg:rgba(20,24,36,.72);
-  --code-bg:rgba(255,255,255,0.1);
-  --code-fg:#a0a0a0;
-  --pre-bg:#1e1e1e;
-
-  --danger:#ff8080;
-  --danger-bg:rgba(255,128,128,0.2);
-  --danger-bg-soft:rgba(255,128,128,0.1);
-  --danger-bg-soft2:rgba(255,128,128,0.15);
-  --success:#6bff8b;
-
-  --overlay-bg:rgba(0,0,0,0.6);
-  --auth-overlay-bg:rgba(13,15,22,0.98);
-  --backdrop-bg:rgba(0,0,0,.5);
-  --shadow-lg:0 10px 40px rgba(0,0,0,0.5);
-  --shadow-md:0 10px 30px rgba(0,0,0,0.5);
-
-  --cloud-bg:rgba(0,0,0,0.2);
-  --cloud-fg:#6b7280;
-  --token-bg:rgba(0,0,0,0.2);
-  --token-fg:#6b7280;
-  --toast-bg:#1c2130;
-  --stop-bg:#e05252;
-
-  --scrollbar-thumb:#2a3040;
-  --scrollbar-thumb-hover:#3a4256;
+  --bubble-user-bg:#2a2a2a; --bubble-user-fg:#ffffff;
+  --bubble-user-em:#e2e8ff; --head-bg:rgba(20,24,36,.72);
+  --code-bg:rgba(255,255,255,0.1); --code-fg:#a0a0a0; --pre-bg:#1e1e1e;
+  --danger:#ff8080; --danger-bg:rgba(255,128,128,0.2);
+  --danger-bg-soft:rgba(255,128,128,0.1); --danger-bg-soft2:rgba(255,128,128,0.15);
+  --success:#6bff8b; --overlay-bg:rgba(0,0,0,0.6);
+  --auth-overlay-bg:rgba(13,15,22,0.98); --backdrop-bg:rgba(0,0,0,.5);
+  --shadow-lg:0 10px 40px rgba(0,0,0,0.5); --shadow-md:0 10px 30px rgba(0,0,0,0.5);
+  --cloud-bg:rgba(0,0,0,0.2); --cloud-fg:#6b7280;
+  --token-bg:rgba(0,0,0,0.2); --token-fg:#6b7280;
+  --toast-bg:#1c2130; --stop-bg:#e05252;
+  --scrollbar-thumb:#2a3040; --scrollbar-thumb-hover:#3a4256;
   --conv-active-bg:rgba(124,108,255,0.1);
 }
 
 html[data-theme="light"]{
   --bg:#ffffff; --panel:#f7f8fa; --panel-2:#eef0f3; --border:#e3e5e8;
   --text:#1a1d21; --muted:#6b7280; --accent:#4d6bfe;
-
-  --bubble-user-bg:#eef1f6;
-  --bubble-user-fg:#1a1d21;
-  --bubble-user-em:#33407a;
-  --head-bg:rgba(255,255,255,.8);
-  --code-bg:rgba(0,0,0,0.06);
-  --code-fg:#6b7280;
-  --pre-bg:#f6f7f9;
-
-  --danger:#d92d20;
-  --danger-bg:rgba(217,45,32,0.12);
-  --danger-bg-soft:rgba(217,45,32,0.06);
-  --danger-bg-soft2:rgba(217,45,32,0.1);
-  --success:#16a34a;
-
-  --overlay-bg:rgba(15,20,30,0.35);
-  --auth-overlay-bg:rgba(250,251,252,0.98);
-  --backdrop-bg:rgba(0,0,0,.25);
-  --shadow-lg:0 10px 40px rgba(15,20,30,0.08);
-  --shadow-md:0 10px 30px rgba(15,20,30,0.08);
-
-  --cloud-bg:rgba(0,0,0,0.03);
-  --cloud-fg:#6b7280;
-  --token-bg:rgba(0,0,0,0.05);
-  --token-fg:#6b7280;
-  --toast-bg:#ffffff;
-  --stop-bg:#d92d20;
-
-  --scrollbar-thumb:#d1d5db;
-  --scrollbar-thumb-hover:#9ca3af;
+  --bubble-user-bg:#eef1f6; --bubble-user-fg:#1a1d21;
+  --bubble-user-em:#33407a; --head-bg:rgba(255,255,255,.8);
+  --code-bg:rgba(0,0,0,0.06); --code-fg:#6b7280; --pre-bg:#f6f7f9;
+  --danger:#d92d20; --danger-bg:rgba(217,45,32,0.12);
+  --danger-bg-soft:rgba(217,45,32,0.06); --danger-bg-soft2:rgba(217,45,32,0.1);
+  --success:#16a34a; --overlay-bg:rgba(15,20,30,0.35);
+  --auth-overlay-bg:rgba(250,251,252,0.98); --backdrop-bg:rgba(0,0,0,.25);
+  --shadow-lg:0 10px 40px rgba(15,20,30,0.08); --shadow-md:0 10px 30px rgba(15,20,30,0.08);
+  --cloud-bg:rgba(0,0,0,0.03); --cloud-fg:#6b7280;
+  --token-bg:rgba(0,0,0,0.05); --token-fg:#6b7280;
+  --toast-bg:#ffffff; --stop-bg:#d92d20;
+  --scrollbar-thumb:#d1d5db; --scrollbar-thumb-hover:#9ca3af;
   --conv-active-bg:rgba(77,107,254,0.08);
 }
 
@@ -165,7 +128,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .btn-clear-chat{background:transparent;color:var(--danger);border:1px solid var(--danger);margin-top:6px;}
 .btn-clear-chat:hover{background:var(--danger-bg-soft);}
 
-/* ---------- 【新增】侧栏底部「更多」区 ---------- */
+/* ---------- 侧栏底部「更多」区 ---------- */
 .side-bottom-bar{
   position:relative;
   display:flex;align-items:center;justify-content:space-between;
@@ -183,7 +146,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .more-btn:hover{background:var(--panel-2);color:var(--text);border-color:var(--border);}
 
 /* ============================================================
-   DeepSeek 风格：设置面板层级滑动
+   DeepSeek 风格：设置面板层级滑动（重构版）
    ============================================================ */
 #settings-overlay {
     position: fixed; inset: 0; z-index: 500;
@@ -192,11 +155,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 }
 #settings-overlay.show { opacity: 1; pointer-events: auto; }
 
+/* 关键修复：这里固定了高度为 70vh */
 #settings-panel {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
     transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-    max-height: 85vh; display: flex; flex-direction: column;
+    height: 70vh; /* 固定高度防止塌陷 */
+    display: flex; flex-direction: column;
     overflow: hidden;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
 }
@@ -211,7 +176,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 #settings-main { transform: translateX(0); z-index: 2; }
 #settings-appearance { transform: translateX(100%); z-index: 3; }
 
-/* 当进入二级菜单时，整体左移 */
 #settings-panel.show-sub #settings-main { transform: translateX(-30%); }
 #settings-panel.show-sub #settings-appearance { transform: translateX(0); }
 
@@ -293,6 +257,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+
 /* 用户消息：保留右侧气泡 */
 .msg.user {
   align-self: flex-end;
@@ -310,7 +275,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 }
 
 /* ============================================================
-   AI 消息：顶部带头像和名字，正文全宽
+   AI 消息：头像在顶部，文字完美全宽，不破坏排版
    ============================================================ */
 .msg.assistant {
   align-self: flex-start;
@@ -604,7 +569,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </div>
 
 <!-- ============================================================
-     DeepSeek 风格设置面板（滑动弹出）
+     DeepSeek 风格设置面板
      ============================================================ -->
 <div id="settings-overlay">
     <div id="settings-panel">
@@ -719,7 +684,7 @@ let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
 let tempAvatarBase64 = null;
-let globalDefaultAvatar = null; // 全局默认头像
+let globalDefaultAvatar = null;
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
