@@ -1762,6 +1762,13 @@ async function regenerateMessage(index) {
 
   // 将 activeLeafId 指回父节点，触发新的生成分支
   activeLeafId = parentId;
+  
+  // 【核心修复】截断内存数组和 DOM，把旧的 AI 气泡直接从界面上抹去
+  msgs = msgs.slice(0, index);
+  msgBox.innerHTML = '';
+  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+
+  // 触发流式生成（新气泡会自动接在刚才的 User 消息下方）
   await generateAIResponse(userMsgContext);
 }
 
