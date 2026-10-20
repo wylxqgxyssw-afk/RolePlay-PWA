@@ -773,7 +773,7 @@ let tempUserAvatarBase64 = null;
 let globalDefaultAvatar = null;
 let globalDefaultUserAvatar = null;
 
-// 【新增】当前分支的叶子节点 ID
+// 当前分支的叶子节点 ID
 let activeLeafId = null; 
 
 /* ---------- 全局排版默认值 ---------- */
@@ -1236,9 +1236,17 @@ async function saveMessageToCloud(msg) {
             sibling_order: msg.sibling_order || 0
         };
         const { error } = await supabaseClient.from('chat_messages').upsert(payload, { onConflict: 'local_id' });
-        if (error) { console.error('❌ 消息同步失败:', error.message); updateCloudStatusUI(false); }
+        if (error) { 
+            console.error('❌ 消息同步失败:', error.message); 
+            updateCloudStatusUI(false); 
+            throw new Error(error.message); // 抛出错误以便上层捕获
+        }
         else updateCloudStatusUI(true);
-    } catch (e) { console.error('❌ 消息同步异常:', e); updateCloudStatusUI(false); }
+    } catch (e) { 
+        console.error('❌ 消息同步异常:', e); 
+        updateCloudStatusUI(false); 
+        throw e; 
+    }
 }
 
 async function loadMessagesFromCloud() {
@@ -1328,6 +1336,7 @@ async function loadMessagesFromCloud() {
 
 /* ---------- 刷新当前聊天界面 ---------- */
 async function refreshCurrentChat() {
+    // 如果正在生成、发送、编辑过程中，忽略 Realtime 的事件，防止并发覆盖
     if (busy || !currentConversationId) return;
     try {
         const res = await loadMessagesFromCloud();
@@ -1624,19 +1633,31 @@ async function send(){
   const input = $('#input');
   const text = input.value.trim();
   if(!text) return;
+  
+  // 加锁，防止 Realtime 干扰
+  busy = true;
+  setBusyUI(true);
   input.value = ''; autoResize();
 
-  // 挂载在当前叶子节点下
-  const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Date.now() };
-  msgs.push(userMsg); 
-  addBubble('user', text, msgs.length - 1); 
-  await saveMessageToCloud(userMsg);
-  
-  // 更新活跃叶子节点为刚发的用户消息
-  activeLeafId = userMsg.local_id;
-  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+  try {
+      // 挂载在当前叶子节点下，使用秒级时间戳防溢出
+      const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
+      msgs.push(userMsg); 
+      addBubble('user', text, msgs.length - 1); 
+      await saveMessageToCloud(userMsg);
+      
+      // 更新活跃叶子节点为刚发的用户消息
+      activeLeafId = userMsg.local_id;
+      await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
 
-  await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
+      await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
+  } catch(e) {
+      console.error("发送失败:", e);
+      alert("发送失败: " + e.message);
+  } finally {
+      busy = false;
+      setBusyUI(false);
+  }
 }
 
 async function generateAIResponse(contextMsgs) {
@@ -1645,8 +1666,8 @@ async function generateAIResponse(contextMsgs) {
   const contentEl = bubble.querySelector('.content');
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  // AI 消息挂载在当前叶子节点下
-  const aiMsg = { role: 'assistant', content: '', local_id: generateId(), tokens: null, parent_id: activeLeafId, sibling_order: Date.now() };
+  // AI 消息挂载在当前叶子节点下，使用秒级时间戳防溢出
+  const aiMsg = { role: 'assistant', content: '', local_id: generateId(), tokens: null, parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
   
   msgs.push(aiMsg);
   const idx = msgs.length - 1;
@@ -1664,7 +1685,7 @@ async function generateAIResponse(contextMsgs) {
         contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
         if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
             aiMsg.content = partialText;
-            saveMessageToCloud(aiMsg);
+            saveMessageToCloud(aiMsg).catch(e => console.error(e));
             lastCloudSave = Date.now();
             aiMsg.lastSavedLength = partialText.length;
         }
@@ -1684,7 +1705,10 @@ async function generateAIResponse(contextMsgs) {
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
-    await saveMessageToCloud(aiMsg);
+    try {
+        await saveMessageToCloud(aiMsg);
+    } catch(e) {}
+    
     busy = false; setBusyUI(false);
     
     // 生成完毕，重新拉取视图（为了把 1/2 版本切换器挂上）
@@ -1729,16 +1753,24 @@ async function switchVersion(index, direction) {
   const targetSibling = msg._siblings[newIndex];
   if (!targetSibling) return;
 
-  // 将当前分支指向目标 sibling
-  activeLeafId = targetSibling.local_id;
-  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+  busy = true; setBusyUI(true);
 
-  const res = await loadMessagesFromCloud();
-  msgs = res.pathMsgs;
-  activeLeafId = res.leafId;
-  msgBox.innerHTML = '';
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-  scrollBottom(true);
+  try {
+      // 将当前分支指向目标 sibling
+      activeLeafId = targetSibling.local_id;
+      await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+
+      const res = await loadMessagesFromCloud();
+      msgs = res.pathMsgs;
+      activeLeafId = res.leafId;
+      msgBox.innerHTML = '';
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+      scrollBottom(true);
+  } catch(e) {
+      console.error("切换分支失败:", e);
+  } finally {
+      busy = false; setBusyUI(false);
+  }
 }
 
 async function editUserMessage(index) {
@@ -1748,26 +1780,38 @@ async function editUserMessage(index) {
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
 
-  // 新建一个兄弟节点
-  const newMsg = {
-      role: 'user',
-      content: newContent,
-      local_id: generateId(),
-      parent_id: msg.parent_id,
-      sibling_order: Date.now() // 保证排在旧消息后面
-  };
+  // 立刻加锁
+  busy = true;
+  setBusyUI(true);
 
-  await saveMessageToCloud(newMsg);
-  
-  activeLeafId = newMsg.local_id;
-  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
-  
-  const res = await loadMessagesFromCloud();
-  msgs = res.pathMsgs;
-  msgBox.innerHTML = ''; 
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
-  
-  await generateAIResponse(msgs.slice(0, msgs.length));
+  try {
+      // 新建一个兄弟节点，使用秒级时间戳防溢出
+      const newMsg = {
+          role: 'user',
+          content: newContent,
+          local_id: generateId(),
+          parent_id: msg.parent_id,
+          sibling_order: Math.floor(Date.now() / 1000)
+      };
+
+      await saveMessageToCloud(newMsg);
+      
+      activeLeafId = newMsg.local_id;
+      await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+      
+      const res = await loadMessagesFromCloud();
+      msgs = res.pathMsgs;
+      msgBox.innerHTML = ''; 
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+      
+      await generateAIResponse(msgs.slice(0, msgs.length));
+  } catch (e) {
+      console.error("编辑消息失败:", e);
+      alert("编辑消息失败: " + e.message);
+  } finally {
+      busy = false;
+      setBusyUI(false);
+  }
 }
 
 async function deleteMessage(index) {
@@ -1775,20 +1819,28 @@ async function deleteMessage(index) {
     if (!confirm('确定要删除这条消息吗？删除后无法恢复。')) return;
     const msg = msgs[index];
     if (!msg) return;
-    
-    // 如果删除的是当前叶子，把 activeLeafId 移到它的父节点
-    if (msg.local_id === activeLeafId && msg.parent_id) {
-        activeLeafId = msg.parent_id;
-        await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+
+    busy = true; setBusyUI(true);
+
+    try {
+        // 如果删除的是当前叶子，把 activeLeafId 移到它的父节点
+        if (msg.local_id === activeLeafId && msg.parent_id) {
+            activeLeafId = msg.parent_id;
+            await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+        }
+        
+        await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
+        
+        const res = await loadMessagesFromCloud();
+        msgs = res.pathMsgs;
+        activeLeafId = res.leafId;
+        msgBox.innerHTML = ''; 
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+    } catch(e) {
+        console.error("删除失败:", e);
+    } finally {
+        busy = false; setBusyUI(false);
     }
-    
-    await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
-    
-    const res = await loadMessagesFromCloud();
-    msgs = res.pathMsgs;
-    activeLeafId = res.leafId;
-    msgBox.innerHTML = ''; 
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
 }
 
 function setBusyUI(b){
