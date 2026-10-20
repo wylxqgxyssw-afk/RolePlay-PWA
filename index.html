@@ -44,6 +44,13 @@ html[data-theme="dark"]{
   --toast-bg:#1c2130; --stop-bg:#e05252;
   --scrollbar-thumb:#2a3040; --scrollbar-thumb-hover:#3a4256;
   --conv-active-bg:rgba(124,108,255,0.1);
+
+  /* 新增：排版变量 */
+  --ai-font-size: 16.5px;
+  --ai-line-height: 1.75;
+  --user-font-size: 15px;
+  --user-line-height: 1.72;
+  --user-bubble-max-width: 78%;
 }
 
 html[data-theme="light"]{
@@ -159,7 +166,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
     transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-    height: 70vh; 
+    height: 75vh; 
     display: flex; flex-direction: column;
     overflow: hidden;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
@@ -207,6 +214,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .settings-group { padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .settings-group:last-child { border-bottom: none; }
 .settings-group-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+.settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 16px; }
+.settings-row label { margin: 0; font-size: 13.5px; color: var(--text); }
+.settings-row .val { font-size: 12px; color: var(--muted); font-family: monospace; }
 
 /* 主题切换按钮组 */
 .theme-btn-group { display: flex; gap: 8px; margin-top: 8px; }
@@ -257,10 +267,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   to { opacity: 1; transform: none; }
 }
 
-/* 用户消息：保留右侧气泡，新增顶部信息 */
+/* ============================================================
+   应用排版变量
+   ============================================================ */
+
+/* 用户消息 */
 .msg.user {
   align-self: flex-end;
-  max-width: min(78%, 760px);
+  max-width: var(--user-bubble-max-width); /* 动态宽度 */
 }
 .msg.user .msg-header {
   display: flex;
@@ -273,7 +287,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--panel-2); /* 使用 panel-2 作为兜底背景，因为用户没有专属 accent 背景 */
+  background: var(--panel-2);
   color: var(--text);
   display: flex;
   align-items: center;
@@ -285,18 +299,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   overflow: hidden;
 }
-.msg.user .avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.msg.user .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg.user .meta {
-  margin: 0;
-  padding: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  text-align: right;
+  margin: 0; padding: 0; font-size: 14px; font-weight: 600; color: var(--text); text-align: right;
 }
 .msg.user .content {
   background: var(--bubble-user-bg);
@@ -304,20 +309,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   border-radius: 18px;
   border: none;
   padding: 11px 15px;
-  line-height: 1.72;
+  font-size: var(--user-font-size); /* 动态字号 */
+  line-height: var(--user-line-height); /* 动态行高 */
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
-/* ============================================================
-   AI 消息：头像在顶部，文字完美全宽，不破坏排版
-   ============================================================ */
+/* AI 消息 */
 .msg.assistant {
   align-self: flex-start;
   max-width: 100%;
 }
-
-/* 顶部：头像和名字水平排列 */
 .msg.assistant .msg-header {
   display: flex;
   align-items: center;
@@ -340,26 +342,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   overflow: hidden;
 }
-.msg.assistant .avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.msg.assistant .meta {
-  margin: 0;
-  padding: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
+.msg.assistant .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.msg.assistant .meta { margin: 0; padding: 0; font-size: 14px; font-weight: 600; color: var(--text); }
 
-/* 正文：保持全宽纯文本，没有任何挤压 */
 .msg.assistant .content {
   background: transparent;
   border: none;
   padding: 0;
   color: var(--text);
-  line-height: 1.75;
+  font-size: var(--ai-font-size); /* 动态字号 */
+  line-height: var(--ai-line-height); /* 动态行高 */
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -570,7 +562,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v1.2</span>
+        <span class="side-foot-meta">RolePlay · v1.3</span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -635,6 +627,44 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
                         <button class="theme-btn" data-theme-value="dark">深色</button>
                         <button class="theme-btn" data-theme-value="auto">跟随系统</button>
                     </div>
+                </div>
+
+                <!-- 全局排版：AI -->
+                <div class="settings-group">
+                    <div class="settings-group-title">AI 消息排版</div>
+                    <div class="settings-row">
+                        <label>字体大小</label>
+                        <span class="val" id="valAiFontSize">16.5px</span>
+                    </div>
+                    <input type="range" id="rangeAiFontSize" min="12" max="24" step="0.5" value="16.5">
+                    
+                    <div class="settings-row" style="margin-top: 16px;">
+                        <label>行间距</label>
+                        <span class="val" id="valAiLineHeight">1.75</span>
+                    </div>
+                    <input type="range" id="rangeAiLineHeight" min="1.2" max="2.5" step="0.05" value="1.75">
+                </div>
+
+                <!-- 全局排版：用户 -->
+                <div class="settings-group">
+                    <div class="settings-group-title">我的消息排版</div>
+                    <div class="settings-row">
+                        <label>字体大小</label>
+                        <span class="val" id="valUserFontSize">15px</span>
+                    </div>
+                    <input type="range" id="rangeUserFontSize" min="12" max="24" step="0.5" value="15">
+                    
+                    <div class="settings-row" style="margin-top: 16px;">
+                        <label>行间距</label>
+                        <span class="val" id="valUserLineHeight">1.72</span>
+                    </div>
+                    <input type="range" id="rangeUserLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
+
+                    <div class="settings-row" style="margin-top: 16px;">
+                        <label>气泡最大宽度</label>
+                        <span class="val" id="valUserBubbleWidth">78%</span>
+                    </div>
+                    <input type="range" id="rangeUserBubbleWidth" min="40" max="95" step="1" value="78">
                 </div>
                 
                 <!-- 默认头像 -->
@@ -738,10 +768,19 @@ let hasBoundEvents = false;
 let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
-let tempAvatarBase64 = null;     // 弹窗中暂存的 AI 头像
-let tempUserAvatarBase64 = null; // 弹窗中暂存的用户头像
-let globalDefaultAvatar = null;     // 全局默认 AI 头像
-let globalDefaultUserAvatar = null; // 全局默认用户头像
+let tempAvatarBase64 = null;
+let tempUserAvatarBase64 = null;
+let globalDefaultAvatar = null;
+let globalDefaultUserAvatar = null;
+
+/* ---------- 全局排版默认值 ---------- */
+let styleConfig = {
+    aiFontSize: 16.5,
+    aiLineHeight: 1.75,
+    userFontSize: 15,
+    userLineHeight: 1.72,
+    userBubbleWidth: 78
+};
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -828,6 +867,29 @@ function applyTheme(pref){
   });
 }
 
+// 应用排版变量到 CSS
+function applyStyleConfig() {
+    document.documentElement.style.setProperty('--ai-font-size', styleConfig.aiFontSize + 'px');
+    document.documentElement.style.setProperty('--ai-line-height', styleConfig.aiLineHeight);
+    document.documentElement.style.setProperty('--user-font-size', styleConfig.userFontSize + 'px');
+    document.documentElement.style.setProperty('--user-line-height', styleConfig.userLineHeight);
+    document.documentElement.style.setProperty('--user-bubble-max-width', styleConfig.userBubbleWidth + '%');
+    
+    // 同步更新界面上的数值显示
+    $('#valAiFontSize').textContent = styleConfig.aiFontSize + 'px';
+    $('#valAiLineHeight').textContent = styleConfig.aiLineHeight;
+    $('#valUserFontSize').textContent = styleConfig.userFontSize + 'px';
+    $('#valUserLineHeight').textContent = styleConfig.userLineHeight;
+    $('#valUserBubbleWidth').textContent = styleConfig.userBubbleWidth + '%';
+    
+    // 同步更新滑动条位置
+    $('#rangeAiFontSize').value = styleConfig.aiFontSize;
+    $('#rangeAiLineHeight').value = styleConfig.aiLineHeight;
+    $('#rangeUserFontSize').value = styleConfig.userFontSize;
+    $('#rangeUserLineHeight').value = styleConfig.userLineHeight;
+    $('#rangeUserBubbleWidth').value = styleConfig.userBubbleWidth;
+}
+
 function applyGlobalAvatar(base64) {
     globalDefaultAvatar = base64;
     const preview = $('#globalAvatarPreview');
@@ -848,17 +910,20 @@ function applyGlobalUserAvatar(base64) {
     }
 }
 
-// 同步外观（主题 + 默认头像）到云端
+// 同步外观（主题 + 头像 + 排版）到云端
 async function syncAppearanceToCloud() {
     if (!USER_ID) return;
     try {
-        const appearanceData = { theme: getThemePref() };
-        if (globalDefaultAvatar) {
-            appearanceData.defaultAvatar = globalDefaultAvatar;
-        }
-        if (globalDefaultUserAvatar) {
-            appearanceData.defaultUserAvatar = globalDefaultUserAvatar;
-        }
+        const appearanceData = { 
+            theme: getThemePref(),
+            aiFontSize: styleConfig.aiFontSize,
+            aiLineHeight: styleConfig.aiLineHeight,
+            userFontSize: styleConfig.userFontSize,
+            userLineHeight: styleConfig.userLineHeight,
+            userBubbleWidth: styleConfig.userBubbleWidth
+        };
+        if (globalDefaultAvatar) appearanceData.defaultAvatar = globalDefaultAvatar;
+        if (globalDefaultUserAvatar) appearanceData.defaultUserAvatar = globalDefaultUserAvatar;
         
         await supabaseClient.from('agent_settings').upsert({
             id: USER_ID,
@@ -875,6 +940,7 @@ function setupThemeUI(){
   applyTheme(getThemePref());
   applyGlobalAvatar(globalDefaultAvatar);
   applyGlobalUserAvatar(globalDefaultUserAvatar);
+  applyStyleConfig();
 
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -906,6 +972,38 @@ function setupThemeUI(){
           syncAppearanceToCloud();
       });
   });
+
+  // --- 新增：排版滑块事件绑定 ---
+  $('#rangeAiFontSize').addEventListener('input', (e) => {
+      styleConfig.aiFontSize = parseFloat(e.target.value);
+      applyStyleConfig();
+  });
+  $('#rangeAiFontSize').addEventListener('change', () => syncAppearanceToCloud());
+
+  $('#rangeAiLineHeight').addEventListener('input', (e) => {
+      styleConfig.aiLineHeight = parseFloat(e.target.value);
+      applyStyleConfig();
+  });
+  $('#rangeAiLineHeight').addEventListener('change', () => syncAppearanceToCloud());
+
+  $('#rangeUserFontSize').addEventListener('input', (e) => {
+      styleConfig.userFontSize = parseFloat(e.target.value);
+      applyStyleConfig();
+  });
+  $('#rangeUserFontSize').addEventListener('change', () => syncAppearanceToCloud());
+
+  $('#rangeUserLineHeight').addEventListener('input', (e) => {
+      styleConfig.userLineHeight = parseFloat(e.target.value);
+      applyStyleConfig();
+  });
+  $('#rangeUserLineHeight').addEventListener('change', () => syncAppearanceToCloud());
+
+  $('#rangeUserBubbleWidth').addEventListener('input', (e) => {
+      styleConfig.userBubbleWidth = parseInt(e.target.value);
+      applyStyleConfig();
+  });
+  $('#rangeUserBubbleWidth').addEventListener('change', () => syncAppearanceToCloud());
+
 
   // 全局默认 AI 头像上传
   $('#globalAvatarPreview').addEventListener('click', () => $('#globalAvatarFileInput').click());
@@ -1030,16 +1128,18 @@ async function fetchGlobalSettings() {
 
             // 解析外观设置
             if (data.appearance) {
-                const cloudTheme = data.appearance.theme;
-                if (cloudTheme && ['auto','light','dark'].includes(cloudTheme)) {
-                    applyTheme(cloudTheme);
-                }
-                if (data.appearance.defaultAvatar) {
-                    applyGlobalAvatar(data.appearance.defaultAvatar);
-                }
-                if (data.appearance.defaultUserAvatar) {
-                    applyGlobalUserAvatar(data.appearance.defaultUserAvatar);
-                }
+                const app = data.appearance;
+                if (app.theme && ['auto','light','dark'].includes(app.theme)) applyTheme(app.theme);
+                if (app.defaultAvatar) applyGlobalAvatar(app.defaultAvatar);
+                if (app.defaultUserAvatar) applyGlobalUserAvatar(app.defaultUserAvatar);
+                
+                // 新增：解析排版设置
+                if (app.aiFontSize !== undefined) styleConfig.aiFontSize = Number(app.aiFontSize);
+                if (app.aiLineHeight !== undefined) styleConfig.aiLineHeight = Number(app.aiLineHeight);
+                if (app.userFontSize !== undefined) styleConfig.userFontSize = Number(app.userFontSize);
+                if (app.userLineHeight !== undefined) styleConfig.userLineHeight = Number(app.userLineHeight);
+                if (app.userBubbleWidth !== undefined) styleConfig.userBubbleWidth = Number(app.userBubbleWidth);
+                applyStyleConfig();
             }
 
             saveCfg(); updateGlobalUI(); updateCloudStatusUI(true); return true;
@@ -1068,7 +1168,12 @@ async function saveGlobalSettings() {
             appearance: { 
                 theme: getThemePref(), 
                 defaultAvatar: globalDefaultAvatar,
-                defaultUserAvatar: globalDefaultUserAvatar
+                defaultUserAvatar: globalDefaultUserAvatar,
+                aiFontSize: styleConfig.aiFontSize,
+                aiLineHeight: styleConfig.aiLineHeight,
+                userFontSize: styleConfig.userFontSize,
+                userLineHeight: styleConfig.userLineHeight,
+                userBubbleWidth: styleConfig.userBubbleWidth
             }
         });
         if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
@@ -1081,7 +1186,7 @@ async function loadConversations() {
     if (!USER_ID) return [];
     try {
         const { data, error } = await supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at, avatar, user_avatar') /* 增加 user_avatar */
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar, user_avatar')
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -1114,11 +1219,7 @@ async function saveConversationSettings(convId, name, prompt, greet, avatar, use
         if (error) console.error('❌ 保存会话设定失败:', error.message);
         const c = conversationsCache.find(x => x.id === convId);
         if (c) { 
-            c.agent_name = name; 
-            c.agent_prompt = prompt; 
-            c.greeting = greet; 
-            c.avatar = avatar; 
-            c.user_avatar = userAvatar;
+            c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; c.avatar = avatar; c.user_avatar = userAvatar;
         }
         if (currentConversation && currentConversation.id === convId) {
             currentConversation.agent_name = name;
