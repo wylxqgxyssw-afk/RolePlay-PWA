@@ -146,7 +146,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .more-btn:hover{background:var(--panel-2);color:var(--text);border-color:var(--border);}
 
 /* ============================================================
-   DeepSeek 风格：设置面板层级滑动（重构版）
+   DeepSeek 风格：设置面板
    ============================================================ */
 #settings-overlay {
     position: fixed; inset: 0; z-index: 500;
@@ -155,12 +155,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 }
 #settings-overlay.show { opacity: 1; pointer-events: auto; }
 
-/* 关键修复：这里固定了高度为 70vh */
 #settings-panel {
     position: absolute; bottom: 0; left: 0; right: 0;
     background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
     transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-    height: 70vh; /* 固定高度防止塌陷 */
+    height: 70vh; 
     display: flex; flex-direction: column;
     overflow: hidden;
     box-shadow: 0 -10px 40px rgba(0,0,0,0.2);
@@ -258,10 +257,46 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   to { opacity: 1; transform: none; }
 }
 
-/* 用户消息：保留右侧气泡 */
+/* 用户消息：保留右侧气泡，新增顶部信息 */
 .msg.user {
   align-self: flex-end;
   max-width: min(78%, 760px);
+}
+.msg.user .msg-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.msg.user .avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--panel-2); /* 使用 panel-2 作为兜底背景，因为用户没有专属 accent 背景 */
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.msg.user .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg.user .meta {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
 }
 .msg.user .content {
   background: var(--bubble-user-bg);
@@ -355,15 +390,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   margin: 8px 0;
 }
 
-/* 名字标识 */
+/* 名字标识（全局兜底） */
 .msg .meta {
   font-size: 11.5px;
   color: var(--muted);
   margin-bottom: 5px;
   padding: 0 4px;
-}
-.msg.user .meta {
-  text-align: right;
 }
 .msg.user .content em {
   color: var(--bubble-user-em);
@@ -607,13 +639,25 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
                 
                 <!-- 默认头像 -->
                 <div class="settings-group">
-                    <div class="settings-group-title">全局默认头像（未单独设置的角色使用）</div>
+                    <div class="settings-group-title">全局默认 AI 头像（未单独设置的角色使用）</div>
                     <div class="avatar-upload-container" style="margin-top: 10px;">
-                        <div class="avatar-preview" id="globalAvatarPreview" title="点击更换默认头像">
+                        <div class="avatar-preview" id="globalAvatarPreview" title="点击更换默认 AI 头像">
                             <span>🤖</span>
                         </div>
-                        <div class="avatar-upload-text" id="globalAvatarUploadText">点击更换默认头像</div>
+                        <div class="avatar-upload-text" id="globalAvatarUploadText">点击更换默认 AI 头像</div>
                         <input type="file" id="globalAvatarFileInput" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+
+                <!-- 全局用户默认头像 -->
+                <div class="settings-group">
+                    <div class="settings-group-title">全局默认用户头像（未单独设置时使用）</div>
+                    <div class="avatar-upload-container" style="margin-top: 10px;">
+                        <div class="avatar-preview" id="globalUserAvatarPreview" title="点击更换默认用户头像">
+                            <span>👤</span>
+                        </div>
+                        <div class="avatar-upload-text" id="globalUserAvatarUploadText">点击更换默认用户头像</div>
+                        <input type="file" id="globalUserAvatarFileInput" accept="image/*" style="display: none;">
                     </div>
                 </div>
             </div>
@@ -626,7 +670,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     <div class="char-settings-card">
         <h3>🎭 角色设定（仅对当前对话生效）</h3>
         
-        <!-- 单角色头像上传 -->
+        <!-- 单角色 AI 头像上传 -->
+        <div class="settings-group-title" style="font-size:13px; margin-bottom:8px;">AI 角色头像</div>
         <div class="avatar-upload-container">
             <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
                 <span>🤖</span>
@@ -635,7 +680,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
             <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
         </div>
 
-        <div class="form-group">
+        <!-- 单角色 用户 头像上传 -->
+        <div class="settings-group-title" style="font-size:13px; margin-bottom:8px; border-top:1px dashed var(--border); padding-top:16px;">当前对话你的头像</div>
+        <div class="avatar-upload-container">
+            <div class="avatar-preview" id="userAvatarPreview" title="点击更换你的头像">
+                <span>👤</span>
+            </div>
+            <div class="avatar-upload-text" id="userAvatarUploadText">点击更换你的头像</div>
+            <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="form-group" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
             <label>角色名</label>
             <input id="modalCharName" spellcheck="false">
         </div>
@@ -683,8 +738,10 @@ let hasBoundEvents = false;
 let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
-let tempAvatarBase64 = null;
-let globalDefaultAvatar = null;
+let tempAvatarBase64 = null;     // 弹窗中暂存的 AI 头像
+let tempUserAvatarBase64 = null; // 弹窗中暂存的用户头像
+let globalDefaultAvatar = null;     // 全局默认 AI 头像
+let globalDefaultUserAvatar = null; // 全局默认用户头像
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -696,19 +753,30 @@ const DEFAULTS = {
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// 获取当前对话的头像 HTML (单角色优先，其次全局默认)
+// 获取 AI 头像
 function getAvatarHtml(convId) {
     let avatar = '🤖';
     const conv = conversationsCache.find(c => c.id === convId);
-    
-    // 优先使用单独设置的头像
     if (conv && conv.avatar) {
         avatar = conv.avatar;
     } else if (globalDefaultAvatar) {
-        // 如果没有单独设置，使用全局默认头像
         avatar = globalDefaultAvatar;
     }
+    if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
+        return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
+    }
+    return escapeHtml(avatar);
+}
 
+// 获取用户头像
+function getUserAvatarHtml(convId) {
+    let avatar = '👤';
+    const conv = conversationsCache.find(c => c.id === convId);
+    if (conv && conv.user_avatar) {
+        avatar = conv.user_avatar;
+    } else if (globalDefaultUserAvatar) {
+        avatar = globalDefaultUserAvatar;
+    }
     if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
         return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
     }
@@ -770,6 +838,16 @@ function applyGlobalAvatar(base64) {
     }
 }
 
+function applyGlobalUserAvatar(base64) {
+    globalDefaultUserAvatar = base64;
+    const preview = $('#globalUserAvatarPreview');
+    if (base64) {
+        preview.innerHTML = `<img src="${base64}" alt="avatar">`;
+    } else {
+        preview.innerHTML = `<span>👤</span>`;
+    }
+}
+
 // 同步外观（主题 + 默认头像）到云端
 async function syncAppearanceToCloud() {
     if (!USER_ID) return;
@@ -777,6 +855,9 @@ async function syncAppearanceToCloud() {
         const appearanceData = { theme: getThemePref() };
         if (globalDefaultAvatar) {
             appearanceData.defaultAvatar = globalDefaultAvatar;
+        }
+        if (globalDefaultUserAvatar) {
+            appearanceData.defaultUserAvatar = globalDefaultUserAvatar;
         }
         
         await supabaseClient.from('agent_settings').upsert({
@@ -793,6 +874,7 @@ function setupThemeUI(){
   // 初始化主题和头像
   applyTheme(getThemePref());
   applyGlobalAvatar(globalDefaultAvatar);
+  applyGlobalUserAvatar(globalDefaultUserAvatar);
 
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -825,7 +907,7 @@ function setupThemeUI(){
       });
   });
 
-  // 全局默认头像上传
+  // 全局默认 AI 头像上传
   $('#globalAvatarPreview').addEventListener('click', () => $('#globalAvatarFileInput').click());
   $('#globalAvatarUploadText').addEventListener('click', () => $('#globalAvatarFileInput').click());
   $('#globalAvatarFileInput').addEventListener('change', function(e) {
@@ -845,6 +927,37 @@ function setupThemeUI(){
               ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
               const base64 = canvas.toDataURL('image/jpeg', 0.8);
               applyGlobalAvatar(base64);
+              syncAppearanceToCloud();
+              // 刷新当前聊天框的头像
+              msgBox.innerHTML = '';
+              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+              e.target.value = '';
+          };
+          img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+  });
+
+  // 全局默认 用户 头像上传
+  $('#globalUserAvatarPreview').addEventListener('click', () => $('#globalUserAvatarFileInput').click());
+  $('#globalUserAvatarUploadText').addEventListener('click', () => $('#globalUserAvatarFileInput').click());
+  $('#globalUserAvatarFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const size = 200; 
+              canvas.width = size; canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSize = Math.min(img.width, img.height);
+              const sx = (img.width - minSize) / 2;
+              const sy = (img.height - minSize) / 2;
+              ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
+              const base64 = canvas.toDataURL('image/jpeg', 0.8);
+              applyGlobalUserAvatar(base64);
               syncAppearanceToCloud();
               // 刷新当前聊天框的头像
               msgBox.innerHTML = '';
@@ -921,9 +1034,11 @@ async function fetchGlobalSettings() {
                 if (cloudTheme && ['auto','light','dark'].includes(cloudTheme)) {
                     applyTheme(cloudTheme);
                 }
-                const cloudAvatar = data.appearance.defaultAvatar;
-                if (cloudAvatar) {
-                    applyGlobalAvatar(cloudAvatar);
+                if (data.appearance.defaultAvatar) {
+                    applyGlobalAvatar(data.appearance.defaultAvatar);
+                }
+                if (data.appearance.defaultUserAvatar) {
+                    applyGlobalUserAvatar(data.appearance.defaultUserAvatar);
                 }
             }
 
@@ -950,7 +1065,11 @@ async function saveGlobalSettings() {
             id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
             temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
             user_name: cfg.userName, user_prompt: cfg.userPrompt,
-            appearance: { theme: getThemePref(), defaultAvatar: globalDefaultAvatar }
+            appearance: { 
+                theme: getThemePref(), 
+                defaultAvatar: globalDefaultAvatar,
+                defaultUserAvatar: globalDefaultUserAvatar
+            }
         });
         if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
         else updateCloudStatusUI(true);
@@ -962,7 +1081,7 @@ async function loadConversations() {
     if (!USER_ID) return [];
     try {
         const { data, error } = await supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at, avatar')
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar, user_avatar') /* 增加 user_avatar */
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -980,20 +1099,33 @@ async function createConversation() {
     } catch (e) { console.error('❌ 创建会话失败:', e); updateCloudStatusUI(false); return null; }
 }
 
-async function saveConversationSettings(convId, name, prompt, greet, avatar) {
+async function saveConversationSettings(convId, name, prompt, greet, avatar, userAvatar) {
     if (!USER_ID || !convId) return;
     try {
         const { error } = await supabaseClient.from('conversations')
-            .update({ agent_name: name, agent_prompt: prompt, greeting: greet, avatar: avatar })
+            .update({ 
+                agent_name: name, 
+                agent_prompt: prompt, 
+                greeting: greet, 
+                avatar: avatar, 
+                user_avatar: userAvatar 
+            })
             .eq('id', convId);
         if (error) console.error('❌ 保存会话设定失败:', error.message);
         const c = conversationsCache.find(x => x.id === convId);
-        if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; c.avatar = avatar; }
+        if (c) { 
+            c.agent_name = name; 
+            c.agent_prompt = prompt; 
+            c.greeting = greet; 
+            c.avatar = avatar; 
+            c.user_avatar = userAvatar;
+        }
         if (currentConversation && currentConversation.id === convId) {
             currentConversation.agent_name = name;
             currentConversation.agent_prompt = prompt;
             currentConversation.greeting = greet;
             currentConversation.avatar = avatar;
+            currentConversation.user_avatar = userAvatar;
         }
     } catch (e) { console.error('❌ 保存会话设定异常:', e); }
 }
@@ -1252,7 +1384,14 @@ function addBubble(role, content, index = null, tokens = null){
         <div class="content"></div>
         <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   } else {
-      wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
+      // 用户消息
+      wrap.innerHTML = `
+        <div class="msg-header">
+          <div class="meta">${escapeHtml(name)}</div>
+          <div class="avatar">${getUserAvatarHtml(currentConversationId)}</div>
+        </div>
+        <div class="content"></div>
+        <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   }
 
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
@@ -1548,23 +1687,29 @@ function bindEvents(){
   // 打开角色设定弹窗
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
-      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting, avatar').eq('id', currentConversationId).single().then(({data, error}) => {
+      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting, avatar, user_avatar').eq('id', currentConversationId).single().then(({data, error}) => {
           if (data) {
               $('#modalCharName').value = data.agent_name || '';
               $('#modalCharPrompt').value = data.agent_prompt || '';
               $('#modalGreeting').value = data.greeting || '';
               tempAvatarBase64 = data.avatar || null;
+              tempUserAvatarBase64 = data.user_avatar || null;
           }
           updateAvatarPreview(tempAvatarBase64);
+          updateUserAvatarPreview(tempUserAvatarBase64);
           $('#char-settings-modal').classList.add('show');
       });
   });
 
-  // 头像预览点击事件
+  // AI 头像预览点击事件
   $('#avatarPreview').addEventListener('click', () => { $('#avatarFileInput').click(); });
   $('#avatarUploadText').addEventListener('click', () => { $('#avatarFileInput').click(); });
 
-  // 头像文件选择及压缩
+  // 用户头像预览点击事件
+  $('#userAvatarPreview').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
+  $('#userAvatarUploadText').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
+
+  // AI 头像文件选择及压缩
   $('#avatarFileInput').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -1575,8 +1720,7 @@ function bindEvents(){
           img.onload = function() {
               const canvas = document.createElement('canvas');
               const size = 200; 
-              canvas.width = size;
-              canvas.height = size;
+              canvas.width = size; canvas.height = size;
               const ctx = canvas.getContext('2d');
               const minSize = Math.min(img.width, img.height);
               const sx = (img.width - minSize) / 2;
@@ -1591,13 +1735,41 @@ function bindEvents(){
       reader.readAsDataURL(file);
   });
 
+  // 用户头像文件选择及压缩
+  $('#userAvatarFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const size = 200; 
+              canvas.width = size; canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSize = Math.min(img.width, img.height);
+              const sx = (img.width - minSize) / 2;
+              const sy = (img.height - minSize) / 2;
+              ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
+              tempUserAvatarBase64 = canvas.toDataURL('image/jpeg', 0.8);
+              updateUserAvatarPreview(tempUserAvatarBase64);
+              e.target.value = '';
+          };
+          img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+  });
+
   function updateAvatarPreview(base64Str) {
       const preview = $('#avatarPreview');
-      if (base64Str) {
-          preview.innerHTML = `<img src="${base64Str}" alt="avatar">`;
-      } else {
-          preview.innerHTML = `<span>🤖</span>`;
-      }
+      if (base64Str) { preview.innerHTML = `<img src="${base64Str}" alt="avatar">`; }
+      else { preview.innerHTML = `<span>🤖</span>`; }
+  }
+  function updateUserAvatarPreview(base64Str) {
+      const preview = $('#userAvatarPreview');
+      if (base64Str) { preview.innerHTML = `<img src="${base64Str}" alt="avatar">`; }
+      else { preview.innerHTML = `<span>👤</span>`; }
   }
 
   $('#cancelCharSettingsBtn').addEventListener('click', () => {
@@ -1614,7 +1786,7 @@ function bindEvents(){
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
 
-      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64);
+      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64, tempUserAvatarBase64);
       
       // 立即刷新界面
       msgBox.innerHTML = '';
