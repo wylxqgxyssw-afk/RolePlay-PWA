@@ -265,11 +265,52 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   word-break: break-word;
   overflow-wrap: anywhere;
 }
-/* AI 消息：DeepSeek 风格，全宽无边框纯文本 */
+
+/* ============================================================
+   AI 消息：新增顶部头像区域，正文完全不受影响
+   ============================================================ */
 .msg.assistant {
   align-self: flex-start;
   max-width: 100%;
 }
+
+/* 顶部：头像和名字水平排列 */
+.msg.assistant .msg-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.msg.assistant .avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  flex-shrink: 0;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+.msg.assistant .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.msg.assistant .meta {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 正文：保持全宽纯文本，没有任何挤压 */
 .msg.assistant .content {
   background: transparent;
   border: none;
@@ -371,6 +412,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .char-settings-card label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; }
 .char-settings-card textarea { min-height: 80px; }
 .char-settings-card .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+/* 新增：头像上传样式 */
+.avatar-upload-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 16px; }
+.avatar-preview {
+    width: 80px; height: 80px; border-radius: 50%; background: var(--panel-2);
+    border: 2px dashed var(--border); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; overflow: hidden; transition: border-color 0.2s;
+}
+.avatar-preview:hover { border-color: var(--accent); }
+.avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-preview span { font-size: 28px; }
+.avatar-upload-text { font-size: 12px; color: var(--accent); margin-top: 8px; cursor: pointer; }
 
 @media(max-width:860px){
   #menuBtn{display:block;}
@@ -476,9 +529,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-clear-chat" id="clearChatBtn">清空当前会话记录</button>
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
-      <!-- 【新增】侧栏底部栏：三点菜单入口 -->
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v1.0</span>
+        <span class="side-foot-meta">RolePlay · v1.1</span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
         <div class="more-menu" id="moreMenu">
           <div class="more-menu-header">外观</div>
@@ -523,6 +575,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 <div id="char-settings-modal">
     <div class="char-settings-card">
         <h3>🎭 角色设定（仅对当前对话生效）</h3>
+        
+        <!-- 新增：头像上传区域 -->
+        <div class="avatar-upload-container">
+            <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
+                <span>🤖</span>
+            </div>
+            <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
+            <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+        </div>
+
         <div class="form-group">
             <label>角色名</label>
             <input id="modalCharName" spellcheck="false">
@@ -571,6 +633,7 @@ let hasBoundEvents = false;
 let hasBoundThemeUI = false;
 let currentLoadedUserId = null;
 let isRegisterMode = false;
+let tempAvatarBase64 = null;
 
 /* ---------- 全局默认配置 ---------- */
 const DEFAULTS = {
@@ -581,6 +644,19 @@ const DEFAULTS = {
 /* ---------- 工具函数 ---------- */
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// 获取当前会话的头像 HTML
+function getAvatarHtml(convId) {
+    let avatar = '🤖';
+    const conv = conversationsCache.find(c => c.id === convId);
+    if (conv && conv.avatar) {
+        avatar = conv.avatar;
+    }
+    if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
+        return `<img src="${escapeHtml(avatar)}" alt="avatar">`;
+    }
+    return escapeHtml(avatar);
+}
 
 // 专业的 Markdown 渲染函数，带流式容错
 function renderContent(s, isStreaming = false){
@@ -766,7 +842,7 @@ async function loadConversations() {
     if (!USER_ID) return [];
     try {
         const { data, error } = await supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at')
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar') /* 增加 avatar */
             .eq('user_id', USER_ID)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -784,19 +860,20 @@ async function createConversation() {
     } catch (e) { console.error('❌ 创建会话失败:', e); updateCloudStatusUI(false); return null; }
 }
 
-async function saveConversationSettings(convId, name, prompt, greet) {
+async function saveConversationSettings(convId, name, prompt, greet, avatar) {
     if (!USER_ID || !convId) return;
     try {
         const { error } = await supabaseClient.from('conversations')
-            .update({ agent_name: name, agent_prompt: prompt, greeting: greet })
+            .update({ agent_name: name, agent_prompt: prompt, greeting: greet, avatar: avatar })
             .eq('id', convId);
         if (error) console.error('❌ 保存会话设定失败:', error.message);
         const c = conversationsCache.find(x => x.id === convId);
-        if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; }
+        if (c) { c.agent_name = name; c.agent_prompt = prompt; c.greeting = greet; c.avatar = avatar; }
         if (currentConversation && currentConversation.id === convId) {
             currentConversation.agent_name = name;
             currentConversation.agent_prompt = prompt;
             currentConversation.greeting = greet;
+            currentConversation.avatar = avatar;
         }
     } catch (e) { console.error('❌ 保存会话设定异常:', e); }
 }
@@ -1045,7 +1122,19 @@ function addBubble(role, content, index = null, tokens = null){
           tokenHtml = `<span class="token-display" title="总 Token: ${totalVal}">T: ${totalVal}</span>`;
       }
   }
-  wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
+
+  if (role === 'assistant') {
+      wrap.innerHTML = `
+        <div class="msg-header">
+          <div class="avatar">${getAvatarHtml(currentConversationId)}</div>
+          <div class="meta">${escapeHtml(name)}</div>
+        </div>
+        <div class="content"></div>
+        <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
+  } else {
+      wrap.innerHTML = `<div class="meta">${escapeHtml(name)}</div><div class="content"></div><div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
+  }
+
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
   msgBox.appendChild(wrap);
 
@@ -1339,15 +1428,57 @@ function bindEvents(){
   // 打开角色设定弹窗
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
-      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting').eq('id', currentConversationId).single().then(({data, error}) => {
+      supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting, avatar').eq('id', currentConversationId).single().then(({data, error}) => {
           if (data) {
               $('#modalCharName').value = data.agent_name || '';
               $('#modalCharPrompt').value = data.agent_prompt || '';
               $('#modalGreeting').value = data.greeting || '';
+              tempAvatarBase64 = data.avatar || null;
           }
+          updateAvatarPreview(tempAvatarBase64);
           $('#char-settings-modal').classList.add('show');
       });
   });
+
+  // 头像预览点击事件
+  $('#avatarPreview').addEventListener('click', () => { $('#avatarFileInput').click(); });
+  $('#avatarUploadText').addEventListener('click', () => { $('#avatarFileInput').click(); });
+
+  // 头像文件选择及压缩
+  $('#avatarFileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+              const canvas = document.createElement('canvas');
+              const size = 200; 
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d');
+              const minSize = Math.min(img.width, img.height);
+              const sx = (img.width - minSize) / 2;
+              const sy = (img.height - minSize) / 2;
+              ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
+              tempAvatarBase64 = canvas.toDataURL('image/jpeg', 0.8);
+              updateAvatarPreview(tempAvatarBase64);
+              e.target.value = '';
+          };
+          img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+  });
+
+  function updateAvatarPreview(base64Str) {
+      const preview = $('#avatarPreview');
+      if (base64Str) {
+          preview.innerHTML = `<img src="${base64Str}" alt="avatar">`;
+      } else {
+          preview.innerHTML = `<span>🤖</span>`;
+      }
+  }
 
   $('#cancelCharSettingsBtn').addEventListener('click', () => {
       $('#char-settings-modal').classList.remove('show');
@@ -1363,9 +1494,13 @@ function bindEvents(){
       const el = document.querySelector(`.conv-item[data-id="${currentConversationId}"] .conv-name`);
       if (el) el.textContent = charName;
 
-      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting);
+      await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64);
+      
+      // 立即刷新界面
+      msgBox.innerHTML = '';
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+
       $('#char-settings-modal').classList.remove('show');
-      alert('角色设定已保存！下次生成将使用新设定。');
   });
 
   $('#logoutBtn').addEventListener('click', async () => { if(!confirm('确定要退出登录吗？')) return; await supabaseClient.auth.signOut(); window.location.reload(); });
