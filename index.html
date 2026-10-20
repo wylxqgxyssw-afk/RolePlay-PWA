@@ -1276,7 +1276,6 @@ async function loadMessagesFromCloud() {
     // 防呆：如果 leaf 丢失或已被删除，回退到最新一条消息
     if (!targetLeafId || !allMsgs.find(m => m.local_id === targetLeafId)) {
         targetLeafId = allMsgs[allMsgs.length - 1].local_id;
-        supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
     }
 
     // 3. 构建树状 Map
@@ -1290,7 +1289,30 @@ async function loadMessagesFromCloud() {
         }
     });
 
-    // 4. 追溯当前路径
+    // === 【新增探底逻辑】 ===
+    // 为了防止 active_leaf_id 被卡在中间节点（如旧的用户消息），需要自动顺着往下找，直到找到最深处的叶子节点
+    let currentId = targetLeafId;
+    while (childrenMap.has(currentId)) {
+        let children = childrenMap.get(currentId);
+        // 按 sibling_order 排序取最新的分支
+        children.sort((a, b) => {
+            const orderA = a.sibling_order || 0;
+            const orderB = b.sibling_order || 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return new Date(a.created_at) - new Date(b.created_at);
+        });
+        // 顺着最后一个子节点往下钻
+        currentId = children[children.length - 1].local_id;
+    }
+    // 修正 targetLeafId 为探底后的真正叶子节点
+    targetLeafId = currentId;
+
+    // 如果探底后的 ID 和数据库不一致，顺手把数据库里的 active_leaf_id 也修正一下
+    if (convData?.active_leaf_id !== targetLeafId) {
+        supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
+    }
+
+    // 4. 追溯当前路径（从真正的叶子节点往上找）
     let currentPath = [];
     let currId = targetLeafId;
     while (currId) {
