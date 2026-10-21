@@ -45,16 +45,12 @@ html[data-theme="dark"]{
   --scrollbar-thumb:#2a3040; --scrollbar-thumb-hover:#3a4256;
   --conv-active-bg:rgba(124,108,255,0.1);
 
-  /* 新增：排版变量 */
+  /* 排版变量 */
   --ai-font-size: 16.5px;
   --ai-line-height: 1.75;
   --user-font-size: 15px;
   --user-line-height: 1.72;
   --user-bubble-max-width: 78%;
-  
-  /* 思考面板变量 */
-  --reasoning-bg: rgba(255,255,255,0.03);
-  --reasoning-border: rgba(255,255,255,0.1);
 }
 
 html[data-theme="light"]{
@@ -73,10 +69,6 @@ html[data-theme="light"]{
   --toast-bg:#ffffff; --stop-bg:#d92d20;
   --scrollbar-thumb:#d1d5db; --scrollbar-thumb-hover:#9ca3af;
   --conv-active-bg:rgba(77,107,254,0.08);
-  
-  /* 思考面板变量 */
-  --reasoning-bg: rgba(0,0,0,0.03);
-  --reasoning-border: rgba(0,0,0,0.08);
 }
 
 html,body{height:100%;height:100dvh;margin:0;}
@@ -425,67 +417,51 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .token-display {font-family: monospace; font-size: 11px; color: var(--token-fg);background: var(--token-bg); padding: 1px 6px; border-radius: 4px; margin-left: auto;}
 
 /* ============================================================
-   思考过程面板样式
+   思考过程面板样式 (DeepSeek 风格)
    ============================================================ */
 .reasoning-box {
-    background: var(--reasoning-bg);
-    border: 1px solid var(--reasoning-border);
-    border-radius: 8px;
     margin-bottom: 12px;
     font-size: 14px;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 .reasoning-header {
-    padding: 8px 12px;
+    padding: 4px 0;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     color: var(--muted);
     font-size: 13px;
     user-select: none;
-    font-weight: 500;
+    transition: color 0.2s;
 }
 .reasoning-header:hover {
-    background: rgba(0,0,0,0.05);
+    color: var(--text);
 }
-[data-theme="dark"] .reasoning-header:hover {
-    background: rgba(255,255,255,0.05);
-}
-.reasoning-icon {
+.reasoning-arrow {
     display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--muted);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid currentColor;
+    transition: transform 0.2s ease;
+    transform: rotate(0deg);
 }
-.reasoning-box.done .reasoning-icon {
-    animation: none;
-    border: none;
-    width: auto;
-    height: auto;
+.reasoning-box:not(.collapsed) .reasoning-arrow {
+    transform: rotate(90deg); /* 展开时箭头向下 */
 }
-.reasoning-box.done .reasoning-icon::after {
-    content: '🧠';
-    font-size: 14px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
 .reasoning-content {
-    padding: 0 12px 12px 12px;
+    padding: 8px 0 8px 18px;
     color: var(--muted);
     font-size: 13px;
     line-height: 1.6;
-    border-top: 1px solid transparent;
     white-space: pre-wrap;
     font-family: monospace;
-}
-.reasoning-box:not(.collapsed) .reasoning-content {
-    border-top-color: var(--reasoning-border);
-    padding-top: 8px;
+    border-left: 2px solid var(--border); /* 左侧一条淡淡的线，半开放感 */
+    margin-left: 4px;
+    margin-top: 4px;
 }
 .reasoning-box.collapsed .reasoning-content {
     display: none;
@@ -650,13 +626,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   <div id="backdrop"></div>
 
   <main class="chat">
-       <header class="chat-head">
+    <header class="chat-head">
       <button class="icon-btn" id="menuBtn" title="设置/会话列表">☰</button>
       <div class="title">
         <span class="n" id="headName">角色</span>
-        <!-- 删除了这里原本的 <span class="sub">角色扮演对话</span> -->
       </div>
-           <div class="head-actions">
+      <div class="head-actions">
         <button class="btn sm" id="openCharSettingsBtn" title="角色设定" style="padding: 6px 10px; display: flex; align-items: center; justify-content: center;">
           <!-- 极简人像线条图标 -->
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1672,9 +1647,9 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null)
   let reasoningHtml = '';
   if (role === 'assistant' && reasoning) {
       reasoningHtml = `
-        <div class="reasoning-box collapsed done">
+        <div class="reasoning-box collapsed">
             <div class="reasoning-header">
-                <span class="reasoning-icon"></span>
+                <span class="reasoning-arrow"></span>
                 <span>已深度思考</span>
             </div>
             <div class="reasoning-content">${escapeHtml(reasoning)}</div>
@@ -1839,10 +1814,11 @@ async function generateAIResponse(contextMsgs) {
   const contentWrap = bubble.querySelector('.content-wrap');
   
   const rBox = document.createElement('div');
-  rBox.className = 'reasoning-box collapsed';
+  // 注意这里去掉了 collapsed，让它默认展开
+  rBox.className = 'reasoning-box'; 
   rBox.innerHTML = `
       <div class="reasoning-header">
-          <span class="reasoning-icon"></span>
+          <span class="reasoning-arrow"></span>
           <span class="reasoning-label">思考中...</span>
       </div>
       <div class="reasoning-content"></div>
@@ -1892,7 +1868,7 @@ async function generateAIResponse(contextMsgs) {
             if (!hasStartedContent) {
                 hasStartedContent = true;
                 if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                rBox.classList.add('done');
+                // 修改文案，且默认收起 (添加 collapsed)
                 rLabel.textContent = `已深度思考 (用时 ${reasoningSeconds} 秒)`;
                 rBox.classList.add('collapsed'); 
             }
@@ -1908,7 +1884,6 @@ async function generateAIResponse(contextMsgs) {
 
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     if (!hasStartedContent) {
-         rBox.classList.add('done');
          rLabel.textContent = `已深度思考 (用时 ${reasoningSeconds} 秒)`;
          rBox.classList.add('collapsed');
     }
@@ -1931,7 +1906,6 @@ async function generateAIResponse(contextMsgs) {
     }
   } catch(err) {
     if (timerInterval) clearInterval(timerInterval);
-    rBox.classList.add('done');
     rBox.classList.add('collapsed');
     rLabel.textContent = `已深度思考`;
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
