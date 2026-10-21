@@ -51,6 +51,10 @@ html[data-theme="dark"]{
   --user-font-size: 15px;
   --user-line-height: 1.72;
   --user-bubble-max-width: 78%;
+  
+  /* 思考面板变量 */
+  --reasoning-bg: rgba(255,255,255,0.03);
+  --reasoning-border: rgba(255,255,255,0.1);
 }
 
 html[data-theme="light"]{
@@ -69,6 +73,10 @@ html[data-theme="light"]{
   --toast-bg:#ffffff; --stop-bg:#d92d20;
   --scrollbar-thumb:#d1d5db; --scrollbar-thumb-hover:#9ca3af;
   --conv-active-bg:rgba(77,107,254,0.08);
+  
+  /* 思考面板变量 */
+  --reasoning-bg: rgba(0,0,0,0.03);
+  --reasoning-border: rgba(0,0,0,0.08);
 }
 
 html,body{height:100%;height:100dvh;margin:0;}
@@ -411,6 +419,73 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .version-switcher button:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
 .version-switcher button:disabled { opacity: 0.3; cursor: not-allowed; }
 .token-display {font-family: monospace; font-size: 11px; color: var(--token-fg);background: var(--token-bg); padding: 1px 6px; border-radius: 4px; margin-left: auto;}
+
+/* ============================================================
+   思考过程面板样式
+   ============================================================ */
+.reasoning-box {
+    background: var(--reasoning-bg);
+    border: 1px solid var(--reasoning-border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+.reasoning-header {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    user-select: none;
+    font-weight: 500;
+}
+.reasoning-header:hover {
+    background: rgba(0,0,0,0.05);
+}
+[data-theme="dark"] .reasoning-header:hover {
+    background: rgba(255,255,255,0.05);
+}
+.reasoning-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--muted);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+.reasoning-box.done .reasoning-icon {
+    animation: none;
+    border: none;
+    width: auto;
+    height: auto;
+}
+.reasoning-box.done .reasoning-icon::after {
+    content: '🧠';
+    font-size: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.reasoning-content {
+    padding: 0 12px 12px 12px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.6;
+    border-top: 1px solid transparent;
+    white-space: pre-wrap;
+    font-family: monospace;
+}
+.reasoning-box:not(.collapsed) .reasoning-content {
+    border-top-color: var(--reasoning-border);
+    padding-top: 8px;
+}
+.reasoning-box.collapsed .reasoning-content {
+    display: none;
+}
 
 .composer{display:flex;gap:10px;align-items:flex-end;padding:12px 16px 16px;padding-bottom: calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:var(--panel);}
 #input{flex:1;resize:none;max-height:180px;min-height:44px;line-height:1.55;padding:11px 14px;border-radius:12px;overflow-y:auto;}
@@ -1004,7 +1079,7 @@ function setupThemeUI(){
               applyGlobalAvatar(base64);
               syncAppearanceToCloud();
               msgBox.innerHTML = '';
-              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
               e.target.value = '';
           };
           img.src = event.target.result;
@@ -1034,7 +1109,7 @@ function setupThemeUI(){
               applyGlobalUserAvatar(base64);
               syncAppearanceToCloud();
               msgBox.innerHTML = '';
-              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
               e.target.value = '';
           };
           img.src = event.target.result;
@@ -1231,6 +1306,7 @@ async function saveMessageToCloud(msg) {
             local_id: msg.local_id, 
             role: msg.role, 
             content: msg.content, 
+            reasoning: msg.reasoning || null, // 保存思考过程
             tokens: msg.tokens || null,
             parent_id: msg.parent_id || null,
             sibling_order: msg.sibling_order || 0
@@ -1254,7 +1330,7 @@ async function loadMessagesFromCloud() {
     
     // 1. 获取当前会话的所有消息
     const { data, error } = await supabaseClient.from('chat_messages')
-        .select('id, role, content, local_id, tokens, created_at, parent_id, sibling_order')
+        .select('id, role, content, reasoning, local_id, tokens, created_at, parent_id, sibling_order')
         .eq('user_id', USER_ID)
         .eq('conversation_id', currentConversationId)
         .order('created_at', { ascending: true });
@@ -1289,30 +1365,25 @@ async function loadMessagesFromCloud() {
         }
     });
 
-    // === 【新增探底逻辑】 ===
-    // 为了防止 active_leaf_id 被卡在中间节点（如旧的用户消息），需要自动顺着往下找，直到找到最深处的叶子节点
+    // 探底逻辑
     let currentId = targetLeafId;
     while (childrenMap.has(currentId)) {
         let children = childrenMap.get(currentId);
-        // 按 sibling_order 排序取最新的分支
         children.sort((a, b) => {
             const orderA = a.sibling_order || 0;
             const orderB = b.sibling_order || 0;
             if (orderA !== orderB) return orderA - orderB;
             return new Date(a.created_at) - new Date(b.created_at);
         });
-        // 顺着最后一个子节点往下钻
         currentId = children[children.length - 1].local_id;
     }
-    // 修正 targetLeafId 为探底后的真正叶子节点
     targetLeafId = currentId;
 
-    // 如果探底后的 ID 和数据库不一致，顺手把数据库里的 active_leaf_id 也修正一下
     if (convData?.active_leaf_id !== targetLeafId) {
         supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
     }
 
-    // 4. 追溯当前路径（从真正的叶子节点往上找）
+    // 4. 追溯当前路径
     let currentPath = [];
     let currId = targetLeafId;
     while (currId) {
@@ -1331,7 +1402,6 @@ async function loadMessagesFromCloud() {
             siblings = allMsgs.filter(x => !x.parent_id);
         }
         
-        // 排序：优先按 sibling_order，其次按时间
         siblings.sort((a, b) => {
             const orderA = a.sibling_order || 0;
             const orderB = b.sibling_order || 0;
@@ -1344,6 +1414,7 @@ async function loadMessagesFromCloud() {
         return { 
             role: m.role, 
             content: m.content, 
+            reasoning: m.reasoning, // 读取思考过程
             local_id: m.local_id, 
             tokens: m.tokens,
             parent_id: m.parent_id,
@@ -1358,7 +1429,6 @@ async function loadMessagesFromCloud() {
 
 /* ---------- 刷新当前聊天界面 ---------- */
 async function refreshCurrentChat() {
-    // 如果正在生成、发送、编辑过程中，忽略 Realtime 的事件，防止并发覆盖
     if (busy || !currentConversationId) return;
     try {
         const res = await loadMessagesFromCloud();
@@ -1366,7 +1436,7 @@ async function refreshCurrentChat() {
             msgs = res.pathMsgs;
             activeLeafId = res.leafId;
             msgBox.innerHTML = '';
-            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
             scrollBottom(true);
         }
     } catch (e) {
@@ -1475,12 +1545,11 @@ async function switchConversation(convId, convObj = null) {
             msgs = cloudRes.pathMsgs;
             activeLeafId = cloudRes.leafId;
             msgBox.innerHTML = '';
-            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
         } else {
             msgBox.innerHTML = '';
             const greetingText = (conv.greeting || '').trim();
             if (greetingText) {
-                // 新建根节点
                 const aiMsg = { role: 'assistant', content: greetingText, local_id: generateId(), parent_id: null, sibling_order: 0 };
                 msgs = [aiMsg];
                 
@@ -1529,7 +1598,7 @@ function updateVersionSwitcher(index, msg) {
     }
 }
 
-function addBubble(role, content, index = null, tokens = null){
+function addBubble(role, content, index = null, tokens = null, reasoning = null){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
   if (index !== null) wrap.setAttribute('data-msg-index', index);
@@ -1540,7 +1609,7 @@ function addBubble(role, content, index = null, tokens = null){
   else actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
   actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
   
-   let tokenHtml = '';
+  let tokenHtml = '';
   if (tokens) {
       let totalVal = 0;
       if (typeof tokens === 'object' && tokens !== null) totalVal = tokens.total_tokens || 0;
@@ -1551,13 +1620,29 @@ function addBubble(role, content, index = null, tokens = null){
       }
   }
 
+  let reasoningHtml = '';
+  if (role === 'assistant' && reasoning) {
+      // 思考面板
+      reasoningHtml = `
+        <div class="reasoning-box collapsed done">
+            <div class="reasoning-header">
+                <span class="reasoning-icon"></span>
+                <span>已深度思考</span>
+            </div>
+            <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+        </div>`;
+  }
+
   if (role === 'assistant') {
       wrap.innerHTML = `
         <div class="msg-header">
           <div class="avatar">${getAvatarHtml(currentConversationId)}</div>
           <div class="meta">${escapeHtml(name)}</div>
         </div>
-        <div class="content"></div>
+        <div class="content-wrap" style="width:100%;">
+            ${reasoningHtml}
+            <div class="content"></div>
+        </div>
         <div class="msg-actions">${actionsHtml}${tokenHtml}</div>`;
   } else {
       wrap.innerHTML = `
@@ -1571,6 +1656,17 @@ function addBubble(role, content, index = null, tokens = null){
 
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
   msgBox.appendChild(wrap);
+
+  // 绑定思考面板折叠事件
+  if (reasoningHtml) {
+      const rBox = wrap.querySelector('.reasoning-box');
+      const rHeader = wrap.querySelector('.reasoning-header');
+      if (rBox && rHeader) {
+          rHeader.addEventListener('click', () => {
+              rBox.classList.toggle('collapsed');
+          });
+      }
+  }
 
   if (index !== null) {
       const msg = msgs[index];
@@ -1610,6 +1706,7 @@ function systemPrompt(){
 
 function buildMessages(contextMsgs){
   const limit = Math.max(2, Number(cfg.ctxLimit) || 30);
+  // 注意：发送给 API 的上下文只保留 role 和 content，剔除 reasoning 字段防止污染上下文
   const hist = contextMsgs.slice(-limit).map(m => ({role: m.role, content: m.content}));
   return [{role:'system', content: systemPrompt()}].concat(hist);
 }
@@ -1625,7 +1722,7 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder('utf-8');
-  let full = '', buf = '', usage = null;
+  let full = '', fullReasoning = '', buf = '', usage = null;
 
   while(true){
     const {done, value} = await reader.read();
@@ -1642,11 +1739,20 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
       if (json.usage) usage = json.usage;
       const choice = json.choices && json.choices[0];
       if(!choice) continue;
-      const delta = (choice.delta && choice.delta.content) ?? (choice.message && choice.message.content) ?? '';
-      if(delta) { full += delta; if (onProgress) onProgress(full); }
+      
+      const delta = choice.delta || {};
+      const reasonDelta = delta.reasoning_content || ''; 
+      const contentDelta = delta.content || '';
+
+      if(reasonDelta) fullReasoning += reasonDelta;
+      if(contentDelta) full += contentDelta;
+
+      if (onProgress && (reasonDelta || contentDelta)) {
+          onProgress(full, fullReasoning);
+      }
     }
   }
-  return { full, usage };
+  return { full, fullReasoning, usage };
 }
 
 /* ---------- 核心业务：发送与生成 ---------- */
@@ -1656,19 +1762,16 @@ async function send(){
   const text = input.value.trim();
   if(!text) return;
   
-  // 加锁，防止 Realtime 干扰
   busy = true;
   setBusyUI(true);
   input.value = ''; autoResize();
 
   try {
-      // 挂载在当前叶子节点下，使用秒级时间戳防溢出
       const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
       msgs.push(userMsg); 
       addBubble('user', text, msgs.length - 1); 
       await saveMessageToCloud(userMsg);
       
-      // 更新活跃叶子节点为刚发的用户消息
       activeLeafId = userMsg.local_id;
       await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
 
@@ -1684,37 +1787,99 @@ async function send(){
 
 async function generateAIResponse(contextMsgs) {
   busy = true; setBusyUI(true);
+  
+  // 预先创建气泡，带有思考区域
   const bubble = addBubble('assistant', '');
   const contentEl = bubble.querySelector('.content');
+  const contentWrap = bubble.querySelector('.content-wrap');
+  
+  // 动态插入思考面板
+  const rBox = document.createElement('div');
+  rBox.className = 'reasoning-box collapsed';
+  rBox.innerHTML = `
+      <div class="reasoning-header">
+          <span class="reasoning-icon"></span>
+          <span class="reasoning-label">思考中...</span>
+      </div>
+      <div class="reasoning-content"></div>
+  `;
+  contentWrap.insertBefore(rBox, contentEl);
+  
+  const rHeader = rBox.querySelector('.reasoning-header');
+  const rLabel = rBox.querySelector('.reasoning-label');
+  const rContent = rBox.querySelector('.reasoning-content');
+  
+  rHeader.addEventListener('click', () => rBox.classList.toggle('collapsed'));
+
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  // AI 消息挂载在当前叶子节点下，使用秒级时间戳防溢出
-  const aiMsg = { role: 'assistant', content: '', local_id: generateId(), tokens: null, parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
+  const aiMsg = { role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null, parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
   
   msgs.push(aiMsg);
   const idx = msgs.length - 1;
   bubble.setAttribute('data-msg-index', idx);
   bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
   
-  // 更新活跃叶子节点为刚生成的 AI 消息
   activeLeafId = aiMsg.local_id;
   await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
   await saveMessageToCloud(aiMsg);
 
   let lastCloudSave = 0;
+  let reasoningSeconds = 0;
+  let timerInterval = null;
+  let hasStartedContent = false;
+
   try {
-    const { full, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText) => {
-        contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
-        if (partialText.length > (aiMsg.lastSavedLength || 0) && Date.now() - lastCloudSave > 2000) {
+    const { full, fullReasoning, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText, partialReasoning) => {
+        // 处理思考过程
+        if (partialReasoning) {
+            rBox.classList.remove('collapsed'); // 确保展示
+            rContent.textContent = partialReasoning;
+            aiMsg.reasoning = partialReasoning;
+            
+            // 首次收到思考数据，启动计时器
+            if (!timerInterval && !hasStartedContent) {
+                timerInterval = setInterval(() => {
+                    reasoningSeconds++;
+                    rLabel.textContent = `思考中 (${reasoningSeconds} 秒)`;
+                }, 1000);
+            }
+        }
+        
+        // 处理正文
+        if (partialText) {
+            if (!hasStartedContent) {
+                hasStartedContent = true;
+                // 正文开始输出，停止计时并折叠思考面板
+                if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                rBox.classList.add('done');
+                rLabel.textContent = `已深度思考 (用时 ${reasoningSeconds} 秒)`;
+                rBox.classList.add('collapsed'); // 自动折叠
+            }
+            contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
             aiMsg.content = partialText;
+        }
+
+        // 定期保存云端
+        if (Date.now() - lastCloudSave > 2000) {
             saveMessageToCloud(aiMsg).catch(e => console.error(e));
             lastCloudSave = Date.now();
-            aiMsg.lastSavedLength = partialText.length;
         }
     });
+
+    // 流式结束，做最终清理
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    if (!hasStartedContent) {
+         rBox.classList.add('done');
+         rLabel.textContent = `已深度思考 (用时 ${reasoningSeconds} 秒)`;
+         rBox.classList.add('collapsed');
+    }
+    
     if(full.trim()){
       contentEl.innerHTML = renderContent(full, false);
-      aiMsg.content = full; aiMsg.tokens = usage ? usage.total_tokens : null;
+      aiMsg.content = full; 
+      aiMsg.reasoning = fullReasoning;
+      aiMsg.tokens = usage ? usage.total_tokens : null;
       if (usage && usage.total_tokens) {
           const tokenSpan = document.createElement('span');
           tokenSpan.className = 'token-display';
@@ -1722,8 +1887,15 @@ async function generateAIResponse(contextMsgs) {
           tokenSpan.textContent = `T: ${usage.total_tokens}`;
           bubble.querySelector('.msg-actions').appendChild(tokenSpan);
       }
-    } else { contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; aiMsg.content = '（模型返回了空内容）'; }
+    } else if (!aiMsg.content) { 
+        contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>'; 
+        aiMsg.content = '（模型返回了空内容）'; 
+    }
   } catch(err) {
+    if (timerInterval) clearInterval(timerInterval);
+    rBox.classList.add('done');
+    rBox.classList.add('collapsed');
+    rLabel.textContent = `已深度思考`;
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
@@ -1733,12 +1905,12 @@ async function generateAIResponse(contextMsgs) {
     
     busy = false; setBusyUI(false);
     
-    // 生成完毕，重新拉取视图（为了把 1/2 版本切换器挂上）
+    // 重新拉取刷新视图
     const res = await loadMessagesFromCloud();
     msgs = res.pathMsgs;
     activeLeafId = res.leafId;
     msgBox.innerHTML = '';
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
     scrollBottom(true);
   }
 }
@@ -1751,7 +1923,6 @@ async function regenerateMessage(index) {
   let userMsgContext = [];
   const parentId = msg.parent_id;
   
-  // 找到 parentId 之前的所有消息作为上下文
   for (let i = index - 1; i >= 0; i--) {
       if (msgs[i].local_id === parentId) {
           userMsgContext = msgs.slice(0, i + 1);
@@ -1760,15 +1931,13 @@ async function regenerateMessage(index) {
   }
   if (!parentId) userMsgContext = []; 
 
-  // 将 activeLeafId 指回父节点，触发新的生成分支
   activeLeafId = parentId;
   
-  // 【核心修复】截断内存数组和 DOM，把旧的 AI 气泡直接从界面上抹去
+  // 截断旧的 AI 气泡
   msgs = msgs.slice(0, index);
   msgBox.innerHTML = '';
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
 
-  // 触发流式生成（新气泡会自动接在刚才的 User 消息下方）
   await generateAIResponse(userMsgContext);
 }
 
@@ -1785,7 +1954,6 @@ async function switchVersion(index, direction) {
   busy = true; setBusyUI(true);
 
   try {
-      // 将当前分支指向目标 sibling
       activeLeafId = targetSibling.local_id;
       await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
 
@@ -1793,7 +1961,7 @@ async function switchVersion(index, direction) {
       msgs = res.pathMsgs;
       activeLeafId = res.leafId;
       msgBox.innerHTML = '';
-      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
       scrollBottom(true);
   } catch(e) {
       console.error("切换分支失败:", e);
@@ -1809,12 +1977,10 @@ async function editUserMessage(index) {
   const newContent = prompt('编辑消息:', msg.content);
   if (newContent === null || newContent.trim() === '' || newContent === msg.content) return;
 
-  // 立刻加锁
   busy = true;
   setBusyUI(true);
 
   try {
-      // 新建一个兄弟节点，使用秒级时间戳防溢出
       const newMsg = {
           role: 'user',
           content: newContent,
@@ -1831,7 +1997,7 @@ async function editUserMessage(index) {
       const res = await loadMessagesFromCloud();
       msgs = res.pathMsgs;
       msgBox.innerHTML = ''; 
-      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
       
       await generateAIResponse(msgs.slice(0, msgs.length));
   } catch (e) {
@@ -1852,7 +2018,6 @@ async function deleteMessage(index) {
     busy = true; setBusyUI(true);
 
     try {
-        // 如果删除的是当前叶子，把 activeLeafId 移到它的父节点
         if (msg.local_id === activeLeafId && msg.parent_id) {
             activeLeafId = msg.parent_id;
             await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
@@ -1864,7 +2029,7 @@ async function deleteMessage(index) {
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
         msgBox.innerHTML = ''; 
-        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
     } catch(e) {
         console.error("删除失败:", e);
     } finally {
@@ -1891,7 +2056,7 @@ function bindEvents(){
   $('#exportBtn').addEventListener('click', () => {
       if(!msgs.length){ alert('还没有对话内容'); return; }
       const nameOf = r => r === 'user' ? (cfg.userName || '我') : ($('#headName').textContent || '角色');
-      const text = msgs.map(m => nameOf(m.role) + '：\n' + m.content).join('\n\n---\n\n');
+      const text = msgs.map(m => nameOf(m.role) + '：\n' + (m.reasoning ? `[思考过程]\n${m.reasoning}\n[正文]\n` : '') + m.content).join('\n\n---\n\n');
       const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
       a.download = ($('#headName').textContent || 'chat') + '-' + new Date().toISOString().slice(0,10) + '.txt'; a.click();
@@ -1908,7 +2073,6 @@ function bindEvents(){
   $('#closeSide').addEventListener('click', () => document.body.classList.remove('side-open'));
   $('#backdrop').addEventListener('click', () => document.body.classList.remove('side-open'));
 
-  // 获取模型列表
   $('#fetchModelsBtn').addEventListener('click', async () => {
     const btn = $('#fetchModelsBtn'); const modelListContainer = $('#modelListContainer');
     const apiBase = $('#apiBase').value.trim(); const apiKey = $('#apiKey').value.trim();
@@ -1933,7 +2097,6 @@ function bindEvents(){
     finally { btn.textContent = '获取'; btn.disabled = false; }
   });
 
-  // 保存全局设置
   $('#applyBtn').addEventListener('click', async () => {
     cfg.apiBase = $('#apiBase').value.trim();
     cfg.apiKey = $('#apiKey').value.trim();
@@ -1947,7 +2110,6 @@ function bindEvents(){
     document.body.classList.remove('side-open'); alert('全局设置已保存！');
   });
 
-  // 打开角色设定弹窗
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
       supabaseClient.from('conversations').select('agent_name, agent_prompt, greeting, avatar, user_avatar').eq('id', currentConversationId).single().then(({data, error}) => {
@@ -2042,7 +2204,7 @@ function bindEvents(){
       await saveConversationSettings(currentConversationId, charName, charPrompt, greeting, tempAvatarBase64, tempUserAvatarBase64);
       
       msgBox.innerHTML = '';
-      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens));
+      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning));
       $('#char-settings-modal').classList.remove('show');
   });
 
