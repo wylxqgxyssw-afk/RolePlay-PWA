@@ -656,9 +656,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <span class="n" id="headName">角色</span>
         <!-- 删除了这里原本的 <span class="sub">角色扮演对话</span> -->
       </div>
-      <div class="head-actions">
-        <button class="btn sm" id="openCharSettingsBtn">🎭 角色设定</button>
-        <button class="btn sm" id="exportBtn">导出</button>
+           <div class="head-actions">
+        <button class="btn sm" id="openCharSettingsBtn" title="角色设定" style="padding: 6px 10px; display: flex; align-items: center; justify-content: center;">
+          <!-- 极简人像线条图标 -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </button>
+        
+        <button class="btn sm" id="exportBtn" title="导出记录" style="padding: 6px 10px; display: flex; align-items: center; justify-content: center;">
+          <!-- 极简下载线条图标 -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </button>
       </div>
     </header>
 
