@@ -1227,45 +1227,16 @@ async function fetchGlobalSettings() {
 
             if (data.appearance) {
                 const app = data.appearance;
-
-                /* =========================================================
-                   主题处理：本地优先 + 时间戳
-                   规则：
-                   1) 本地从未手动选择 → 用云端
-                   2) 本地手动选择过：
-                      a) 云端时间戳 > 本地 → 云端更新，用云端
-                      b) 本地时间戳 > 云端 → 本地更新，推送到云端
-                      c) 时间戳相同 → 不操作
-                   ========================================================= */
-                const cloudTheme = app.theme;
-                const cloudTs = Number(app.theme_updated_at || 0);
-                const localPref = getThemePref();
-                const localTs = getThemeTs();
+                
+                // 【核心改动】彻底废除云端主题覆盖本地！
+                // 只要本地 localStorage 里存了主题，哪怕云端天塌下来，也不用管它。
+                // 如果本地什么都没存过，才用云端的（作为新设备的初始值）。
                 const localManual = isThemeManual();
-
-                let shouldApplyCloud = false;
-                let shouldPushLocal = false;
-
-                if (cloudTheme && ['auto','light','dark'].includes(cloudTheme)) {
-                    if (!localManual) {
-                        // 本地没有明确用户选择，优先采用云端
-                        shouldApplyCloud = true;
-                    } else if (cloudTs > localTs) {
-                        shouldApplyCloud = true;
-                    } else if (localTs > cloudTs) {
-                        shouldPushLocal = true;
-                    }
+                if (!localManual && app.theme && ['auto','light','dark'].includes(app.theme)) {
+                    applyTheme(app.theme, { persist: false }); // 只渲染不写时间戳
                 }
 
-                if (shouldApplyCloud) {
-                    // 应用云端主题（清除 manual 标记：这是"远端"权威值）
-                    applyTheme(cloudTheme, { persist: true, manual: false, ts: cloudTs });
-                }
-                if (shouldPushLocal) {
-                    // 本地手动更新更晚，异步推送，不阻塞
-                    setTimeout(() => { syncAppearanceToCloud(); }, 0);
-                }
-
+                // 头像和排版依旧可以同步
                 if (app.defaultAvatar) applyGlobalAvatar(app.defaultAvatar);
                 if (app.defaultUserAvatar) applyGlobalUserAvatar(app.defaultUserAvatar);
                 
