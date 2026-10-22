@@ -914,28 +914,57 @@ function renderContent(s, isStreaming = false){
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
 /* ================================================================
-   主题与外观系统
+   主题与外观系统（本地优先 + 时间戳 + 重试 + 多标签同步）
    ================================================================ */
 const THEME_KEY = 'rp_theme';
+const THEME_TS_KEY = 'rp_theme_ts';
+const THEME_MANUAL_KEY = 'rp_theme_manual';
+const THEME_SYNC_EVENT_KEY = 'rp_theme_sync_event';
 
 function getThemePref(){
   try { return localStorage.getItem(THEME_KEY) || 'auto'; } catch(e){ return 'auto'; }
 }
+function getThemeTs(){
+  try { return Number(localStorage.getItem(THEME_TS_KEY) || 0); } catch(e){ return 0; }
+}
+function isThemeManual(){
+  try { return localStorage.getItem(THEME_MANUAL_KEY) === '1'; } catch(e){ return false; }
+}
+
 function effectiveTheme(pref){
   if (pref === 'light' || pref === 'dark') return pref;
   return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
 }
-function applyTheme(pref){
+
+/**
+ * 应用主题
+ * opts.persist: 是否写回 localStorage（默认 true）
+ * opts.manual : 是否是用户手动切换（写入时间戳和 manual 标记）
+ * opts.ts     : 时间戳（如果不传且 manual，则使用当前时间）
+ */
+function applyTheme(pref, opts = {}){
+  const { persist = true, manual = false, ts = null } = opts;
   const eff = effectiveTheme(pref);
   document.documentElement.setAttribute('data-theme', eff);
   document.documentElement.style.colorScheme = eff;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', eff === 'dark' ? '#000000' : '#ffffff');
-  try { localStorage.setItem(THEME_KEY, pref); } catch(e){}
-  
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_KEY, pref);
+      if (manual) {
+        localStorage.setItem(THEME_TS_KEY, String(ts || Date.now()));
+        localStorage.setItem(THEME_MANUAL_KEY, '1');
+      } else if (ts) {
+        localStorage.setItem(THEME_TS_KEY, String(ts));
+        localStorage.removeItem(THEME_MANUAL_KEY);
+      }
+    } catch(e){}
+  }
   document.querySelectorAll('.theme-btn').forEach(el => {
     el.classList.toggle('active', el.getAttribute('data-theme-value') === pref);
   });
+  return eff;
 }
 
 // 应用排版变量到 CSS
@@ -979,12 +1008,14 @@ function applyGlobalUserAvatar(base64) {
     }
 }
 
-// 同步外观到云端
+// 同步外观到云端（带时间戳 + 失败重试）
+let appearanceRetryTimer = null;
 async function syncAppearanceToCloud() {
     if (!USER_ID) return;
     try {
         const appearanceData = { 
             theme: getThemePref(),
+            theme_updated_at: getThemeTs(),
             aiFontSize: styleConfig.aiFontSize,
             aiLineHeight: styleConfig.aiLineHeight,
             userFontSize: styleConfig.userFontSize,
@@ -994,28 +1025,50 @@ async function syncAppearanceToCloud() {
         if (globalDefaultAvatar) appearanceData.defaultAvatar = globalDefaultAvatar;
         if (globalDefaultUserAvatar) appearanceData.defaultUserAvatar = globalDefaultUserAvatar;
         
-        await supabaseClient.from('agent_settings').upsert({
+        const { error } = await supabaseClient.from('agent_settings').upsert({
             id: USER_ID,
             appearance: appearanceData
         });
-    } catch (e) { console.warn('同步外观设置失败:', e); }
+        if (error) throw error;
+    } catch (e) {
+        console.warn('同步外观设置失败，稍后重试:', e);
+        if (!appearanceRetryTimer) {
+            appearanceRetryTimer = setTimeout(() => {
+                appearanceRetryTimer = null;
+                syncAppearanceToCloud();
+            }, 5000);
+        }
+    }
 }
 
 function setupThemeUI(){
   if (hasBoundThemeUI) return;
   hasBoundThemeUI = true;
 
-  applyTheme(getThemePref());
+  // 初始应用：只渲染不写回
+  applyTheme(getThemePref(), { persist: false });
   applyGlobalAvatar(globalDefaultAvatar);
   applyGlobalUserAvatar(globalDefaultUserAvatar);
   applyStyleConfig();
 
+  // 系统主题变化监听
   if (window.matchMedia) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => { if (getThemePref() === 'auto') applyTheme('auto'); };
+    const handler = () => {
+        if (getThemePref() === 'auto') {
+            applyTheme('auto', { persist: false });
+        }
+    };
     if (mq.addEventListener) mq.addEventListener('change', handler);
     else if (mq.addListener) mq.addListener(handler);
   }
+
+  // 多标签页同步：其他标签切换主题时，本标签跟随（不写回以免相互覆盖）
+  window.addEventListener('storage', (e) => {
+      if (e.key === THEME_KEY && e.newValue) {
+          applyTheme(e.newValue, { persist: false });
+      }
+  });
 
   const overlay = $('#settings-overlay');
   const panel = $('#settings-panel');
@@ -1032,10 +1085,13 @@ function setupThemeUI(){
   if($('#goToAppearance')) $('#goToAppearance').addEventListener('click', () => panel.classList.add('show-sub'));
   if($('#backToMainBtn')) $('#backToMainBtn').addEventListener('click', () => panel.classList.remove('show-sub'));
 
+  // 主题切换：本地立即生效 + 记录手动时间戳 + 云端异步同步（不阻塞、不回滚）
   document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-          applyTheme(btn.getAttribute('data-theme-value'));
+          const val = btn.getAttribute('data-theme-value');
+          applyTheme(val, { persist: true, manual: true });
           syncAppearanceToCloud();
+          try { localStorage.setItem(THEME_SYNC_EVENT_KEY, String(Date.now())); } catch(e){}
       });
   });
 
@@ -1171,7 +1227,45 @@ async function fetchGlobalSettings() {
 
             if (data.appearance) {
                 const app = data.appearance;
-                if (app.theme && ['auto','light','dark'].includes(app.theme)) applyTheme(app.theme);
+
+                /* =========================================================
+                   主题处理：本地优先 + 时间戳
+                   规则：
+                   1) 本地从未手动选择 → 用云端
+                   2) 本地手动选择过：
+                      a) 云端时间戳 > 本地 → 云端更新，用云端
+                      b) 本地时间戳 > 云端 → 本地更新，推送到云端
+                      c) 时间戳相同 → 不操作
+                   ========================================================= */
+                const cloudTheme = app.theme;
+                const cloudTs = Number(app.theme_updated_at || 0);
+                const localPref = getThemePref();
+                const localTs = getThemeTs();
+                const localManual = isThemeManual();
+
+                let shouldApplyCloud = false;
+                let shouldPushLocal = false;
+
+                if (cloudTheme && ['auto','light','dark'].includes(cloudTheme)) {
+                    if (!localManual) {
+                        // 本地没有明确用户选择，优先采用云端
+                        shouldApplyCloud = true;
+                    } else if (cloudTs > localTs) {
+                        shouldApplyCloud = true;
+                    } else if (localTs > cloudTs) {
+                        shouldPushLocal = true;
+                    }
+                }
+
+                if (shouldApplyCloud) {
+                    // 应用云端主题（清除 manual 标记：这是"远端"权威值）
+                    applyTheme(cloudTheme, { persist: true, manual: false, ts: cloudTs });
+                }
+                if (shouldPushLocal) {
+                    // 本地手动更新更晚，异步推送，不阻塞
+                    setTimeout(() => { syncAppearanceToCloud(); }, 0);
+                }
+
                 if (app.defaultAvatar) applyGlobalAvatar(app.defaultAvatar);
                 if (app.defaultUserAvatar) applyGlobalUserAvatar(app.defaultUserAvatar);
                 
@@ -1190,7 +1284,7 @@ async function fetchGlobalSettings() {
                     id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
                     temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
                     user_name: cfg.userName, user_prompt: cfg.userPrompt,
-                    appearance: { theme: getThemePref() }
+                    appearance: { theme: getThemePref(), theme_updated_at: getThemeTs() }
                 });
             } catch (insertErr) { console.warn('写入默认全局配置失败:', insertErr.message); }
             updateGlobalUI(); return false;
@@ -1207,7 +1301,8 @@ async function saveGlobalSettings() {
             temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
             user_name: cfg.userName, user_prompt: cfg.userPrompt,
             appearance: { 
-                theme: getThemePref(), 
+                theme: getThemePref(),
+                theme_updated_at: getThemeTs(),
                 defaultAvatar: globalDefaultAvatar,
                 defaultUserAvatar: globalDefaultUserAvatar,
                 aiFontSize: styleConfig.aiFontSize,
