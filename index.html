@@ -617,7 +617,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v1.4</span>
+        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">1.0.1</span></span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -815,6 +815,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
+/* ================================================================
+   全局版本控制核心配置
+   ================================================================ */
+const CURRENT_VERSION = '1.0.1'; // 【核心】每次发版改这里！
+
+// 初始化显示版本号
+document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('appVersionDisplay');
+    if (el) el.textContent = CURRENT_VERSION;
+});
+
 /* ---------- Supabase 初始化 ---------- */
 const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
@@ -1002,8 +1013,9 @@ async function syncAppearanceToCloud() {
     if (!USER_ID) return;
     try {
         const appearanceData = { 
+            version: CURRENT_VERSION, // 【新增】同步版本号到云端
             theme: getThemePref(),
-            theme_updated_at: Date.now(), // 强制用当前时间戳覆盖云端
+            theme_updated_at: Date.now(),
             aiFontSize: styleConfig.aiFontSize,
             aiLineHeight: styleConfig.aiLineHeight,
             userFontSize: styleConfig.userFontSize,
@@ -1070,13 +1082,10 @@ function setupThemeUI(){
   if($('#goToAppearance')) $('#goToAppearance').addEventListener('click', () => panel.classList.add('show-sub'));
   if($('#backToMainBtn')) $('#backToMainBtn').addEventListener('click', () => panel.classList.remove('show-sub'));
 
-  // 【核心修改】主题切换：绝对本地优先，先改界面，再存本地，最后异步同步云端，防卡顿防报错
   document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.addEventListener('click', () => {
           const val = btn.getAttribute('data-theme-value');
-          // 1. 立刻改界面 + 存本地
           applyTheme(val, { persist: true, ts: Date.now() });
-          // 2. 后台悄悄同步云端，即使卡死/断网也不影响本地
           syncAppearanceToCloud();
       });
   });
@@ -1214,15 +1223,18 @@ async function fetchGlobalSettings() {
             if (data.appearance) {
                 const app = data.appearance;
                 
-                // 【核心修改】绝对本地优先，只要本地有主题记录，就绝对不听云端的！
+                // 版本检查机制：只要云端有版本，就在控制台输出。如果版本不同，说明有新版本。
+                if (app.version) {
+                    console.log(`[版本控制] 本地版本: ${CURRENT_VERSION} | 云端版本: ${app.version}`);
+                }
+
+                // 绝对本地优先，只要本地有主题记录，就绝对不听云端的！
                 let localTheme = null;
                 try { localTheme = localStorage.getItem('rp_theme'); } catch(e){}
                 
                 if (localTheme) {
-                    // 本地有记录，直接应用本地（防止被云端旧数据强行卡成深色）
                     applyTheme(localTheme, { persist: false });
                 } else if (app.theme && ['auto','light','dark'].includes(app.theme)) {
-                    // 只有在新设备第一次登录（本地彻底空白）时，才认云端的数据
                     applyTheme(app.theme, { persist: true });
                 }
 
@@ -1245,7 +1257,7 @@ async function fetchGlobalSettings() {
                     id: USER_ID, api_base: cfg.apiBase, api_key: cfg.apiKey, model: cfg.model,
                     temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
                     user_name: cfg.userName, user_prompt: cfg.userPrompt,
-                    appearance: { theme: getThemePref(), theme_updated_at: Date.now() }
+                    appearance: { version: CURRENT_VERSION, theme: getThemePref(), theme_updated_at: Date.now() }
                 });
             } catch (insertErr) { console.warn('写入默认全局配置失败:', insertErr.message); }
             updateGlobalUI(); return false;
@@ -1262,6 +1274,7 @@ async function saveGlobalSettings() {
             temperature: Number(cfg.temperature), max_tokens: Number(cfg.maxTokens), ctx_limit: Number(cfg.ctxLimit),
             user_name: cfg.userName, user_prompt: cfg.userPrompt,
             appearance: { 
+                version: CURRENT_VERSION,
                 theme: getThemePref(),
                 theme_updated_at: Date.now(),
                 defaultAvatar: globalDefaultAvatar,
@@ -1870,7 +1883,6 @@ async function generateAIResponse(contextMsgs) {
   const contentWrap = bubble.querySelector('.content-wrap');
   
   const rBox = document.createElement('div');
-  // 注意这里去掉了 collapsed，让它默认展开
   rBox.className = 'reasoning-box'; 
   rBox.innerHTML = `
       <div class="reasoning-header">
@@ -1924,7 +1936,6 @@ async function generateAIResponse(contextMsgs) {
             if (!hasStartedContent) {
                 hasStartedContent = true;
                 if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                // 修改文案，且默认收起 (添加 collapsed)
                 rLabel.textContent = `已深度思考 (用时 ${reasoningSeconds} 秒)`;
                 rBox.classList.add('collapsed'); 
             }
@@ -2379,32 +2390,35 @@ async function loadUserData() {
   setupRealtimeListener();
 }
 
-/* ---------- 热更新机制 ---------- */
-let refreshing = false;
-navigator.serviceWorker && navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    setTimeout(() => { window.location.reload(); }, 300);
-});
-
+/* ================================================================
+   SW 强制更新机制核心（全自动刷新）
+   ================================================================ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw-chat.js').then(reg => {
+    // 1. 在注册 SW 时，带上版本号参数。确保浏览器每次去拉最新 SW
+    navigator.serviceWorker.register('sw-chat.js?v=' + CURRENT_VERSION).then(reg => {
+      // 定时轮询更新（防长期挂机）
       setInterval(() => { reg.update(); }, 300000); 
+      
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing;
         newWorker.addEventListener('statechange', () => {
+          // 发现新代码下载完毕，且旧页面还在
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            const toast = $('#update-toast');
-            toast.style.display = 'flex';
-            $('#update-confirm-btn').onclick = () => {
-                toast.style.display = 'none';
-                newWorker.postMessage({ action: 'skipWaiting' });
-            };
+            // 直接发消息让它跳过等待，立刻激活
+            newWorker.postMessage({ action: 'skipWaiting' });
           }
         });
       });
     }).catch(err => console.log('SW 注册失败:', err));
+
+    // 2. 监听 SW 替换事件。一旦新 SW 接管，直接刷新整个页面！
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+    });
   });
 }
 
