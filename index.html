@@ -30,9 +30,11 @@
 :root,
 html[data-theme="dark"]{
   --bg:#121212; --panel:#1e1e1e; --panel-2:#2a2a2a; --border:#3a3a3a;
+  --divider:rgba(255,255,255,0.07);   /* 统一的分隔线颜色（很淡） */
   --text:#ececec; --muted:#9e9e9e; --accent:#4d6bfe;
   --bubble-user-bg:#2a2a2a; --bubble-user-fg:#ffffff;
-  --bubble-user-em:#e2e8ff; --head-bg:rgba(20,24,36,.72);
+  --bubble-user-em:#e2e8ff;
+  --head-bg:rgba(18,18,18,0.85);      /* 让标题栏和聊天背景融合 */
   --code-bg:rgba(255,255,255,0.1); --code-fg:#a0a0a0; --pre-bg:#1e1e1e;
   --danger:#ff8080; --danger-bg:rgba(255,128,128,0.2);
   --danger-bg-soft:rgba(255,128,128,0.1); --danger-bg-soft2:rgba(255,128,128,0.15);
@@ -55,9 +57,11 @@ html[data-theme="dark"]{
 
 html[data-theme="light"]{
   --bg:#ffffff; --panel:#f7f8fa; --panel-2:#eef0f3; --border:#e3e5e8;
+  --divider:rgba(0,0,0,0.07);         /* 统一的分隔线颜色（很淡） */
   --text:#1a1d21; --muted:#6b7280; --accent:#4d6bfe;
   --bubble-user-bg:#eef1f6; --bubble-user-fg:#1a1d21;
-  --bubble-user-em:#33407a; --head-bg:rgba(255,255,255,.8);
+  --bubble-user-em:#33407a;
+  --head-bg:rgba(255,255,255,0.85);
   --code-bg:rgba(0,0,0,0.06); --code-fg:#6b7280; --pre-bg:#f6f7f9;
   --danger:#d92d20; --danger-bg:rgba(217,45,32,0.12);
   --danger-bg-soft:rgba(217,45,32,0.06); --danger-bg-soft2:rgba(217,45,32,0.1);
@@ -103,7 +107,7 @@ button{font-family:inherit;}
 .side-body{flex:1;overflow-y:auto;padding:16px;}
 
 /* 云端状态指示器 */
-#cloud-status-bar {display: flex;align-items: center; justify-content: center; gap: 6px; padding: 6px 16px; font-size: 12px; color: var(--cloud-fg); background: var(--cloud-bg); border-bottom: 1px solid var(--border); transition: 0.3s;}
+#cloud-status-bar {display: flex;align-items: center; justify-content: center; gap: 6px; padding: 6px 16px; font-size: 12px; color: var(--cloud-fg); background: var(--cloud-bg); border-bottom: 1px solid var(--divider); transition: 0.3s;}
 #cloud-status-bar.online { color: var(--success); }
 #cloud-status-bar.offline { color: var(--danger); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cloud-fg); }
@@ -191,7 +195,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 .settings-header {
     display: flex; align-items: center; padding: 16px 20px;
-    font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--border);
+    font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--divider);
     flex-shrink: 0;
 }
 .settings-header .back-btn {
@@ -215,7 +219,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .settings-list-item .arrow { color: var(--muted); font-size: 18px; }
 
 /* 表单区域 */
-.settings-group { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.settings-group { padding: 16px 20px; border-bottom: 1px solid var(--divider); }
 .settings-group:last-child { border-bottom: none; }
 .settings-group-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
 .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 16px; }
@@ -244,7 +248,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 /* ---------- 聊天区 ---------- */
 .chat{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;}
-.chat-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--head-bg);backdrop-filter:blur(10px);}
+
+/* 标题栏：下边线统一使用 --divider */
+.chat-head{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--divider);background:var(--head-bg);backdrop-filter:blur(10px);}
 .chat-head .title{display:flex;flex-direction:column;line-height:1.3;flex:1;min-width:0;}
 .chat-head .title .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .chat-head .sub{font-size:11.5px;color:var(--muted);}
@@ -459,7 +465,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     line-height: 1.6;
     white-space: pre-wrap;
     font-family: monospace;
-    border-left: 2px solid var(--border); /* 左侧一条淡淡的线，半开放感 */
+    border-left: 2px solid var(--divider);
     margin-left: 4px;
     margin-top: 4px;
 }
@@ -473,7 +479,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .composer-wrap {
     padding: 12px 16px 16px;
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border);
+    /* 上边线统一使用 --divider，和标题栏下边线同色 */
+    border-top: 1px solid var(--divider);
     background: var(--panel);
     display: flex;
     justify-content: center;
@@ -726,7 +733,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <span id="cloud-status-text">云端已连接</span>
     </div>
 
-    <div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">
+    <div style="padding: 10px 16px; border-bottom: 1px solid var(--divider);">
       <button class="btn primary" id="newConvBtn" style="width:100%;">➕ 新建角色对话</button>
     </div>
 
