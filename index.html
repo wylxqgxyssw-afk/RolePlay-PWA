@@ -677,7 +677,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   .edit-modal-card textarea { font-size: 16px !important; min-height: 120px; } /* 防止 iOS 缩放 */
 }
 @media(max-width:640px){
-  #exportBtn{display:none;}
   #messages{padding:16px 12px 8px;}
 }
 ::-webkit-scrollbar{width:9px;height:9px;}
@@ -771,7 +770,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">1.0.2</span></span>
+        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">1.0.3</span></span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -791,15 +790,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
             <circle cx="12" cy="7" r="4"></circle>
-          </svg>
-        </button>
-        
-        <button class="btn sm" id="exportBtn" title="导出记录" style="padding: 6px 10px; display: flex; align-items: center; justify-content: center;">
-          <!-- 极简下载线条图标 -->
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
         </button>
       </div>
@@ -977,9 +967,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
             <label>开场白</label>
             <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
         </div>
-        <div class="actions">
-            <button class="btn" id="cancelCharSettingsBtn">取消</button>
-            <button class="btn primary" id="saveCharSettingsBtn">保存设定</button>
+        <!-- 修改了底部的按钮区域，加入了导出记录按钮 -->
+        <div class="actions" style="justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 16px; margin-top: 16px;">
+            <button class="btn" id="exportBtn" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                导出记录
+            </button>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" id="cancelCharSettingsBtn">取消</button>
+                <button class="btn primary" id="saveCharSettingsBtn">保存设定</button>
+            </div>
         </div>
     </div>
 </div>
@@ -1007,7 +1008,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    全局版本控制核心配置
    ================================================================ */
-const CURRENT_VERSION = '1.0.2'; // 【核心】每次发版改这里！
+const CURRENT_VERSION = '1.0.3'; // 【核心】每次发版改这里！
 
 // 初始化显示版本号
 document.addEventListener('DOMContentLoaded', () => {
@@ -2397,6 +2398,7 @@ function bindEvents(){
       }
   });
 
+  // 导出记录按钮（现在在角色设定弹窗里）
   $('#exportBtn').addEventListener('click', () => {
       if(!msgs.length){ alert('还没有对话内容'); return; }
       const nameOf = r => r === 'user' ? (cfg.userName || '我') : ($('#headName').textContent || '角色');
