@@ -1,3 +1,10 @@
+完全理解。如果只保留文字，把头像全部去掉，整个栏目的高度会大幅降低，背景也能保持完全透明，不再有任何白色块状的遮挡感。
+
+我帮你把输入框上方的多角色选择栏改成了“纯文本标签”样式。去掉了头像显示，把名字改成了无背景/透明背景的按钮样式。当前选中的角色会有高亮文字和微弱的边框，没有选中的角色就是纯文字。这样既清爽，又不会挡住任何聊天内容。
+
+版本号已更新为 `2.0.1`，直接覆盖你的 `index.html` 即可：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -480,67 +487,62 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     align-items: center;
 }
 
-/* 多角色头像横排选择栏 */
+/* 多角色名字选择栏 - 纯文本、无背景、绝对镂空 */
 #agent-selector-bar {
     display: flex;
-    gap: 14px;
+    gap: 8px;
     overflow-x: auto;
     width: 100%;
     max-width: 820px;
-    padding: 4px 0 12px 0;
+    padding: 0 0 10px 0;
     scrollbar-width: none; /* Firefox */
 }
 #agent-selector-bar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
 .agent-select-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
-    opacity: 0.5;
-    transition: 0.2s;
-}
-.agent-select-item:hover {
-    opacity: 0.8;
-}
-.agent-select-item.active {
-    opacity: 1;
-}
-.agent-select-item .avatar {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: var(--panel-2);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
-    border: 2px solid transparent;
-    transition: 0.2s;
-    overflow: hidden;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent; /* 背景完全透明 */
+    border: 1px solid transparent;
 }
-.agent-select-item.active .avatar {
+
+.agent-select-item:hover {
+    background: var(--panel-2);
+}
+
+.agent-select-item.active {
+    background: rgba(77, 107, 254, 0.1);
     border-color: var(--accent);
-    box-shadow: 0 0 10px rgba(77,107,254,0.3);
 }
-.agent-select-item .avatar img {
-    width: 100%; height: 100%; object-fit: cover;
+
+/* 强制隐藏头像 */
+.agent-select-item .avatar {
+    display: none !important;
 }
-/* 名字增加一个小胶囊背景 */
+
+/* 名字样式 - 去掉了胶囊背景 */
 .agent-select-item .name {
-    font-size: 11px;
-    color: var(--text);
-    max-width: 64px;
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: center;
-    background: var(--panel); /* 小背景色 */
-    padding: 2px 8px;
-    border-radius: 12px;
-    margin-top: 2px;
-    border: 1px solid var(--border); /* 加一点细边框，质感更好 */
-    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.agent-select-item.active .name {
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .composer {
@@ -860,7 +862,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">2.0.0</span></span>
+        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">2.0.1</span></span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -888,7 +890,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
     <!-- DeepSeek 风格输入区，上方增加角色选择 -->
     <div class="composer-wrap">
-      <!-- 多角色选择栏 -->
+      <!-- 多角色选择栏（仅显示名字） -->
       <div id="agent-selector-bar"></div>
       
       <div class="composer">
@@ -1110,7 +1112,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    全局版本控制核心配置
    ================================================================ */
-const CURRENT_VERSION = '2.0.0'; // 【核心】多角色群聊版本
+const CURRENT_VERSION = '2.0.1'; // 【核心】多角色群聊版本
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
@@ -1893,7 +1895,7 @@ function renderConversationList(convs) {
     });
 }
 
-/* 渲染输入框上方的角色选择横条 */
+/* 渲染输入框上方的角色选择横条 (去掉头像，纯文字) */
 function renderAgentSelector() {
     const container = $('#agent-selector-bar');
     container.innerHTML = '';
@@ -1902,15 +1904,8 @@ function renderAgentSelector() {
         const item = document.createElement('div');
         item.className = 'agent-select-item' + (agent.id === currentAgentId ? ' active' : '');
         
-        let avatarHtml = '';
-        if (agent.avatar && (agent.avatar.startsWith('data:image') || agent.avatar.startsWith('http'))) {
-            avatarHtml = `<img src="${escapeHtml(agent.avatar)}" alt="avatar">`;
-        } else {
-            avatarHtml = escapeHtml(agent.avatar || '🤖');
-        }
-        
+        // 不再生成头像 HTML，只保留名字
         item.innerHTML = `
-            <div class="avatar">${avatarHtml}</div>
             <div class="name">${escapeHtml(agent.name)}</div>
         `;
         
@@ -2990,3 +2985,4 @@ init();
 </script>
 </body>
 </html>
+```
