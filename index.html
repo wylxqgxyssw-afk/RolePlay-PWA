@@ -51,6 +51,14 @@ html[data-theme="dark"]{
   --user-font-size: 15px;
   --user-line-height: 1.72;
   --user-bubble-max-width: 78%;
+  
+  /* 头像与名字基础尺寸 */
+  --user-avatar-size: 38px;
+  --ai-avatar-size: 38px;
+  --user-avatar-font-size: 20px;
+  --ai-avatar-font-size: 20px;
+  --user-meta-size: 14px;
+  --ai-meta-size: 14px;
 }
 
 html[data-theme="light"]{
@@ -288,15 +296,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   margin-bottom: 12px;
 }
 .msg.user .avatar {
-  width: 38px;
-  height: 38px;
+  width: var(--user-avatar-size);
+  height: var(--user-avatar-size);
   border-radius: 50%;
   background: var(--panel-2);
   color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: var(--user-avatar-font-size);
   font-weight: bold;
   flex-shrink: 0;
   user-select: none;
@@ -305,7 +313,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 }
 .msg.user .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg.user .meta {
-  margin: 0; padding: 0; font-size: 14px; font-weight: 600; color: var(--text); text-align: right;
+  margin: 0; padding: 0; font-size: var(--user-meta-size); font-weight: 600; color: var(--text); text-align: right;
 }
 .msg.user .content {
   background: var(--bubble-user-bg);
@@ -331,15 +339,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   margin-bottom: 12px;
 }
 .msg.assistant .avatar {
-  width: 38px;
-  height: 38px;
+  width: var(--ai-avatar-size);
+  height: var(--ai-avatar-size);
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: var(--ai-avatar-font-size);
   font-weight: bold;
   flex-shrink: 0;
   user-select: none;
@@ -347,7 +355,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   overflow: hidden;
 }
 .msg.assistant .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.msg.assistant .meta { margin: 0; padding: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.msg.assistant .meta { margin: 0; padding: 0; font-size: var(--ai-meta-size); font-weight: 600; color: var(--text); }
 
 .msg.assistant .content {
   background: transparent;
@@ -473,7 +481,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .composer-wrap {
     padding: 10px 16px 16px;
     padding-bottom: calc(16px + env(safe-area-inset-bottom));
-    /* 这里改为透明，去掉大面积的实色遮挡 */
     background: transparent; 
     display: flex;
     flex-direction: column;
@@ -488,9 +495,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     width: 100%;
     max-width: 820px;
     padding: 0 0 10px 0;
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none; 
 }
-#agent-selector-bar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+#agent-selector-bar::-webkit-scrollbar { display: none; } 
 
 .agent-select-item {
     display: inline-flex;
@@ -500,7 +507,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     border-radius: 20px;
     cursor: pointer;
     transition: all 0.2s ease;
-    background: transparent; /* 背景完全透明 */
+    background: transparent; 
     border: 1px solid transparent;
 }
 
@@ -513,12 +520,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     border-color: var(--accent);
 }
 
-/* 强制隐藏头像 */
 .agent-select-item .avatar {
     display: none !important;
 }
 
-/* 名字样式 - 去掉了胶囊背景 */
 .agent-select-item .name {
     font-size: 13px;
     color: var(--muted);
@@ -541,14 +546,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .composer {
     width: 100%;
     max-width: 820px;
-    background: var(--bg); /* 保留背景，让它像悬浮的卡片 */
+    background: var(--bg); 
     border: 1px solid var(--border);
     border-radius: 16px;
     padding: 8px 12px 8px 16px;
     display: flex;
     flex-direction: column;
     transition: border-color 0.2s;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.05); /* 稍微增加阴影，增强悬浮感 */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05); 
 }
 .composer:focus-within {
     border-color: var(--accent);
@@ -855,7 +860,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">2.0.1</span></span>
+        <span class="side-foot-meta">RolePlay · v<span id="appVersionDisplay">2.0.2</span></span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -1105,7 +1110,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    全局版本控制核心配置
    ================================================================ */
-const CURRENT_VERSION = '2.0.1'; // 【核心】多角色群聊版本
+const CURRENT_VERSION = '2.0.2'; // 头像与名字跟随字体缩放
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
@@ -1124,8 +1129,8 @@ const inputEl = $('#input');
 let USER_ID = null;
 let currentConversationId = null;
 let currentConversation = null; 
-let currentAgents = []; // 当前会话的所有角色数组
-let currentAgentId = null; // 当前选中的是哪个角色回复
+let currentAgents = []; 
+let currentAgentId = null; 
 let conversationsCache = [];
 let cfg = {};
 let msgs = [];
@@ -1253,12 +1258,27 @@ function applyTheme(pref, opts = {}){
   return eff;
 }
 
+// 核心：同步排版与缩放
 function applyStyleConfig() {
     document.documentElement.style.setProperty('--ai-font-size', styleConfig.aiFontSize + 'px');
     document.documentElement.style.setProperty('--ai-line-height', styleConfig.aiLineHeight);
     document.documentElement.style.setProperty('--user-font-size', styleConfig.userFontSize + 'px');
     document.documentElement.style.setProperty('--user-line-height', styleConfig.userLineHeight);
     document.documentElement.style.setProperty('--user-bubble-max-width', styleConfig.userBubbleWidth + '%');
+    
+    // 动态计算头像和名字大小（以默认AI 16.5px、用户 15px 为基准）
+    const uScale = styleConfig.userFontSize / 15;
+    const aScale = styleConfig.aiFontSize / 16.5;
+
+    // 用户侧缩放
+    document.documentElement.style.setProperty('--user-avatar-size', (38 * uScale) + 'px');
+    document.documentElement.style.setProperty('--user-avatar-font-size', (20 * uScale) + 'px');
+    document.documentElement.style.setProperty('--user-meta-size', (14 * uScale) + 'px');
+
+    // AI侧缩放
+    document.documentElement.style.setProperty('--ai-avatar-size', (38 * aScale) + 'px');
+    document.documentElement.style.setProperty('--ai-avatar-font-size', (20 * aScale) + 'px');
+    document.documentElement.style.setProperty('--ai-meta-size', (14 * aScale) + 'px');
     
     if($('#valAiFontSize')) $('#valAiFontSize').textContent = styleConfig.aiFontSize + 'px';
     if($('#valAiLineHeight')) $('#valAiLineHeight').textContent = styleConfig.aiLineHeight;
@@ -1601,7 +1621,6 @@ async function createConversation() {
 async function saveConversationSettings(convId, agents, userAvatar) {
     if (!USER_ID || !convId) return;
     try {
-        // 兼容旧字段，默认取第一个角色的信息
         const mainAgent = agents[0] || {name: '角色', prompt: '', greeting: '', avatar: ''};
         
         const { error } = await supabaseClient.from('conversations')
@@ -1857,7 +1876,6 @@ function renderConversationList(convs) {
         const pinIcon = isPinned ? '📍' : '📌';
         const pinClass = isPinned ? 'conv-pin pinned' : 'conv-pin';
         
-        // 取第一个角色的名字作为群名
         const displayName = (c.agents && c.agents.length > 0) ? c.agents[0].name : (c.agent_name || '未命名');
         
         item.innerHTML = `
@@ -1888,7 +1906,7 @@ function renderConversationList(convs) {
     });
 }
 
-/* 渲染输入框上方的角色选择横条 (去掉头像，纯文字) */
+/* 渲染输入框上方的角色选择横条 */
 function renderAgentSelector() {
     const container = $('#agent-selector-bar');
     container.innerHTML = '';
@@ -1897,14 +1915,13 @@ function renderAgentSelector() {
         const item = document.createElement('div');
         item.className = 'agent-select-item' + (agent.id === currentAgentId ? ' active' : '');
         
-        // 不再生成头像 HTML，只保留名字
         item.innerHTML = `
             <div class="name">${escapeHtml(agent.name)}</div>
         `;
         
         item.addEventListener('click', () => {
             currentAgentId = agent.id;
-            renderAgentSelector(); // 刷新高亮
+            renderAgentSelector();
         });
         
         container.appendChild(item);
@@ -1933,7 +1950,6 @@ async function switchConversation(convId, convObj = null) {
         || conversationsCache.find(c => c.id === convId)
         || { id: convId };
         
-    // 向下兼容：如果没 agents，自动用旧字段补全
     if (!conv.agents || conv.agents.length === 0) {
         conv.agents = [{
             id: 'default_agent',
@@ -1947,13 +1963,12 @@ async function switchConversation(convId, convObj = null) {
     currentConversation = conv;
     currentAgents = conv.agents;
     
-    // 默认选中第一个角色
     if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
         currentAgentId = currentAgents[0].id;
     }
 
     updateCurrentConversationUI(conv);
-    renderAgentSelector(); // 渲染头像
+    renderAgentSelector();
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:13px;">正在加载聊天记录...</div>';
 
     try {
@@ -1982,7 +1997,6 @@ async function switchConversation(convId, convObj = null) {
             msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
         } else {
             msgBox.innerHTML = '';
-            // 群聊开场白：把所有角色的开场白都发一遍
             let hasGreeting = false;
             for (let agent of currentAgents) {
                 if (agent.greeting && agent.greeting.trim()) {
@@ -2143,7 +2157,6 @@ function endpoint(){
   return base + '/chat/completions';
 }
 
-// 多角色群聊专用 System Prompt
 function systemPrompt() {
   const agent = currentAgents.find(a => a.id === currentAgentId) || currentAgents[0];
   const promptText = agent ? agent.prompt : '';
@@ -2165,24 +2178,18 @@ function systemPrompt() {
   return parts.join('\n\n');
 }
 
-// 上下文重构核心逻辑
 function buildMessages(contextMsgs){
   const limit = Math.max(2, Number(cfg.ctxLimit) || 30);
-  
-  // 向后兼容处理，截取最近的历史
   const recentMsgs = contextMsgs.slice(-limit);
   
   const hist = recentMsgs.map(m => {
       if (m.role === 'user') {
           return { role: 'user', content: `【${cfg.userName || '用户'}】说：${m.content}` };
       } else {
-          // 如果老消息没有 agent_id，默认当作当前角色说的
           const msgAgentId = m.agent_id || currentAgentId;
           if (msgAgentId === currentAgentId) {
-              // 是我（当前角色）说的
               return { role: 'assistant', content: m.content };
           } else {
-              // 是群里其他 AI 说的
               const otherAgent = currentAgents.find(a => a.id === msgAgentId);
               const otherName = otherAgent ? otherAgent.name : '其他角色';
               return { role: 'user', content: `【${otherName}】说：${m.content}` };
@@ -2407,7 +2414,6 @@ async function regenerateMessage(index) {
   msgBox.innerHTML = '';
   msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
 
-  // 恢复这个角色的id
   currentAgentId = msg.agent_id || currentAgents[0].id;
   renderAgentSelector();
 
@@ -2550,7 +2556,6 @@ function renderCharSettings() {
         const tab = document.createElement('div');
         tab.className = 'agent-tab' + (agent.id === editingAgentId ? ' active' : '');
         
-        // 不能删除最后一个角色
         const deleteBtn = currentAgents.length > 1 ? `<span class="del-agent" data-id="${agent.id}">✕</span>` : '';
         
         tab.innerHTML = `
@@ -2573,7 +2578,6 @@ function renderCharSettings() {
                 return;
             }
             
-            // 切换编辑角色，保存当前表单
             saveFormToCurrentAgent();
             editingAgentId = agent.id;
             renderCharSettings();
@@ -2582,7 +2586,6 @@ function renderCharSettings() {
         tabList.appendChild(tab);
     });
 
-    // 填充表单
     const currentEditAgent = currentAgents.find(a => a.id === editingAgentId);
     if (currentEditAgent) {
         $('#modalCharName').value = currentEditAgent.name || '';
@@ -2598,7 +2601,6 @@ function saveFormToCurrentAgent() {
         agent.name = $('#modalCharName').value.trim() || '未命名';
         agent.prompt = $('#modalCharPrompt').value.trim();
         agent.greeting = $('#modalGreeting').value.trim();
-        // 头像在外部函数中直接修改，不再需要从DOM取
     }
 }
 
@@ -2622,7 +2624,6 @@ function bindEvents(){
   inputEl.addEventListener('input', autoResize);
   inputEl.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); if(!busy) send(); } });
 
-  // 编辑弹窗事件
   $('#cancel-edit-btn').addEventListener('click', () => {
       $('#edit-modal').classList.remove('show');
       editingMsgIndex = null;
@@ -2654,7 +2655,6 @@ function bindEvents(){
       }
   });
 
-  // 导出记录按钮
   $('#exportBtn').addEventListener('click', () => {
       if(!msgs.length){ alert('还没有对话内容'); return; }
       const text = msgs.map(m => {
@@ -2718,11 +2718,9 @@ function bindEvents(){
     document.body.classList.remove('side-open'); alert('全局设置已保存！');
   });
 
-  // 打开角色设定弹窗
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
       
-      // 备份一下当前的 agents，防止点击取消导致数据被污染
       currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
       if (currentAgents.length === 0) {
           currentAgents.push({ id: generateId(), name: '新角色', prompt: '', greeting: '', avatar: '' });
@@ -2734,7 +2732,6 @@ function bindEvents(){
       $('#char-settings-modal').classList.add('show');
   });
 
-  // 添加角色
   $('#addAgentBtn').addEventListener('click', () => {
       saveFormToCurrentAgent();
       const newAgent = {
@@ -2749,7 +2746,6 @@ function bindEvents(){
       renderCharSettings();
   });
 
-  // 头像上传 (单角色 AI)
   $('#avatarPreview').addEventListener('click', () => { $('#avatarFileInput').click(); });
   $('#avatarUploadText').addEventListener('click', () => { $('#avatarFileInput').click(); });
   $('#avatarFileInput').addEventListener('change', function(e) {
@@ -2779,7 +2775,6 @@ function bindEvents(){
       reader.readAsDataURL(file);
   });
 
-  // 头像上传 (用户自己)
   $('#userAvatarPreview').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
   $('#userAvatarUploadText').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
   $('#userAvatarFileInput').addEventListener('change', function(e) {
@@ -2798,7 +2793,7 @@ function bindEvents(){
               const sy = (img.height - minSize) / 2;
               ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
               const base64 = canvas.toDataURL('image/jpeg', 0.8);
-              currentConversation.tempUserAvatar = base64; // 暂存
+              currentConversation.tempUserAvatar = base64; 
               updateUserAvatarPreview(base64);
               e.target.value = '';
           };
@@ -2808,23 +2803,20 @@ function bindEvents(){
   });
 
   $('#cancelCharSettingsBtn').addEventListener('click', () => { 
-      // 恢复到未修改状态
       currentAgents = currentConversation.agents || [];
       if (currentAgents.length > 0) currentAgentId = currentAgents[0].id;
       renderAgentSelector();
       $('#char-settings-modal').classList.remove('show'); 
   });
 
-  // 保存角色设定
   $('#saveCharSettingsBtn').addEventListener('click', async () => {
       saveFormToCurrentAgent();
       
       const userAvatar = currentConversation.tempUserAvatar !== undefined ? currentConversation.tempUserAvatar : currentConversation.user_avatar;
-      currentConversation.user_avatar = userAvatar; // 同步到 conv 对象
+      currentConversation.user_avatar = userAvatar;
 
       await saveConversationSettings(currentConversationId, currentAgents, userAvatar);
       
-      // 更新当前界面的角色
       currentConversation.agents = currentAgents;
       if (!currentAgents.find(a => a.id === currentAgentId)) {
           currentAgentId = currentAgents[0].id;
@@ -2833,7 +2825,6 @@ function bindEvents(){
       updateCurrentConversationUI(currentConversation);
       renderAgentSelector();
       
-      // 重新渲染聊天记录（头像和名字可能变了）
       msgBox.innerHTML = '';
       msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
       
