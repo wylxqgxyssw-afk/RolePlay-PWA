@@ -1,3 +1,10 @@
+没问题，这两个细节确实很影响使用体验。输入框聚焦时的蓝色边框容易造成视觉干扰，而方形的文字发送按钮也不够精致。
+
+我已经帮你把输入框聚焦的高亮效果彻底移除了，并把“发送”按钮改成了类似 DeepSeek 的**小圆形按钮（带向上箭头图标）**，发送过程中会变成停止方块图标。
+
+以下是修改后的完整代码（版本号已升级至 `2.0.7`），直接覆盖即可：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -29,7 +36,7 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <style>
-*{box-sizing:border-box;}
+*{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
 
 /* ============================================================
    主题变量
@@ -617,8 +624,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     transition: border-color 0.2s;
     box-shadow: none; 
 }
+/* 核心：去掉输入框聚焦变蓝 */
 .composer:focus-within {
-    border-color: var(--accent);
+    border-color: var(--border); 
 }
 .composer-input-area {
     display: flex;
@@ -687,31 +695,38 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     width: 18px;
     height: 18px;
 }
+
+/* 核心：发送按钮改版 (圆形箭头) */
 .send-btn {
+    width: 32px;
     height: 32px;
-    padding: 0 16px;
-    border-radius: 8px;
+    border-radius: 50%;
     background: var(--accent);
     color: #fff;
     border: none;
-    font-size: 14px;
-    font-weight: 500;
     cursor: pointer;
     transition: 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
 }
 .send-btn:hover {
     filter: brightness(1.1);
 }
-.send-btn:disabled, .send-btn.stop {
+.send-btn:disabled {
     background: var(--muted);
     cursor: not-allowed;
 }
 .send-btn.stop {
     background: var(--stop-bg);
     cursor: pointer;
+}
+.send-btn svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 
 #backdrop{position:fixed;inset:0;background:var(--backdrop-bg);z-index:40;display:none;}
@@ -973,7 +988,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn btn-logout" id="logoutBtn">退出登录</button>
 
       <div class="side-bottom-bar">
-        <span class="side-foot-meta" id="appVersionTrigger">RolePlay · v<span id="appVersionDisplay">2.0.6</span></span>
+        <span class="side-foot-meta" id="appVersionTrigger">RolePlay · v<span id="appVersionDisplay">2.0.7</span></span>
         <button class="more-btn" id="moreBtn" aria-label="更多设置" title="更多设置">⋯</button>
       </div>
     </div>
@@ -1024,7 +1039,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
             <input type="file" id="fileInput" style="display: none;" accept="image/*,.txt,.pdf">
           </div>
           <div class="toolbar-right">
-            <button id="sendBtn" class="send-btn">发送</button>
+            <!-- 改成圆形带箭头图标 -->
+            <button id="sendBtn" class="send-btn" title="发送">
+              <svg id="sendIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+              <svg id="stopIcon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none; width: 14px; height: 14px;">
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -1290,7 +1314,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    全局版本控制核心配置
    ================================================================ */
-const CURRENT_VERSION = '2.0.6'; // 增加VIP会员系统
+const CURRENT_VERSION = '2.0.7'; // 去除输入框高亮，发送按钮改圆
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
@@ -2762,8 +2786,19 @@ async function deleteMessage(index) {
 function setBusyUI(b){
   const btn = $('#sendBtn'); 
   if(btn) { 
-      btn.textContent = b ? '停止' : '发送'; 
-      btn.classList.toggle('stop', b); 
+      const sendIcon = document.getElementById('sendIcon');
+      const stopIcon = document.getElementById('stopIcon');
+      if (b) {
+          if(sendIcon) sendIcon.style.display = 'none';
+          if(stopIcon) stopIcon.style.display = 'block';
+          btn.classList.add('stop');
+          btn.title = '停止';
+      } else {
+          if(sendIcon) sendIcon.style.display = 'block';
+          if(stopIcon) stopIcon.style.display = 'none';
+          btn.classList.remove('stop');
+          btn.title = '发送';
+      }
   }
   const newBtn = $('#newConvBtn'); 
   if(newBtn) newBtn.disabled = b;
@@ -3308,3 +3343,4 @@ init();
 </script>
 </body>
 </html>
+```
