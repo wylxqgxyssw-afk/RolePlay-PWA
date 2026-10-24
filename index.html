@@ -23,8 +23,14 @@
   } catch (e) {}
 })();
 </script>
+
+<!-- 核心依赖：Markdown解析、KaTeX公式渲染、安全净化 -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked-katex-extension@5.0.0/dist/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+
 <style>
 *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
 
@@ -677,7 +683,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
       <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:11.5px;">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.1</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.2</span></span>
       </div>
     </div>
   </div>
@@ -899,11 +905,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    版本控制
    ================================================================ */
-const CURRENT_VERSION = '2.1.1';
+const CURRENT_VERSION = '2.1.2';
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
     if (el) el.textContent = CURRENT_VERSION;
+    
+    // 初始化 KaTeX 插件扩展
+    if (window.marked && window.markedKatex) {
+        marked.use(markedKatex({
+            throwOnError: false,
+            nonStandard: true // 支持 \( ... \) 和 \[ ... \]
+        }));
+    }
 });
 
 /* ---------- Supabase ---------- */
@@ -981,16 +995,34 @@ function getUserAvatarHtml() {
 
 function renderContent(s, isStreaming = false){
   if (!s) return '';
+  
+  // 流式容错逻辑：如果符号未闭合，降级为纯文本渲染，防止闪烁和报错
   if (isStreaming) {
       const backticks = (s.match(/`/g) || []).length;
       const asterisks = (s.match(/\*\*/g) || []).length;
-      if (backticks % 2 !== 0 || asterisks % 2 !== 0) {
+      
+      // 针对 LaTeX 的流式容错
+      const dollarCount = (s.match(/\$/g) || []).length;
+      const openParenCount = (s.match(/\\\(/g) || []).length;
+      const closeParenCount = (s.match(/\\\)/g) || []).length;
+      const openBracketCount = (s.match(/\\\[/g) || []).length;
+      const closeBracketCount = (s.match(/\\\]/g) || []).length;
+      
+      if (backticks % 2 !== 0 || asterisks % 2 !== 0 || 
+          dollarCount % 2 !== 0 || 
+          openParenCount !== closeParenCount || 
+          openBracketCount !== closeBracketCount) {
           return escapeHtml(s).replace(/\n/g, '<br>');
       }
   }
+  
   try {
       let rawHtml = marked.parse(s, { breaks: true, gfm: true });
-      return DOMPurify.sanitize(rawHtml);
+      // 允许 KaTeX 生成的 MathML 标签和属性通过净化
+      return DOMPurify.sanitize(rawHtml, {
+          ADD_TAGS: ['math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt', 'mroot', 'mtable', 'mtr', 'mtd', 'semantics', 'annotation', 'mtext', 'mspace', 'menclose', 'mstyle', 'merror'],
+          ADD_ATTR: ['encoding', 'xmlns']
+      });
   } catch (e) {
       console.error('Markdown 解析失败:', e);
       return escapeHtml(s).replace(/\n/g, '<br>');
@@ -1925,7 +1957,7 @@ function systemPrompt() {
   parts.push(`你现在正在一个多人聊天群组中，你的角色是【${agentName}】。`);
   parts.push(`【角色设定】\n${promptText}`);
   parts.push(`【群聊规则】\n1. 对话历史中，带有【用户】或【其他角色名】前缀的内容，是别人说的话。\n2. 只有没有前缀的内容，才是你自己（${agentName}）之前说的话。\n3. 请根据当前群聊的上下文，用你角色的性格、口吻进行回复。\n4. 【绝对指令】直接输出你的对话和动作，千万不要在你回复的开头加上你自己的名字（如"${agentName}："），系统已经知道你是谁了。`);
-  parts.push('【格式规范】动作、神态和环境描写请使用反引号 ` 包裹。对话直接输出。绝对禁止使用 * 星号包裹动作。');
+  parts.push('【格式规范】你支持标准的 Markdown 与 LaTeX 语法。可以使用 **加粗**、*斜体*、`代码块` 以及标准的 LaTeX 公式（例如：$\\textbf{加粗文字}$、$\\color{red}{红色文字}$、$\\frac{1}{2}$ 等）。动作、神态和环境描写请使用反引号 ` 包裹，或者直接使用普通段落描写。');
   if ($('#deepThinkBtn').classList.contains('active')) parts.push('【深度思考已开启】请在进行回复前，进行极其详细的心理、逻辑和剧情推演，然后再输出正文。');
   if ($('#searchBtn').classList.contains('active')) parts.push('【智能搜索已开启】请结合你的广泛知识库，给出准确的事实和设定，避免出现常识性错误。');
   return parts.join('\n\n');
@@ -2133,17 +2165,12 @@ async function generateAIResponse(contextMsgs) {
   }
 }
 
-/* ---------- 重新生成 ----------
-   规则：使用当前选中的角色（currentAgentId）来重新生成，
-        不再强制回退到原消息的 agent_id。
-        只有 currentAgentId 无效时，才回退到原消息的 agent_id。
-*/
+/* ---------- 重新生成 ---------- */
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
-  // 构造上下文
   let userMsgContext = [];
   const parentId = msg.parent_id;
   for (let i = index - 1; i >= 0; i--) {
@@ -2156,13 +2183,10 @@ async function regenerateMessage(index) {
 
   activeLeafId = parentId;
 
-  // 视觉上先移除当前消息及之后的（等生成完成后会重新从云端刷新）
   msgs = msgs.slice(0, index);
   msgBox.innerHTML = '';
   msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
 
-  // 关键：不覆盖 currentAgentId，沿用当前选中角色
-  // 仅当 currentAgentId 无效时，才回退到原消息的角色
   if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
       currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
       renderAgentSelector();
@@ -2171,27 +2195,20 @@ async function regenerateMessage(index) {
   await generateAIResponse(userMsgContext);
 }
 
-/* ---------- 继续生成 ----------
-   规则：以被继续的消息为 parent，生成一条新的 AI 消息；
-        生成者是当前选中的角色（currentAgentId），
-        与重新生成保持一致的"当前角色优先"逻辑。
-*/
+/* ---------- 继续生成 ---------- */
 async function continueGeneration(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
-  // 关键：不覆盖 currentAgentId，沿用当前选中角色
   if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
       currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
       renderAgentSelector();
   }
 
-  // 以被继续消息为 parent
   activeLeafId = msg.local_id;
   await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
 
-  // 上下文：从开头到被继续消息（含），末尾追加一条"继续"指令
   const contextMsgs = msgs.slice(0, index + 1).concat([{
       role: 'user',
       content: '（请自然地接着上面的内容继续往下说，不要重复已说过的内容，延续当前角色的语气与动作。）',
