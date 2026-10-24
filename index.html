@@ -683,7 +683,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
       <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:11.5px;">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.2</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.3</span></span>
       </div>
     </div>
   </div>
@@ -905,7 +905,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    版本控制
    ================================================================ */
-const CURRENT_VERSION = '2.1.2';
+const CURRENT_VERSION = '2.1.3';
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
@@ -915,7 +915,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.marked && window.markedKatex) {
         marked.use(markedKatex({
             throwOnError: false,
-            nonStandard: true // 支持 \( ... \) 和 \[ ... \]
+            nonStandard: true // 允许 \( ... \) 和 \[ ... \]
         }));
     }
 });
@@ -996,35 +996,29 @@ function getUserAvatarHtml() {
 function renderContent(s, isStreaming = false){
   if (!s) return '';
   
-  // 流式容错逻辑：如果符号未闭合，降级为纯文本渲染，防止闪烁和报错
+  // 1. 强制格式转换（兼容一切非标准输入）
+  // 将 \[ ... \] 替换为 $$ ... $$
+  let processed = s.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+  // 将 \( ... \) 替换为 $ ... $
+  processed = processed.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+
+  // 2. 流式输出降级处理
   if (isStreaming) {
-      const backticks = (s.match(/`/g) || []).length;
-      const asterisks = (s.match(/\*\*/g) || []).length;
-      
-      // 针对 LaTeX 的流式容错
-      const dollarCount = (s.match(/\$/g) || []).length;
-      const openParenCount = (s.match(/\\\(/g) || []).length;
-      const closeParenCount = (s.match(/\\\)/g) || []).length;
-      const openBracketCount = (s.match(/\\\[/g) || []).length;
-      const closeBracketCount = (s.match(/\\\]/g) || []).length;
-      
-      if (backticks % 2 !== 0 || asterisks % 2 !== 0 || 
-          dollarCount % 2 !== 0 || 
-          openParenCount !== closeParenCount || 
-          openBracketCount !== closeBracketCount) {
-          return escapeHtml(s).replace(/\n/g, '<br>');
-      }
+      // 不再一刀切拦截未闭合符号，直接信任 marked 和 KaTeX 的容错处理
   }
   
   try {
-      let rawHtml = marked.parse(s, { breaks: true, gfm: true });
-      // 允许 KaTeX 生成的 MathML 标签和属性通过净化
+      // 3. Markdown 渲染
+      let rawHtml = marked.parse(processed, { breaks: true, gfm: true });
+      
+      // 4. 彻底的 DOMPurify 白名单放行
+      // 允许 KaTeX 生成的所有数学标签、SVG 标签以及关键样式
       return DOMPurify.sanitize(rawHtml, {
-          ADD_TAGS: ['math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt', 'mroot', 'mtable', 'mtr', 'mtd', 'semantics', 'annotation', 'mtext', 'mspace', 'menclose', 'mstyle', 'merror'],
-          ADD_ATTR: ['encoding', 'xmlns']
+          ADD_TAGS: ['math', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'msqrt', 'mroot', 'mtable', 'mtr', 'mtd', 'semantics', 'annotation', 'mtext', 'mspace', 'menclose', 'mstyle', 'merror', 'svg', 'path', 'line', 'g', 'defs', 'use', 'clipPath', 'rect'],
+          ADD_ATTR: ['encoding', 'xmlns', 'class', 'style', 'aria-hidden', 'focusable', 'role', 'viewBox', 'preserveAspectRatio', 'd', 'fill', 'stroke', 'stroke-width', 'x', 'y', 'width', 'height', 'transform', 'rx', 'ry', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'fill-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'clip-path', 'id', 'href', 'xlink:href', 'xmlns:xlink']
       });
   } catch (e) {
-      console.error('Markdown 解析失败:', e);
+      console.error('Markdown/LaTeX 解析失败:', e);
       return escapeHtml(s).replace(/\n/g, '<br>');
   }
 }
