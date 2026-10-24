@@ -677,7 +677,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
       <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:11.5px;">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.0</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.1.1</span></span>
       </div>
     </div>
   </div>
@@ -899,7 +899,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    版本控制
    ================================================================ */
-const CURRENT_VERSION = '2.1.0';
+const CURRENT_VERSION = '2.1.1';
 
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
@@ -1832,6 +1832,7 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   let actionsHtml = '';
   if (role === 'assistant') {
       actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
+      actionsHtml += `<button class="action-btn continue-btn" data-msg-index="${index}">继续生成</button>`;
       actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
   } else {
       actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
@@ -1935,6 +1936,9 @@ function buildMessages(contextMsgs){
   const recentMsgs = contextMsgs.slice(-limit);
   const hist = recentMsgs.map(m => {
       if (m.role === 'user') {
+          if (m._isContinue) {
+              return { role: 'user', content: m.content };
+          }
           return { role: 'user', content: `【${cfg.userName || '用户'}】说：${m.content}` };
       } else {
           const msgAgentId = m.agent_id || currentAgentId;
@@ -2129,11 +2133,17 @@ async function generateAIResponse(contextMsgs) {
   }
 }
 
+/* ---------- 重新生成 ----------
+   规则：使用当前选中的角色（currentAgentId）来重新生成，
+        不再强制回退到原消息的 agent_id。
+        只有 currentAgentId 无效时，才回退到原消息的 agent_id。
+*/
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
+  // 构造上下文
   let userMsgContext = [];
   const parentId = msg.parent_id;
   for (let i = index - 1; i >= 0; i--) {
@@ -2145,14 +2155,50 @@ async function regenerateMessage(index) {
   if (!parentId) userMsgContext = [];
 
   activeLeafId = parentId;
+
+  // 视觉上先移除当前消息及之后的（等生成完成后会重新从云端刷新）
   msgs = msgs.slice(0, index);
   msgBox.innerHTML = '';
   msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
 
-  currentAgentId = msg.agent_id || currentAgents[0].id;
-  renderAgentSelector();
+  // 关键：不覆盖 currentAgentId，沿用当前选中角色
+  // 仅当 currentAgentId 无效时，才回退到原消息的角色
+  if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
+      currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
+      renderAgentSelector();
+  }
 
   await generateAIResponse(userMsgContext);
+}
+
+/* ---------- 继续生成 ----------
+   规则：以被继续的消息为 parent，生成一条新的 AI 消息；
+        生成者是当前选中的角色（currentAgentId），
+        与重新生成保持一致的"当前角色优先"逻辑。
+*/
+async function continueGeneration(index) {
+  if (busy) return;
+  const msg = msgs[index];
+  if (!msg || msg.role !== 'assistant') return;
+
+  // 关键：不覆盖 currentAgentId，沿用当前选中角色
+  if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
+      currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
+      renderAgentSelector();
+  }
+
+  // 以被继续消息为 parent
+  activeLeafId = msg.local_id;
+  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+
+  // 上下文：从开头到被继续消息（含），末尾追加一条"继续"指令
+  const contextMsgs = msgs.slice(0, index + 1).concat([{
+      role: 'user',
+      content: '（请自然地接着上面的内容继续往下说，不要重复已说过的内容，延续当前角色的语气与动作。）',
+      _isContinue: true
+  }]);
+
+  await generateAIResponse(contextMsgs);
 }
 
 async function switchVersion(index, direction) {
@@ -2655,6 +2701,7 @@ function bindEvents(){
   msgBox.addEventListener('click', async (e) => {
     const target = e.target;
     if (target.classList.contains('regen-btn')) await regenerateMessage(parseInt(target.getAttribute('data-msg-index')));
+    else if (target.classList.contains('continue-btn')) await continueGeneration(parseInt(target.getAttribute('data-msg-index')));
     else if (target.classList.contains('version-btn')) switchVersion(parseInt(target.getAttribute('data-msg-index')), parseInt(target.getAttribute('data-direction')));
     else if (target.classList.contains('edit-btn')) openEditModal(parseInt(target.getAttribute('data-msg-index')));
     else if (target.classList.contains('delete-btn')) await deleteMessage(parseInt(target.getAttribute('data-msg-index')));
