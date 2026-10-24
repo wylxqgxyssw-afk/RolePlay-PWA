@@ -1,54 +1,3 @@
-是的，我们先搞 SQL，再给你完整的代码。
-
-为了不影响你之前的数据，我采用的是**“扩展原有配置表 + 新建订单表”**的方案。
-
-### 第一步：执行 SQL 语句
-
-请去你的 Supabase 控制台 -> SQL Editor 执行以下代码：
-
-```sql
--- 1. 给原有的配置表加上 VIP 状态字段（如果已经有就不用管）
-ALTER TABLE public.agent_settings ADD COLUMN IF NOT EXISTS is_vip boolean DEFAULT false;
-ALTER TABLE public.agent_settings ADD COLUMN IF NOT EXISTS vip_expire_at timestamptz;
-
--- 2. 创建会员订单表，用于接收用户填写的付款单号
-CREATE TABLE IF NOT EXISTS public.vip_orders (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id uuid REFERENCES auth.users(id) NOT NULL,
-    plan_name text NOT NULL,
-    amount numeric NOT NULL,
-    status text DEFAULT 'pending', -- pending, approved
-    payment_note text,
-    created_at timestamptz DEFAULT now()
-);
-
--- 3. 开启订单表的行级安全策略 (RLS)
-ALTER TABLE public.vip_orders ENABLE ROW LEVEL SECURITY;
-
--- 允许用户插入自己的订单
-CREATE POLICY "Users can insert their own orders" ON public.vip_orders FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
-
--- 允许用户查看自己的订单
-CREATE POLICY "Users can view their own orders" ON public.vip_orders FOR SELECT TO authenticated USING (auth.uid() = user_id);
-
--- 允许所有人（实际上只有你在用）查看和更新订单
--- （为了让你能在前端直接做个审核面板，不写后端代码）
-CREATE POLICY "Admins can view all orders" ON public.vip_orders FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Admins can update all orders" ON public.vip_orders FOR UPDATE TO authenticated USING (true);
-```
-
----
-
-### 第二步：完整的修改后代码 (版本 2.0.6)
-
-这次更新包含了：
-1. **新增“会员中心”入口**：在左侧设置面板里，和“外观”并列。
-2. **高级感 VIP 弹窗**：展示套餐权益、收款码（留了位置让你放图）、付款单号提交。
-3. **隐藏的“审核面板”**：为了让你不用去数据库手动改数据，我加了一个隐藏功能。**双击你侧边栏底部那行小字 `RolePlay · v2.0.6`**，就会弹出一个审核列表。你可以看到所有人提交的待审核订单，核对金额和单号没问题后，点“通过”，系统就会自动把他的会员开通并加上时间。
-
-以下是完整的 `index.html` 代码，直接覆盖即可：
-
-```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -3359,4 +3308,3 @@ init();
 </script>
 </body>
 </html>
-```
