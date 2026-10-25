@@ -379,11 +379,23 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .action-btn:hover { color: var(--text); background: var(--border); }
 .action-btn.delete-btn { color: var(--danger); }
 .action-btn.delete-btn:hover { background: var(--danger-bg-soft2); }
-.version-switcher { display: flex; align-items: center; gap: 4px; }
-.version-switcher span { font-variant-numeric: tabular-nums; min-width: calc(28px * var(--font-scale)); text-align: center; font-size: calc(12px * var(--font-scale)); }
-.version-switcher button {background: none; border: 1px solid var(--border); color: var(--muted);cursor: pointer; border-radius: 3px; padding: 0 4px; font-size: calc(12px * var(--font-scale));}
-.version-switcher button:hover:not(:disabled) { color: var(--text); border-color: var(--muted); }
+
+/* DeepSeek 同款极简切换器 */
+.version-switcher { display: flex; align-items: center; gap: 4px; margin: 0 4px; }
+.version-switcher span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.version-switcher button {
+  background: none; 
+  border: none; 
+  color: var(--muted); 
+  cursor: pointer; 
+  padding: 0 4px; 
+  font-size: 14px; 
+  font-family: monospace;
+  transition: color 0.2s;
+}
+.version-switcher button:hover:not(:disabled) { color: var(--text); }
 .version-switcher button:disabled { opacity: 0.3; cursor: not-allowed; }
+
 .token-display {font-family: monospace; font-size: calc(11px * var(--font-scale)); color: var(--token-fg);background: var(--token-bg); padding: 1px 6px; border-radius: 4px; margin-left: auto;}
 
 .reasoning-box { margin-bottom: 12px; font-size: calc(14px * var(--font-scale)); overflow: hidden; transition: all 0.2s ease; }
@@ -407,7 +419,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .composer { width: 100%; max-width: 820px; background-color: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 8px 12px 8px 16px; display: flex; flex-direction: column; transition: border-color 0.2s; }
 .composer:focus-within { border-color: var(--border); }
 
-/* 新增：编辑输入头部 */
+/* 编辑输入头部 */
 #edit-input-header {
   display: none; /* 默认隐藏 */
   align-items: center; 
@@ -509,8 +521,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .admin-order-info { font-size: calc(12px * var(--font-scale)); color: var(--muted); }
 .admin-order-info span { display: block; margin-bottom: 2px; }
 .admin-order-info strong { color: var(--text); font-size: calc(14px * var(--font-scale));}
-
-/* 移除了旧的 #edit-modal 相关样式 */
 
 @media(max-width:640px){
   .msg{max-width: 92%;}
@@ -667,7 +677,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
       <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.0</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.1</span></span>
       </div>
     </div>
   </div>
@@ -721,7 +731,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     <div id="agent-selector-bar"></div>
     <div class="composer">
       
-      <!-- 新增：编辑输入头部 -->
+      <!-- 编辑输入头部 -->
       <div id="edit-input-header">
         <span>修改输入</span>
         <button id="cancel-edit-input-btn">✕</button>
@@ -759,7 +769,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       </div>
     </div>
     
-    <!-- 新增：底部免责声明 -->
+    <!-- 底部免责声明 -->
     <div class="ai-disclaimer">回答由 AI 生成，仅供参考</div>
   </div>
 </div>
@@ -918,7 +928,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    版本控制
    ================================================================ */
-const CURRENT_VERSION = '2.3.0';
+const CURRENT_VERSION = '2.3.1';
 
 /* ---------- 自定义 KaTeX 扩展 ---------- */
 const katexExt = {
@@ -1568,18 +1578,8 @@ async function loadMessagesFromCloud() {
         }
     });
 
-    let currentId = targetLeafId;
-    while (childrenMap.has(currentId)) {
-        let children = childrenMap.get(currentId);
-        children.sort((a, b) => {
-            const orderA = a.sibling_order || 0;
-            const orderB = b.sibling_order || 0;
-            if (orderA !== orderB) return orderA - orderB;
-            return new Date(a.created_at) - new Date(b.created_at);
-        });
-        currentId = children[children.length - 1].local_id;
-    }
-    targetLeafId = currentId;
+    // 核心修复：移除了强制的探底逻辑，完全信任 active_leaf_id
+    // 使得用户能停留在历史分支节点上
 
     if (convData?.active_leaf_id !== targetLeafId) {
         supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
