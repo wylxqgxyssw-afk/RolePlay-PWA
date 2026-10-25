@@ -677,7 +677,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
       <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.1</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.2</span></span>
       </div>
     </div>
   </div>
@@ -928,7 +928,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 /* ================================================================
    版本控制
    ================================================================ */
-const CURRENT_VERSION = '2.3.1';
+const CURRENT_VERSION = '2.3.2';
 
 /* ---------- 自定义 KaTeX 扩展 ---------- */
 const katexExt = {
@@ -1578,8 +1578,19 @@ async function loadMessagesFromCloud() {
         }
     });
 
-    // 核心修复：移除了强制的探底逻辑，完全信任 active_leaf_id
-    // 使得用户能停留在历史分支节点上
+    // 恢复探底逻辑：确保沿着当前 active_leaf_id 找到最底部的叶子节点
+    let currentId = targetLeafId;
+    while (childrenMap.has(currentId)) {
+        let children = childrenMap.get(currentId);
+        children.sort((a, b) => {
+            const orderA = a.sibling_order || 0;
+            const orderB = b.sibling_order || 0;
+            if (orderA !== orderB) return orderA - orderB;
+            return new Date(a.created_at) - new Date(b.created_at);
+        });
+        currentId = children[children.length - 1].local_id;
+    }
+    targetLeafId = currentId;
 
     if (convData?.active_leaf_id !== targetLeafId) {
         supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
@@ -1915,7 +1926,6 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   if (role === 'user' && index !== null) {
       const contentEl = wrap.querySelector('.content');
       contentEl.addEventListener('click', (e) => {
-          // 防止点选文字时触发
           if (window.getSelection().toString() === '') {
               openEditModal(index);
           }
