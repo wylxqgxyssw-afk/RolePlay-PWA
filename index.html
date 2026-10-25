@@ -510,6 +510,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 ::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:5px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
 ::-webkit-scrollbar-track{background:transparent;}
+
+/* ===== 账号管理 ===== */
+#account-modal { position: fixed; inset: 0; z-index: 650; background: var(--overlay-bg); display: none; align-items: center; justify-content: center; padding: 20px; }
+#account-modal.show { display: flex; }
+
+.account-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 8px; background: var(--panel-2);
+}
+.account-item .acc-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--panel);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0; border: 1px solid var(--border);
+}
+.account-item .acc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* 账号入口的迷你头像 */
+#accountMiniAvatar { width:42px; height:42px; border-radius:50%; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; overflow:hidden; margin:0; }
+#accountMiniAvatar img { width:100%; height:100%; object-fit:cover; }
 </style>
 </head>
 <body>
@@ -535,6 +555,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     <button class="btn-login" id="auth-login-btn">登录</button>
     <button class="btn-register" id="auth-register-btn">没有账号？点击注册</button>
     <div class="auth-msg" id="auth-msg"></div>
+
+    <div id="authSavedAccounts" style="display:none; margin-top:16px; border-top:1px dashed var(--border); padding-top:14px;">
+      <div style="font-size:calc(12px * var(--font-scale)); color:var(--muted); margin-bottom:8px;">本机已保存的账号（点击切换）</div>
+      <div id="authSavedList"></div>
+    </div>
   </div>
 </div>
 
@@ -785,6 +810,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       <button class="btn sm" id="addAgentBtn" style="font-size:calc(12px * var(--font-scale)); padding: 4px 8px;">➕ 添加角色</button>
     </h3>
 
+    <button class="settings-list-item" id="openAccountBtn" style="margin-bottom:16px; background:var(--panel-2);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="avatar-preview" id="accountMiniAvatar">
+          <span style="font-size:20px;">👤</span>
+        </div>
+        <div style="text-align:left;">
+          <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
+          <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
+        </div>
+      </div>
+      <span class="arrow">›</span>
+    </button>
+
     <div class="agent-tab-list" id="agentTabList"></div>
 
     <div id="agentEditForm">
@@ -865,6 +903,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </div>
 </div>
 
+<div id="account-modal">
+  <div class="vip-card" style="max-width:480px;">
+    <h3 style="color:var(--text);">👤 账号管理</h3>
+
+    <div style="margin-bottom:16px;">
+      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:10px;">当前账号</div>
+      <div class="account-item" id="currentAccountBox" style="cursor:default;"></div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:10px;">其他已保存账号</div>
+      <div id="accountListBox"></div>
+    </div>
+
+    <div style="display:flex; gap:10px;">
+      <button class="btn primary" id="addAccountBtn" style="flex:1;">＋ 添加账号</button>
+      <button class="btn" id="closeAccountModal">关闭</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const CURRENT_VERSION = '2.3.2';
@@ -932,6 +991,7 @@ let isRegisterMode = false;
 let globalDefaultAvatar = null;
 let globalDefaultUserAvatar = null;
 let activeLeafId = null;
+let currentUserEmail = '';
 
 let currentVipStatus = { is_vip: false, expire_at: null };
 let selectedVipPlan = { name: '月卡', amount: 30 };
@@ -2609,6 +2669,7 @@ function bindEvents(){
 
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
+      renderAccountMini();
       currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
       if (currentAgents.length === 0) {
           currentAgents.push({ id: generateId(), name: '新角色', prompt: '', greeting: '', avatar: '' });
@@ -2727,7 +2788,191 @@ function bindEvents(){
     else if (target.classList.contains('edit-btn')) openEditModal(parseInt(target.getAttribute('data-msg-index')));
     else if (target.classList.contains('delete-btn')) await deleteMessage(parseInt(target.getAttribute('data-msg-index')));
   });
+
+  // ==================== 账号管理事件 ====================
+  const openAccBtn = $('#openAccountBtn');
+  if (openAccBtn) {
+      openAccBtn.addEventListener('click', () => {
+          saveCurrentAccountToCache();
+          renderAccountMini();
+          renderAccountModal();
+          $('#account-modal').classList.add('show');
+      });
+  }
+  const closeAccBtn = $('#closeAccountModal');
+  if (closeAccBtn) closeAccBtn.addEventListener('click', () => $('#account-modal').classList.remove('show'));
+
+  const addAccBtn = $('#addAccountBtn');
+  if (addAccBtn) addAccBtn.addEventListener('click', addAccount);
 }
+
+/* ==================== 账号管理模块 ==================== */
+const ACCOUNTS_KEY = 'rp_accounts';
+
+function getSupabaseStorageKey() {
+  const m = String(SUPABASE_URL).match(/^https:\/\/([^.]+)\.supabase\.co/);
+  return m ? `sb-${m[1]}-auth-token` : null;
+}
+
+function getAccounts() {
+  try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveAccounts(list) {
+  try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list)); } catch(e) {}
+}
+
+function upsertAccountFromSession(session) {
+  if (!session || !session.user) return;
+  const list = getAccounts();
+  const uid = session.user.id;
+  const existing = list.find(a => a.uid === uid);
+  const snapshot = {
+    access_token: session.access_token,
+    token_type: session.token_type,
+    expires_in: session.expires_in,
+    expires_at: session.expires_at,
+    refresh_token: session.refresh_token,
+    user: session.user
+  };
+  const entry = {
+    uid,
+    email: session.user.email || (existing ? existing.email : ''),
+    session: snapshot,
+    updated_at: Date.now()
+  };
+  if (existing) Object.assign(existing, entry);
+  else list.push(entry);
+  saveAccounts(list);
+}
+
+function saveCurrentAccountToCache() {
+  try {
+    const key = getSupabaseStorageKey();
+    if (!key) return;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.user) upsertAccountFromSession(parsed);
+  } catch(e) { console.warn('保存当前账号失败:', e); }
+}
+
+function renderAccountMini() {
+  const emailEl = $('#accountMiniEmail');
+  const avatarEl = $('#accountMiniAvatar');
+  if (!emailEl || !avatarEl) return;
+  emailEl.textContent = currentUserEmail || USER_ID || '未登录';
+  if (globalDefaultUserAvatar) {
+    avatarEl.innerHTML = `<img src="${globalDefaultUserAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;">`;
+  } else {
+    avatarEl.innerHTML = '<span style="font-size:20px;">👤</span>';
+  }
+}
+
+function renderAccountModal() {
+  const currentBox = $('#currentAccountBox');
+  const listBox = $('#accountListBox');
+  if (!currentBox || !listBox) return;
+
+  const avatarHtml = globalDefaultUserAvatar
+    ? `<img src="${globalDefaultUserAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;">`
+    : '<span style="font-size:18px;">👤</span>';
+
+  currentBox.innerHTML = `
+    <div class="acc-avatar">${avatarHtml}</div>
+    <div style="flex:1; text-align:left; margin-left:10px; min-width:0;">
+      <div style="font-size:calc(13px * var(--font-scale)); font-weight:600; word-break:break-all;">${escapeHtml(currentUserEmail || USER_ID || '未登录')}</div>
+      <div style="font-size:calc(11px * var(--font-scale)); color:var(--muted);">当前正在使用</div>
+    </div>
+  `;
+
+  listBox.innerHTML = '';
+  const others = getAccounts().filter(a => a.uid !== USER_ID);
+  if (others.length === 0) {
+    listBox.innerHTML = '<div class="muted" style="font-size:calc(12px * var(--font-scale)); padding:8px 0;">暂无其他已保存账号，点击下方「添加账号」登录。</div>';
+    return;
+  }
+  others.forEach(acc => {
+    const item = document.createElement('div');
+    item.className = 'account-item';
+    item.innerHTML = `
+      <div class="acc-avatar"><span style="font-size:18px;">👤</span></div>
+      <div style="flex:1; text-align:left; margin-left:10px; min-width:0;">
+        <div style="font-size:calc(13px * var(--font-scale)); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(acc.email || acc.uid)}</div>
+      </div>
+      <button class="btn sm switch-acc-btn">切换</button>
+      <button class="btn sm remove-acc-btn" style="color:var(--danger); border-color:var(--danger);">移除</button>
+    `;
+    item.querySelector('.switch-acc-btn').addEventListener('click', () => switchAccount(acc.uid));
+    item.querySelector('.remove-acc-btn').addEventListener('click', () => removeAccount(acc.uid));
+    listBox.appendChild(item);
+  });
+}
+
+function renderSavedAccountsInAuth() {
+  const box = $('#authSavedAccounts');
+  const listBox = $('#authSavedList');
+  if (!box || !listBox) return;
+  const list = getAccounts();
+  if (list.length === 0) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  listBox.innerHTML = '';
+  list.forEach(acc => {
+    const item = document.createElement('div');
+    item.className = 'account-item';
+    item.style.cursor = 'pointer';
+    item.innerHTML = `
+      <div class="acc-avatar"><span style="font-size:18px;">👤</span></div>
+      <div style="flex:1; text-align:left; margin-left:10px; min-width:0;">
+        <div style="font-size:calc(13px * var(--font-scale)); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(acc.email || acc.uid)}</div>
+      </div>
+      <span style="font-size:calc(12px * var(--font-scale)); color:var(--accent); font-weight:600;">切换</span>
+    `;
+    item.addEventListener('click', () => switchAccount(acc.uid));
+    listBox.appendChild(item);
+  });
+}
+
+function switchAccount(uid) {
+  if (uid === USER_ID) { alert('已经是当前账号了'); return; }
+  saveCurrentAccountToCache();
+  const target = getAccounts().find(a => a.uid === uid);
+  if (!target || !target.session) { alert('账号信息缺失，请重新登录该账号'); return; }
+  const key = getSupabaseStorageKey();
+  if (!key) { alert('无法定位登录存储，请刷新页面重试'); return; }
+  try {
+    localStorage.setItem(key, JSON.stringify(target.session));
+    window.location.reload();
+  } catch(e) {
+    alert('切换账号失败：' + (e.message || e));
+  }
+}
+
+function removeAccount(uid) {
+  if (uid === USER_ID) { alert('不能移除当前正在使用的账号'); return; }
+  if (!confirm('确定要从此设备移除该账号吗？（不会注销账号，只是清除本机保存）')) return;
+  saveAccounts(getAccounts().filter(a => a.uid !== uid));
+  renderAccountModal();
+}
+
+async function addAccount() {
+  if (!confirm('添加新账号需要先退出当前账号。\n当前账号已保存在本机，可随时在登录界面或账号管理里切换回来。\n\n是否继续？')) return;
+  saveCurrentAccountToCache();
+  try { await supabaseClient.auth.signOut({ scope: 'local' }); } catch(e) { console.warn(e); }
+
+  document.querySelectorAll('#account-modal,#char-settings-modal,#vip-modal,#admin-modal').forEach(m => m.classList.remove('show'));
+  USER_ID = null;
+  currentLoadedUserId = null;
+  authOverlay.classList.remove('hidden');
+  authMsg.textContent = '';
+  authMsg.className = 'auth-msg';
+  $('#auth-title').textContent = '登录 / 添加账号';
+  $('#auth-subtitle').textContent = '登录后将作为当前账号，原账号已保存在本机';
+  authLoginBtn.textContent = '登录';
+  authRegisterBtn.textContent = '没有账号？点击注册';
+  isRegisterMode = false;
+  renderSavedAccountsInAuth();
+}
+/* ==================== 账号管理模块结束 ==================== */
 
 const authOverlay = $('#auth-overlay');
 const authEmail = $('#auth-email');
@@ -2770,18 +3015,26 @@ async function init() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session && session.user) {
     USER_ID = session.user.id;
+    currentUserEmail = session.user.email || '';
+    upsertAccountFromSession(session);
     authOverlay.classList.add('hidden');
     await new Promise(r => setTimeout(r, 80));
     await loadUserData();
   } else {
     authOverlay.classList.remove('hidden');
+    renderSavedAccountsInAuth();
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      currentUserEmail = session.user.email || '';
+      upsertAccountFromSession(session);
+    }
     if (event === 'SIGNED_OUT') {
       USER_ID = null;
       currentLoadedUserId = null;
       authOverlay.classList.remove('hidden');
+      renderSavedAccountsInAuth();
     } else if (session && session.user && USER_ID !== session.user.id) {
       USER_ID = session.user.id;
       authOverlay.classList.add('hidden');
@@ -2797,6 +3050,7 @@ async function loadUserData() {
   updateGlobalUI();
   bindEvents();
   await fetchGlobalSettings();
+  renderAccountMini();
 
   let convs = await loadConversations();
   if (convs.length === 0) {
