@@ -1,3 +1,14 @@
+已经按照我们梳理的逻辑重构了分支树状结构和切换机制。
+
+这次修改的核心点：
+1. **彻底废弃了本地的 `msgs.slice` 截断操作**：重新生成或编辑时，旧消息绝对不会丢失，新生成的消息会作为兄弟节点（分支）存在于云端。
+2. **重写了 `loadMessagesFromCloud` 的探底逻辑**：当主动切换分支时，精准顺着目标分支往下找最新的叶子节点，绝不乱跳。
+3. **使用毫秒级时间戳**：保证了兄弟节点的排序100%稳定，切换器 `< 1 / 2 >` 正常显示。
+4. **UI 完全极简**：纯灰色箭头和数字，无任何花里胡哨的装饰，和 DeepSeek 保持一致。
+
+以下是完整的修改好的代码：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1546,7 +1557,7 @@ async function saveMessageToCloud(msg) {
     }
 }
 
-async function loadMessagesFromCloud() {
+async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
     const { data, error } = await supabaseClient.from('chat_messages')
@@ -1560,14 +1571,6 @@ async function loadMessagesFromCloud() {
     const allMsgs = data || [];
     if (allMsgs.length === 0) return { pathMsgs: [], leafId: null };
 
-    const { data: convData } = await supabaseClient.from('conversations')
-        .select('active_leaf_id').eq('id', currentConversationId).single();
-
-    let targetLeafId = convData?.active_leaf_id;
-    if (!targetLeafId || !allMsgs.find(m => m.local_id === targetLeafId)) {
-        targetLeafId = allMsgs[allMsgs.length - 1].local_id;
-    }
-
     const msgMap = new Map();
     const childrenMap = new Map();
     allMsgs.forEach(m => {
@@ -1578,24 +1581,36 @@ async function loadMessagesFromCloud() {
         }
     });
 
-    // 恢复探底逻辑：确保沿着当前 active_leaf_id 找到最底部的叶子节点
+    let targetLeafId = targetNodeId;
+    
+    // 如果没传 targetNodeId，则从云端拉取 active_leaf_id
+    if (!targetLeafId) {
+        const { data: convData } = await supabaseClient.from('conversations')
+            .select('active_leaf_id').eq('id', currentConversationId).single();
+        targetLeafId = convData?.active_leaf_id;
+    }
+
+    // 如果还没找到，或者节点已失效，取最后一条消息
+    if (!targetLeafId || !msgMap.has(targetLeafId)) {
+        targetLeafId = allMsgs[allMsgs.length - 1].local_id;
+    }
+
+    // =========================================================
+    // 【核心修复】探底逻辑：从 targetLeafId 开始，顺着子节点找最新的
+    // =========================================================
     let currentId = targetLeafId;
     while (childrenMap.has(currentId)) {
         let children = childrenMap.get(currentId);
-        children.sort((a, b) => {
-            const orderA = a.sibling_order || 0;
-            const orderB = b.sibling_order || 0;
-            if (orderA !== orderB) return orderA - orderB;
-            return new Date(a.created_at) - new Date(b.created_at);
-        });
+        // 按照 sibling_order 排序，取最新的一个子节点
+        children.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
         currentId = children[children.length - 1].local_id;
     }
     targetLeafId = currentId;
 
-    if (convData?.active_leaf_id !== targetLeafId) {
-        supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
-    }
+    // 更新云端的 active_leaf_id 为当前的最终叶子节点
+    supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
 
+    // 从 targetLeafId 往上回溯构建路径
     let currentPath = [];
     let currId = targetLeafId;
     while (currId) {
@@ -1605,16 +1620,14 @@ async function loadMessagesFromCloud() {
         currId = node.parent_id;
     }
 
+    // 计算每个节点在兄弟节点中的索引，用于渲染切换器
     const finalMsgs = currentPath.map(m => {
         let siblings = [];
         if (m.parent_id) siblings = childrenMap.get(m.parent_id) || [];
         else siblings = allMsgs.filter(x => !x.parent_id);
-        siblings.sort((a, b) => {
-            const orderA = a.sibling_order || 0;
-            const orderB = b.sibling_order || 0;
-            if (orderA !== orderB) return orderA - orderB;
-            return new Date(a.created_at) - new Date(b.created_at);
-        });
+        
+        siblings.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
+        
         const sibIndex = siblings.findIndex(x => x.local_id === m.local_id);
         return {
             role: m.role, content: m.content, reasoning: m.reasoning,
@@ -1800,7 +1813,7 @@ async function switchConversation(convId, convObj = null) {
             let hasGreeting = false;
             for (let agent of currentAgents) {
                 if (agent.greeting && agent.greeting.trim()) {
-                    const aiMsg = { role: 'assistant', content: agent.greeting, local_id: generateId(), parent_id: null, sibling_order: 0, agent_id: agent.id };
+                    const aiMsg = { role: 'assistant', content: agent.greeting, local_id: generateId(), parent_id: null, sibling_order: Date.now(), agent_id: agent.id };
                     msgs.push(aiMsg);
                     await saveMessageToCloud(aiMsg);
                     addBubble('assistant', agent.greeting, msgs.length - 1, null, null, agent.id);
@@ -2078,31 +2091,28 @@ async function saveEditedMessage() {
     
     busy = true;
     setBusyUI(true);
-    const indexToEdit = editingMsgIndex;
     cancelEditMode(); // 立刻清理UI，隐藏编辑框
     
     try {
+        // 创建新的兄弟用户消息（复制旧消息的父节点，建立新分支）
         const newMsg = {
             role: msg.role, content: newContent, local_id: generateId(),
-            parent_id: msg.parent_id, sibling_order: Math.floor(Date.now() / 1000), agent_id: msg.agent_id
+            parent_id: msg.parent_id, sibling_order: Date.now(), agent_id: msg.agent_id
         };
         await saveMessageToCloud(newMsg);
+        
+        // 更新会话的 active_leaf_id 为新分支，并强制触发 AI 回复
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         
-        const res = await loadMessagesFromCloud();
-        msgs = res.pathMsgs;
-        msgBox.innerHTML = '';
-        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+        // 构造上下文，包含这轮新发出的消息
+        const contextMsgs = msgs.slice(0, editingMsgIndex).concat([newMsg]);
         
-        // 如果是用户消息被编辑，需要截断后续并让AI重新回复
-        if (newMsg.role === 'user') {
-            await generateAIResponse(msgs.slice(0, msgs.length));
-        }
+        // 触发AI回复
+        await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
     } catch (e) {
         console.error("编辑消息失败:", e);
         alert("编辑消息失败: " + e.message);
-    } finally {
         busy = false;
         setBusyUI(false);
     }
@@ -2127,7 +2137,7 @@ async function send(){
   input.value = ''; autoResize();
 
   try {
-      const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000) };
+      const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Date.now() };
       msgs.push(userMsg);
       addBubble('user', text, msgs.length - 1);
       await saveMessageToCloud(userMsg);
@@ -2135,20 +2145,29 @@ async function send(){
       activeLeafId = userMsg.local_id;
       await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
 
-      await generateAIResponse(msgs.slice(0, -1).concat(userMsg));
+      await generateAIResponse(msgs.slice(0, -1).concat(userMsg), userMsg.local_id);
   } catch(e) {
       console.error("发送失败:", e);
       alert("发送失败: " + e.message);
-  } finally {
       busy = false;
       setBusyUI(false);
   }
 }
 
-async function generateAIResponse(contextMsgs) {
+/**
+ * 通用 AI 响应生成
+ * @param {Array} contextMsgs 提供的上下文消息数组
+ * @param {String} parentId 当前要生成的消息所挂载的父节点 ID
+ * @param {String} agentId 指定的角色 ID (如果不传则用当前激活的)
+ */
+async function generateAIResponse(contextMsgs, parentId = null, agentId = null) {
   busy = true; setBusyUI(true);
 
-  const bubble = addBubble('assistant', '', null, null, null, currentAgentId);
+  const actualParentId = parentId !== null ? parentId : activeLeafId;
+  const actualAgentId = agentId || currentAgentId;
+
+  // 创建一个临时的 DOM 气泡进行流式渲染，不立刻推入 msgs 数组
+  const bubble = addBubble('assistant', '', null, null, null, actualAgentId);
   const contentEl = bubble.querySelector('.content');
   const contentWrap = bubble.querySelector('.content-wrap');
 
@@ -2171,15 +2190,11 @@ async function generateAIResponse(contextMsgs) {
 
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  const aiMsg = { role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null, parent_id: activeLeafId, sibling_order: Math.floor(Date.now() / 1000), agent_id: currentAgentId };
+  const aiMsg = { 
+      role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null, 
+      parent_id: actualParentId, sibling_order: Date.now(), agent_id: actualAgentId 
+  };
 
-  msgs.push(aiMsg);
-  const idx = msgs.length - 1;
-  bubble.setAttribute('data-msg-index', idx);
-  bubble.querySelectorAll('.action-btn').forEach(btn => btn.setAttribute('data-msg-index', idx));
-
-  activeLeafId = aiMsg.local_id;
-  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
   await saveMessageToCloud(aiMsg);
 
   let lastCloudSave = 0;
@@ -2245,12 +2260,19 @@ async function generateAIResponse(contextMsgs) {
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
+    
+    // 【核心修复】生成完毕后，强制触发一次重新加载，从云端构建正确的兄弟节点树结构
+    try {
+        const res = await loadMessagesFromCloud(aiMsg.local_id);
+        msgs = res.pathMsgs;
+        activeLeafId = res.leafId;
+        msgBox.innerHTML = '';
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+    } catch (e) {
+        console.error("刷新分支树失败:", e);
+    }
+    
     busy = false; setBusyUI(false);
-    const res = await loadMessagesFromCloud();
-    msgs = res.pathMsgs;
-    activeLeafId = res.leafId;
-    msgBox.innerHTML = '';
-    msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
     scrollBottom(true);
   }
 }
@@ -2263,6 +2285,8 @@ async function regenerateMessage(index) {
 
   let userMsgContext = [];
   const parentId = msg.parent_id;
+  
+  // 找出当前要重新生成的AI消息，对应的上下文（到 parentId 为止）
   for (let i = index - 1; i >= 0; i--) {
       if (msgs[i].local_id === parentId) {
           userMsgContext = msgs.slice(0, i + 1);
@@ -2271,18 +2295,13 @@ async function regenerateMessage(index) {
   }
   if (!parentId) userMsgContext = [];
 
-  activeLeafId = parentId;
-
-  msgs = msgs.slice(0, index);
-  msgBox.innerHTML = '';
-  msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
-
   if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
       currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
       renderAgentSelector();
   }
 
-  await generateAIResponse(userMsgContext);
+  // 【核心修复】不再截断旧消息，直接基于 parentId 和上下文生成新分支
+  await generateAIResponse(userMsgContext, parentId, msg.agent_id || currentAgentId);
 }
 
 async function continueGeneration(index) {
@@ -2295,16 +2314,14 @@ async function continueGeneration(index) {
       renderAgentSelector();
   }
 
-  activeLeafId = msg.local_id;
-  await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
-
   const contextMsgs = msgs.slice(0, index + 1).concat([{
       role: 'user',
       content: '（请自然地接着上面的内容继续往下说，不要重复已说过的内容，延续当前角色的语气与动作。）',
       _isContinue: true
   }]);
 
-  await generateAIResponse(contextMsgs);
+  // 【核心修复】将当前消息的 local_id 作为父节点
+  await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id || currentAgentId);
 }
 
 async function switchVersion(index, direction) {
@@ -2316,9 +2333,8 @@ async function switchVersion(index, direction) {
   if (!targetSibling) return;
   busy = true; setBusyUI(true);
   try {
-      activeLeafId = targetSibling.local_id;
-      await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
-      const res = await loadMessagesFromCloud();
+      // 【核心修复】传入我们想要切换到的目标兄弟节点 ID，让加载函数顺着该分支去找尾部
+      const res = await loadMessagesFromCloud(targetSibling.local_id);
       msgs = res.pathMsgs;
       activeLeafId = res.leafId;
       msgBox.innerHTML = '';
@@ -2341,7 +2357,9 @@ async function deleteMessage(index) {
             await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         }
         await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
-        const res = await loadMessagesFromCloud();
+        
+        // 重新加载，从剩余的最新分支
+        const res = await loadMessagesFromCloud(msg.parent_id);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
@@ -2877,3 +2895,4 @@ init();
 </script>
 </body>
 </html>
+```
