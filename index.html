@@ -1472,9 +1472,11 @@ async function saveMessageToCloud(msg) {
 }
 
 // =====================================================================
-// 【终极核心】加载消息：无论是否传 targetNodeId，都必须向下探底
-// 如果传了 targetNodeId（切分支/重新生成等），从该节点出发往最深处找
-// 如果没传，从 active_leaf_id 或最后一条出发往最深处找
+// 【核心】加载消息：探底 + 回溯 + 路径前驱修正 + 防自环/断链
+// - 探底：从起点开始按数据库 parent_id 关系往最新叶子找
+// - 回溯：从叶子往上，路径前驱（rawPath[i-1]）就是当前节点的真父节点
+// - 修正：渲染用 trueParentId，不信任数据库可能存在的脏 parent_id
+// - 保护：返回 _raw_parent_id 供后续修复判断
 // =====================================================================
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
@@ -1491,16 +1493,9 @@ async function loadMessagesFromCloud(targetNodeId = null) {
     if (allMsgs.length === 0) return { pathMsgs: [], leafId: null };
 
     const msgMap = new Map();
-    const childrenMap = new Map();
-    allMsgs.forEach(m => {
-        msgMap.set(m.local_id, m);
-        if (m.parent_id) {
-            if (!childrenMap.has(m.parent_id)) childrenMap.set(m.parent_id, []);
-            childrenMap.get(m.parent_id).push(m);
-        }
-    });
+    allMsgs.forEach(m => msgMap.set(m.local_id, m));
 
-    // 1. 决定起点节点
+    // 1. 决定起点
     let startNodeId = targetNodeId;
     if (!startNodeId) {
         const { data: convData } = await supabaseClient.from('conversations')
@@ -1511,40 +1506,70 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         startNodeId = allMsgs[allMsgs.length - 1].local_id;
     }
 
-    // 2. 【关键】从起点开始，无论如何都往下探底找最新叶子
+    // 2. 建 childrenMap（过滤自环）
+    const childrenMap = new Map();
+    allMsgs.forEach(m => {
+        if (m.parent_id && m.parent_id !== m.local_id && msgMap.has(m.parent_id)) {
+            if (!childrenMap.has(m.parent_id)) childrenMap.set(m.parent_id, []);
+            childrenMap.get(m.parent_id).push(m);
+        }
+    });
+
+    // 3. 探底：从起点往最新叶子找
     let targetLeafId = startNodeId;
-    while (childrenMap.has(targetLeafId)) {
-        let children = childrenMap.get(targetLeafId);
+    const visited = new Set();
+    while (childrenMap.has(targetLeafId) && !visited.has(targetLeafId)) {
+        visited.add(targetLeafId);
+        const children = childrenMap.get(targetLeafId);
         children.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
         targetLeafId = children[children.length - 1].local_id;
     }
 
-    // 3. 更新云端 active_leaf_id
-    supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
-
-    // 4. 从叶子往上回溯构建路径
-    let currentPath = [];
+    // 4. 回溯构建路径（防自环/断链）
+    const rawPath = [];
     let currId = targetLeafId;
-    while (currId) {
+    const backtrackVisited = new Set();
+    while (currId && !backtrackVisited.has(currId)) {
+        backtrackVisited.add(currId);
         const node = msgMap.get(currId);
         if (!node) break;
-        currentPath.unshift(node);
+        rawPath.unshift(node);
+        if (node.parent_id === node.local_id) break;
         currId = node.parent_id;
     }
 
-    // 5. 计算每个消息的兄弟信息
-    const finalMsgs = currentPath.map(m => {
-        let siblings = [];
-        if (m.parent_id) siblings = childrenMap.get(m.parent_id) || [];
-        else siblings = allMsgs.filter(x => !x.parent_id);
-        
+    // 5. 更新云端 active_leaf_id
+    supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
+
+    // 6. 用路径前驱计算真父节点和兄弟
+    const finalMsgs = rawPath.map((m, i) => {
+        const trueParentId = i > 0 ? rawPath[i - 1].local_id : null;
+
+        // 找兄弟：所有 parent_id 指向 trueParentId 的消息（排除自环）
+        let siblings = allMsgs.filter(x => {
+            if (x.local_id === m.local_id) return true; // 一定包含自己
+            if (x.parent_id === x.local_id) return false; // 排除自环
+            if (trueParentId === null) {
+                return !x.parent_id || !msgMap.has(x.parent_id);
+            }
+            return x.parent_id === trueParentId;
+        });
+
         siblings.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
-        
         const sibIndex = siblings.findIndex(x => x.local_id === m.local_id);
+
         return {
-            role: m.role, content: m.content, reasoning: m.reasoning,
-            local_id: m.local_id, tokens: m.tokens, parent_id: m.parent_id, agent_id: m.agent_id,
-            _sibTotal: siblings.length, _sibIndex: sibIndex, _siblings: siblings
+            role: m.role,
+            content: m.content,
+            reasoning: m.reasoning,
+            local_id: m.local_id,
+            tokens: m.tokens,
+            parent_id: trueParentId,          // 渲染用：修正后的父节点
+            _raw_parent_id: m.parent_id || null, // 数据库原始值（供修复判断）
+            agent_id: m.agent_id,
+            _sibTotal: siblings.length,
+            _sibIndex: sibIndex >= 0 ? sibIndex : 0,
+            _siblings: siblings
         };
     });
 
@@ -1979,6 +2004,10 @@ function cancelEditMode() {
     autoResize();
 }
 
+// =====================================================================
+// 【核心修复】编辑用户消息：真父节点 = msgs[editingMsgIndex-1].local_id
+// 并顺手修复旧用户消息的 parent_id（如果脏了）
+// =====================================================================
 async function saveEditedMessage() {
     if (busy || editingMsgIndex === null) return;
     const msg = msgs[editingMsgIndex];
@@ -1992,19 +2021,33 @@ async function saveEditedMessage() {
     
     busy = true;
     setBusyUI(true);
+    const idxSnapshot = editingMsgIndex;
     cancelEditMode();
     
     try {
+        // 真父节点：路径前驱
+        const trueParentId = idxSnapshot > 0 ? msgs[idxSnapshot - 1].local_id : null;
+
+        // 顺手修复旧用户消息的 parent_id（如果脏了）
+        if (msg._raw_parent_id !== undefined && msg._raw_parent_id !== trueParentId) {
+            try {
+                await supabaseClient.from('chat_messages')
+                    .update({ parent_id: trueParentId })
+                    .eq('local_id', msg.local_id);
+                console.log(`[修复] 用户消息 ${msg.local_id} 的 parent_id: ${msg._raw_parent_id} → ${trueParentId}`);
+            } catch (e) { console.error('修复旧用户消息 parent_id 失败:', e); }
+        }
+
         const newMsg = {
             role: msg.role, content: newContent, local_id: generateId(),
-            parent_id: msg.parent_id, sibling_order: Date.now(), agent_id: msg.agent_id
+            parent_id: trueParentId, sibling_order: Date.now(), agent_id: msg.agent_id
         };
         await saveMessageToCloud(newMsg);
         
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         
-        const contextMsgs = msgs.slice(0, editingMsgIndex).concat([newMsg]);
+        const contextMsgs = msgs.slice(0, idxSnapshot).concat([newMsg]);
         await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
     } catch (e) {
         console.error("编辑消息失败:", e);
@@ -2048,10 +2091,16 @@ async function send(){
   }
 }
 
-async function generateAIResponse(contextMsgs, parentId = null, agentId = null) {
+// =====================================================================
+// 【核心修复】parentId 语义：
+//   - undefined → 兜底用 activeLeafId（正常发送/继续生成等）
+//   - null      → 明确表示根节点（开场白重新生成）
+//   - 具体值    → 使用该值作为父节点
+// =====================================================================
+async function generateAIResponse(contextMsgs, parentId, agentId = null) {
   busy = true; setBusyUI(true);
 
-  const actualParentId = parentId !== null ? parentId : activeLeafId;
+  const actualParentId = parentId !== undefined ? parentId : activeLeafId;
   const actualAgentId = agentId || currentAgentId;
 
   const bubble = addBubble('assistant', '', null, null, null, actualAgentId);
@@ -2146,10 +2195,10 @@ async function generateAIResponse(contextMsgs, parentId = null, agentId = null) 
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
-    // 强一致保存落库
+    // 强一致落库
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
     
-    // 从新生成的这条消息出发探底，构建完整分支
+    // 从新 AI 消息出发探底（注意：此时旧 AI 消息的 parent_id 已经被顺手修复，所以新旧 AI 会成为真兄弟）
     try {
         const res = await loadMessagesFromCloud(aiMsg.local_id);
         msgs = res.pathMsgs;
@@ -2165,28 +2214,36 @@ async function generateAIResponse(contextMsgs, parentId = null, agentId = null) 
   }
 }
 
+// =====================================================================
+// 【核心修复】重新生成：真父节点 = msgs[index-1].local_id
+// 并顺手修复旧 AI 消息的 parent_id（如果脏了）
+// =====================================================================
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
-  let userMsgContext = [];
-  const parentId = msg.parent_id;
-  
-  for (let i = index - 1; i >= 0; i--) {
-      if (msgs[i].local_id === parentId) {
-          userMsgContext = msgs.slice(0, i + 1);
-          break;
-      }
+  // 真父节点：路径前驱（msgs 数组是干净的、按路径前驱回溯出来的）
+  const trueParentId = index > 0 ? msgs[index - 1].local_id : null;
+  const userMsgContext = index > 0 ? msgs.slice(0, index) : [];
+
+  // 顺手修复旧 AI 消息的 parent_id（如果数据库里脏了）
+  if (msg._raw_parent_id !== undefined && msg._raw_parent_id !== trueParentId) {
+      try {
+          await supabaseClient.from('chat_messages')
+              .update({ parent_id: trueParentId })
+              .eq('local_id', msg.local_id);
+          console.log(`[修复] AI消息 ${msg.local_id} 的 parent_id: ${msg._raw_parent_id} → ${trueParentId}`);
+      } catch (e) { console.error('修复旧AI消息 parent_id 失败:', e); }
   }
-  if (!parentId) userMsgContext = [];
 
   if (!currentAgentId || !currentAgents.find(a => a.id === currentAgentId)) {
       currentAgentId = msg.agent_id || (currentAgents[0] ? currentAgents[0].id : null);
       renderAgentSelector();
   }
 
-  await generateAIResponse(userMsgContext, parentId, msg.agent_id || currentAgentId);
+  // 生成新 AI 消息，parent_id = 真父节点（与旧 AI 消息成为兄弟）
+  await generateAIResponse(userMsgContext, trueParentId, msg.agent_id || currentAgentId);
 }
 
 async function continueGeneration(index) {
@@ -2205,10 +2262,10 @@ async function continueGeneration(index) {
       _isContinue: true
   }]);
 
+  // 继续生成：新 AI 消息的父节点 = 当前 AI 消息（形成"续说"的父子关系）
   await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id || currentAgentId);
 }
 
-// 【核心修复】切换分支：传入目标兄弟节点ID，从该节点出发探底找最新叶子
 async function switchVersion(index, direction) {
   const msg = msgs[index];
   if (!msg || !msg._siblings) return;
