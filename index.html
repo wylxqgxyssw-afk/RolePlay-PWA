@@ -24,7 +24,6 @@
 })();
 </script>
 
-<!-- 核心依赖：Markdown解析、KaTeX公式渲染、安全净化 -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
@@ -55,7 +54,6 @@ html[data-theme="dark"]{
   --vip-gold-bg: rgba(245,166,35,0.1);
   --vip-gold-border: rgba(245,166,35,0.3);
 
-  /* 全局排版变量 */
   --font-scale: 1; 
   --global-font-size: 15px;
   --global-line-height: 1.72;
@@ -99,9 +97,6 @@ body{
 }
 button{font-family:inherit;}
 
-/* ============================================================
-   主容器 & 三板块 Tab
-   ============================================================ */
 .main-app{
   height:100%;
   height:100dvh;
@@ -153,7 +148,6 @@ button{font-family:inherit;}
   -webkit-overflow-scrolling:touch;
 }
 
-/* 底部导航 */
 .bottom-nav{
   display:flex;
   border-top:1px solid var(--border);
@@ -183,7 +177,6 @@ button{font-family:inherit;}
   stroke-width:2;
 }
 
-/* 敬请期待 */
 .coming-soon{
   display:flex;
   flex-direction:column;
@@ -215,9 +208,6 @@ button{font-family:inherit;}
   line-height:1.6;
 }
 
-/* ============================================================
-   全屏聊天屏
-   ============================================================ */
 .chat-screen{
   position:fixed;
   inset:0;
@@ -229,7 +219,6 @@ button{font-family:inherit;}
 }
 .chat-screen.hidden{display:none;}
 
-/* ---------- 登录遮罩层 ---------- */
 #auth-overlay{position:fixed;inset:0;z-index:999;background:var(--auth-overlay-bg);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity 0.3s;}
 #auth-overlay.hidden{opacity:0;pointer-events:none;}
 .auth-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 24px;box-shadow:var(--shadow-lg);}
@@ -246,7 +235,6 @@ button{font-family:inherit;}
 .auth-msg.error{color:var(--danger);}
 .auth-msg.success{color:var(--success);}
 
-/* ---------- 云端状态 ---------- */
 #cloud-status-bar {display: flex;align-items: center; justify-content: center; gap: 6px; padding: 6px 16px; font-size: calc(12px * var(--font-scale)); color: var(--cloud-fg); background: var(--cloud-bg); border-bottom: 1px solid var(--border); transition: 0.3s; flex-shrink:0;}
 #cloud-status-bar.online { color: var(--success); }
 #cloud-status-bar.offline { color: var(--danger); }
@@ -254,7 +242,6 @@ button{font-family:inherit;}
 #cloud-status-bar.online .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
 #cloud-status-bar.offline .status-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
 
-/* 会话列表 */
 .conv-item {padding: 14px 14px; border-radius: 12px; cursor: pointer; margin-bottom: 8px; border: 1px solid var(--border); transition: 0.2s; display: flex; justify-content: space-between; align-items: center; background:var(--panel);}
 .conv-item:hover { border-color:var(--accent); background: var(--panel-2); }
 .conv-item .conv-name { font-size: calc(15px * var(--font-scale)); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;}
@@ -265,7 +252,6 @@ button{font-family:inherit;}
 .conv-item .conv-delete { color: var(--danger); cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: calc(14px * var(--font-scale));}
 .conv-item .conv-delete:hover { background: var(--danger-bg); }
 
-/* 表单 */
 label{display:block;font-size:calc(12.5px * var(--font-scale));color:var(--muted);margin:10px 0 5px;}
 input,textarea{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 11px;font-size:calc(13.5px * var(--font-scale));font-family:inherit;outline:none;transition:border-color .15s;}
 input:focus,textarea:focus{border-color:var(--accent);}
@@ -274,7 +260,6 @@ input[type=range]{padding:0;background:none;border:none;-webkit-appearance:none;
 input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--border);border-radius:2px;}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--accent);margin-top:-5.5px;cursor:pointer;}
 
-/* 按钮 */
 .btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:calc(13.5px * var(--font-scale));transition:.15s;}
 .btn:hover{border-color:var(--accent);}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -288,7 +273,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .icon-btn{background:none;border:none;color:var(--muted);font-size:calc(18px * var(--font-scale));cursor:pointer;padding:6px 10px;border-radius:8px;line-height:1;}
 .icon-btn:hover{color:var(--text);background:var(--panel-2);}
 
-/* 设置列表项 */
 .settings-list-item {
     display: flex; align-items: center; justify-content: space-between;
     width: 100%; padding: 16px 16px; background: var(--panel); border: 1px solid var(--border);
@@ -298,14 +282,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .settings-list-item:hover { background: var(--panel-2); }
 .settings-list-item .arrow { color: var(--muted); font-size: calc(18px * var(--font-scale)); }
 
-/* 设置分组 */
 .settings-group { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding: 16px 16px; margin-bottom:12px; }
 .settings-group-title { font-size: calc(14px * var(--font-scale)); font-weight: 600; margin-bottom: 12px; color: var(--text); }
 .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 16px; }
 .settings-row label { margin: 0; font-size: calc(13.5px * var(--font-scale)); color: var(--text); }
 .settings-row .val { font-size: calc(12px * var(--font-scale)); color: var(--muted); font-family: monospace; }
 
-/* 主题按钮 */
 .theme-btn-group { display: flex; gap: 8px; margin-top: 8px; }
 .theme-btn {
     flex: 1; padding: 10px 0; border-radius: 8px;
@@ -316,7 +298,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     background: rgba(77,107,254,0.1); border-color: var(--accent); color: var(--accent);
 }
 
-/* ---------- 聊天区 ---------- */
 .chat-head{
   display:flex;align-items:center;gap:10px;
   padding:12px 16px;
@@ -351,7 +332,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .msg.user .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg.user .meta { margin: 0; padding: 0; font-size: calc(14px * var(--font-scale)); font-weight: 600; color: var(--text); text-align: right; }
 .msg.user .content { background: var(--bubble-user-bg); color: var(--bubble-user-fg); border-radius: 18px; border: none; padding: 11px 15px; font-size: var(--global-font-size); line-height: var(--global-line-height); word-break: break-word; overflow-wrap: anywhere; cursor: pointer; transition: filter 0.2s; }
-.msg.user .content:active { filter: brightness(0.9); } /* 点击气泡的视觉反馈 */
+.msg.user .content:active { filter: brightness(0.9); }
 
 .msg.assistant { align-self: flex-start; max-width: 100%; }
 .msg.assistant .msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -380,7 +361,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .action-btn.delete-btn { color: var(--danger); }
 .action-btn.delete-btn:hover { background: var(--danger-bg-soft2); }
 
-/* DeepSeek 同款极简切换器 */
 .version-switcher { display: flex; align-items: center; gap: 4px; margin: 0 4px; }
 .version-switcher span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .version-switcher button {
@@ -406,7 +386,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .reasoning-content { padding: 8px 0 8px 18px; color: var(--muted); font-size: calc(13px * var(--font-scale)); line-height: 1.6; white-space: pre-wrap; font-family: monospace; border-left: 2px solid var(--border); margin-left: 4px; margin-top: 4px; }
 .reasoning-box.collapsed .reasoning-content { display: none; }
 
-/* 输入区 */
 .composer-wrap { padding: 10px 16px 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); background-color: var(--bg); display: flex; flex-direction: column; align-items: center; flex-shrink:0; }
 #agent-selector-bar { display: flex; gap: 8px; overflow-x: auto; width: 100%; max-width: 820px; padding: 0 0 10px 0; scrollbar-width: none; }
 #agent-selector-bar::-webkit-scrollbar { display: none; } 
@@ -419,9 +398,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .composer { width: 100%; max-width: 820px; background-color: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 8px 12px 8px 16px; display: flex; flex-direction: column; transition: border-color 0.2s; }
 .composer:focus-within { border-color: var(--border); }
 
-/* 编辑输入头部 */
 #edit-input-header {
-  display: none; /* 默认隐藏 */
+  display: none;
   align-items: center; 
   justify-content: space-between; 
   padding: 8px 4px 12px;
@@ -461,7 +439,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .tool-btn svg { width: calc(14px * var(--font-scale)); height: calc(14px * var(--font-scale)); }
 .tool-btn.icon-only svg { width: calc(18px * var(--font-scale)); height: calc(18px * var(--font-scale)); }
 
-/* 底部提示语 */
 .ai-disclaimer {
   text-align: center;
   font-size: calc(11px * var(--font-scale));
@@ -476,9 +453,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .send-btn.stop { background: var(--stop-bg); cursor: pointer; }
 .send-btn svg { width: calc(16px * var(--font-scale)); height: calc(16px * var(--font-scale)); display: block; }
 
-/* ============================================================
-   模态框 & 弹窗
-   ============================================================ */
 #char-settings-modal { position: fixed; inset: 0; z-index: 200; background: var(--overlay-bg); display: none; align-items: center; justify-content: center; padding: 20px; transition: opacity 0.3s; }
 #char-settings-modal.show { display: flex; }
 .char-settings-card { width: 100%; max-width: 550px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: var(--shadow-lg); max-height: 90vh; display: flex; flex-direction: column; overflow-y: auto; }
@@ -540,7 +514,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 </head>
 <body>
 
-<!-- 错误监控 -->
 <div id="debug-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:#000; color:#ff8080; padding:20px; overflow:auto; font-family:monospace; white-space:pre-wrap; font-size:14px;"></div>
 <script>
   window.onerror = function(message, source, lineno, colno, error) {
@@ -553,7 +526,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   });
 </script>
 
-<!-- 登录 -->
 <div id="auth-overlay" class="hidden">
   <div class="auth-card">
     <h2 id="auth-title">欢迎回来</h2>
@@ -566,12 +538,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </div>
 </div>
 
-<!-- ============================================================
-     主应用：三板块
-     ============================================================ -->
 <div class="main-app" id="mainApp">
 
-  <!-- ============ Tab 1：聊天（会话列表） ============ -->
   <div class="tab-page" id="tabChat">
     <div class="tab-header">
       <h2>聊天</h2>
@@ -586,7 +554,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     </div>
   </div>
 
-  <!-- ============ Tab 2：敬请期待 ============ -->
   <div class="tab-page hidden" id="tabComing">
     <div class="tab-header">
       <h2>敬请期待</h2>
@@ -598,14 +565,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     </div>
   </div>
 
-  <!-- ============ Tab 3：我的 ============ -->
   <div class="tab-page hidden" id="tabMe">
     <div class="tab-header">
       <h2>我的</h2>
     </div>
     <div class="tab-content">
 
-      <!-- 会员 -->
       <button class="settings-list-item" id="goToVip">
         <div style="display:flex; align-items:center;">
           <span style="margin-right:10px; font-size:20px;">👑</span>
@@ -614,7 +579,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <span class="arrow">›</span>
       </button>
 
-      <!-- 默认头像 -->
       <div class="settings-group">
         <div class="settings-group-title">默认 AI 头像</div>
         <div class="avatar-upload-container" style="margin-top: 10px;">
@@ -637,7 +601,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         </div>
       </div>
 
-      <!-- 接口配置 -->
       <div class="settings-group">
         <div class="settings-group-title">全局接口配置</div>
         <label>API 地址（Base URL）</label>
@@ -659,7 +622,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <input id="ctxLimit" type="number" min="4" max="200" step="2">
       </div>
 
-      <!-- 我的设定 -->
       <div class="settings-group">
         <div class="settings-group-title">你的设定</div>
         <label>你的名字</label>
@@ -668,21 +630,18 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <textarea id="userPrompt" rows="3" spellcheck="false"></textarea>
       </div>
 
-      <!-- 操作按钮 -->
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
         <button class="btn primary" id="applyBtn" style="width:100%;">保存全局设置</button>
         <button class="btn btn-clear-chat" id="clearChatBtn" style="width:100%;">清空当前会话记录</button>
         <button class="btn btn-logout" id="logoutBtn" style="width:100%;">退出登录</button>
       </div>
 
-      <!-- 版本号 -->
       <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
         <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.2</span></span>
       </div>
     </div>
   </div>
 
-  <!-- ============ 底部导航 ============ -->
   <nav class="bottom-nav" id="bottomNav">
     <button data-tab="chat" class="active">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
@@ -706,9 +665,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </nav>
 </div>
 
-<!-- ============================================================
-     全屏聊天屏
-     ============================================================ -->
 <div class="chat-screen hidden" id="chatScreen">
   <header class="chat-head">
     <div class="title">
@@ -731,7 +687,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     <div id="agent-selector-bar"></div>
     <div class="composer">
       
-      <!-- 编辑输入头部 -->
       <div id="edit-input-header">
         <span>修改输入</span>
         <button id="cancel-edit-input-btn">✕</button>
@@ -769,14 +724,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
       </div>
     </div>
     
-    <!-- 底部免责声明 -->
     <div class="ai-disclaimer">回答由 AI 生成，仅供参考</div>
   </div>
 </div>
 
-<!-- ============================================================
-     会员中心
-     ============================================================ -->
 <div id="vip-modal">
   <div class="vip-card">
     <h3>👑 开通会员</h3>
@@ -817,9 +768,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </div>
 </div>
 
-<!-- ============================================================
-     隐藏审核台
-     ============================================================ -->
 <div id="admin-modal">
   <div class="vip-card" style="max-width: 600px;">
     <h3 style="color:var(--text);">📋 订单审核台</h3>
@@ -830,9 +778,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
   </div>
 </div>
 
-<!-- ============================================================
-     角色设定弹窗
-     ============================================================ -->
 <div id="char-settings-modal">
   <div class="char-settings-card">
     <h3>
@@ -874,7 +819,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
       </div>
 
-      <!-- ===== 外观设置迁移至此 ===== -->
       <div style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
         <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">外观设置</div>
         
@@ -902,8 +846,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
         </div>
         <input type="range" id="rangeUserBubbleWidth" min="40" max="95" step="1" value="78">
       </div>
-      <!-- ===== 外观设置结束 ===== -->
-
     </div>
 
     <div class="actions" style="justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 16px; margin-top: 16px;">
@@ -925,12 +867,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-/* ================================================================
-   版本控制
-   ================================================================ */
 const CURRENT_VERSION = '2.3.2';
 
-/* ---------- 自定义 KaTeX 扩展 ---------- */
 const katexExt = {
   extensions: [
     {
@@ -970,12 +908,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.marked && window.katex) { marked.use(katexExt); }
 });
 
-/* ---------- Supabase ---------- */
 const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-/* ---------- 全局变量 ---------- */
 const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
@@ -1000,7 +936,7 @@ let activeLeafId = null;
 let currentVipStatus = { is_vip: false, expire_at: null };
 let selectedVipPlan = { name: '月卡', amount: 30 };
 
-let editingMsgIndex = null; // 如果非 null，表示当前处于编辑状态
+let editingMsgIndex = null;
 let editingAgentId = null;
 
 let currentTab = 'chat';
@@ -1016,7 +952,6 @@ const DEFAULTS = {
   userName: '旅人', userPrompt: '一个刚搬来这座城市的人，喜欢在傍晚散步。'
 };
 
-/* ---------- 工具 ---------- */
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -1057,9 +992,6 @@ function renderContent(s, isStreaming = false){
 
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
-/* ================================================================
-   Tab 切换 & 聊天屏开关
-   ================================================================ */
 function switchTab(tab) {
   closeChatScreen();
   currentTab = tab;
@@ -1083,9 +1015,6 @@ function closeChatScreen() {
   if (el) el.classList.add('hidden');
 }
 
-/* ================================================================
-   主题与外观
-   ================================================================ */
 const THEME_KEY = 'rp_theme';
 const THEME_TS_KEY = 'rp_theme_ts';
 
@@ -1307,7 +1236,6 @@ function setupThemeUI(){
   if($('#closeAdminModal')) $('#closeAdminModal').addEventListener('click', () => $('#admin-modal').classList.remove('show'));
 }
 
-/* ---------- 云端状态 ---------- */
 function updateCloudStatusUI(isOnline) {
     const bar = $('#cloud-status-bar');
     const text = $('#cloud-status-text');
@@ -1328,7 +1256,6 @@ setInterval(async () => {
     } catch (e) { updateCloudStatusUI(false); }
 }, 60000);
 
-/* ---------- 配置 ---------- */
 function loadCfg(){
   if(!USER_ID) return Object.assign({}, DEFAULTS);
   try{
@@ -1425,7 +1352,6 @@ async function saveGlobalSettings() {
     } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
 }
 
-/* ---------- 会话 ---------- */
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
@@ -1517,7 +1443,6 @@ async function deleteConversation(convId) {
     } catch (e) { console.error('❌ 删除会话异常:', e); updateCloudStatusUI(false); }
 }
 
-/* ---------- 消息 ---------- */
 async function saveMessageToCloud(msg) {
     if (!USER_ID || !currentConversationId) return;
     try {
@@ -1546,7 +1471,11 @@ async function saveMessageToCloud(msg) {
     }
 }
 
-// 【核心纯净逻辑】loadMessagesFromCloud
+// =====================================================================
+// 【终极核心】加载消息：无论是否传 targetNodeId，都必须向下探底
+// 如果传了 targetNodeId（切分支/重新生成等），从该节点出发往最深处找
+// 如果没传，从 active_leaf_id 或最后一条出发往最深处找
+// =====================================================================
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
@@ -1571,35 +1500,29 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         }
     });
 
-    let targetLeafId = targetNodeId;
-    
-    // 如果没传 targetNodeId，则从云端拉取 active_leaf_id
-    if (!targetLeafId) {
+    // 1. 决定起点节点
+    let startNodeId = targetNodeId;
+    if (!startNodeId) {
         const { data: convData } = await supabaseClient.from('conversations')
             .select('active_leaf_id').eq('id', currentConversationId).single();
-        targetLeafId = convData?.active_leaf_id;
+        startNodeId = convData?.active_leaf_id;
+    }
+    if (!startNodeId || !msgMap.has(startNodeId)) {
+        startNodeId = allMsgs[allMsgs.length - 1].local_id;
     }
 
-    // 如果没找到有效节点，取最后一条消息
-    if (!targetLeafId || !msgMap.has(targetLeafId)) {
-        targetLeafId = allMsgs[allMsgs.length - 1].local_id;
+    // 2. 【关键】从起点开始，无论如何都往下探底找最新叶子
+    let targetLeafId = startNodeId;
+    while (childrenMap.has(targetLeafId)) {
+        let children = childrenMap.get(targetLeafId);
+        children.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
+        targetLeafId = children[children.length - 1].local_id;
     }
 
-    // 【重要】只有在“打开会话且未传targetNodeId”时，才允许“探底”寻找最新回复。
-    // 如果传了targetNodeId（主动切分支、重新生成、编辑等），直接停在传进来的节点，绝不乱动。
-    if (!targetNodeId) {
-        let currentId = targetLeafId;
-        while (childrenMap.has(currentId)) {
-            let children = childrenMap.get(currentId);
-            children.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
-            currentId = children[children.length - 1].local_id;
-        }
-        targetLeafId = currentId;
-    }
-
-    // 更新云端活跃叶子节点
+    // 3. 更新云端 active_leaf_id
     supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
 
+    // 4. 从叶子往上回溯构建路径
     let currentPath = [];
     let currId = targetLeafId;
     while (currId) {
@@ -1609,6 +1532,7 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         currId = node.parent_id;
     }
 
+    // 5. 计算每个消息的兄弟信息
     const finalMsgs = currentPath.map(m => {
         let siblings = [];
         if (m.parent_id) siblings = childrenMap.get(m.parent_id) || [];
@@ -1630,7 +1554,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
 async function refreshCurrentChat() {
     if (busy || !currentConversationId) return;
     try {
-        // 必须传入当前正在查看的 activeLeafId，防止被后台强制拉到最新分支
         const res = await loadMessagesFromCloud(activeLeafId);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
@@ -1650,7 +1573,6 @@ function setupRealtimeListener() {
         .on('postgres_changes',
             { event: '*', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${USER_ID}` },
             (payload) => {
-                // 只有当前会话且非 busy 状态下才允许刷新
                 if (payload.new && payload.new.conversation_id === currentConversationId) refreshCurrentChat();
             }
         )
@@ -1659,7 +1581,6 @@ function setupRealtimeListener() {
         });
 }
 
-/* ---------- UI ---------- */
 function updateGlobalUI() {
   if ($('#apiBase')) $('#apiBase').value = cfg.apiBase || '';
   if ($('#apiKey')) $('#apiKey').value = cfg.apiKey || '';
@@ -1738,7 +1659,6 @@ function updateCurrentConversationUI(conv) {
     });
 }
 
-/* ---------- 进入会话 ---------- */
 let currentFetchId = 0;
 async function switchConversation(convId, convObj = null) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
@@ -1749,7 +1669,7 @@ async function switchConversation(convId, convObj = null) {
 
     msgs = [];
     activeLeafId = null;
-    cancelEditMode(); // 切换会话时自动取消编辑状态
+    cancelEditMode();
 
     const conv = convObj || conversationsCache.find(c => c.id === convId) || { id: convId };
     if (!conv.agents || conv.agents.length === 0) {
@@ -1779,7 +1699,6 @@ async function switchConversation(convId, convObj = null) {
         for (let attempt = 0; attempt < 3; attempt++) {
             if (fetchId !== currentFetchId) return;
             try {
-                // 打开会话不传参，允许找最新节点
                 cloudRes = await loadMessagesFromCloud();
                 lastErr = null;
                 break;
@@ -1829,7 +1748,6 @@ async function switchConversation(convId, convObj = null) {
     }
 }
 
-/* ---------- 消息渲染 ---------- */
 function updateVersionSwitcher(index, msg) {
     const msgRow = msgBox.querySelector(`.msg[data-msg-index="${index}"]`);
     if (!msgRow) return;
@@ -1875,7 +1793,6 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
       actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
       actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
   } else {
-      // 用户气泡下方不再显示编辑和删除
       actionsHtml = ''; 
   }
 
@@ -1919,13 +1836,12 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
           <div class="avatar">${avatarHtml}</div>
         </div>
         <div class="content"></div>
-        <div class="msg-actions"></div>`; /* 添加了 msg-actions 容器 */
+        <div class="msg-actions"></div>`;
   }
 
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
   msgBox.appendChild(wrap);
 
-  // 如果是用户气泡，点击气泡进入编辑模式
   if (role === 'user' && index !== null) {
       const contentEl = wrap.querySelector('.content');
       contentEl.addEventListener('click', (e) => {
@@ -1959,7 +1875,6 @@ function scrollBottom(force){
   msgBox.scrollTop = msgBox.scrollHeight;
 }
 
-/* ---------- 请求 ---------- */
 function endpoint(){
   let base = String(cfg.apiBase || '').trim().replace(/\/+$/, '');
   if(!base) throw new Error('请先在"我的"页填写 API 地址');
@@ -2043,7 +1958,6 @@ async function fetchAIResponseStreaming(contextMsgs, onProgress) {
   return { full, fullReasoning, usage };
 }
 
-/* ---------- 编辑模式控制 ---------- */
 function openEditModal(index) {
     if (busy) return;
     const msg = msgs[index];
@@ -2052,10 +1966,7 @@ function openEditModal(index) {
     editingMsgIndex = index;
     $('#input').value = msg.content;
     $('#edit-input-header').style.display = 'flex';
-    
-    // 隐藏角色选择栏，让用户专心编辑
     $('#agent-selector-bar').style.display = 'none';
-    
     autoResize();
     $('#input').focus();
 }
@@ -2064,7 +1975,7 @@ function cancelEditMode() {
     editingMsgIndex = null;
     $('#input').value = '';
     $('#edit-input-header').style.display = 'none';
-    $('#agent-selector-bar').style.display = 'flex'; // 恢复角色选择栏
+    $('#agent-selector-bar').style.display = 'flex';
     autoResize();
 }
 
@@ -2081,24 +1992,19 @@ async function saveEditedMessage() {
     
     busy = true;
     setBusyUI(true);
-    cancelEditMode(); // 立刻清理UI，隐藏编辑框
+    cancelEditMode();
     
     try {
-        // 创建新的兄弟用户消息（复制旧消息的父节点，建立新分支）
         const newMsg = {
             role: msg.role, content: newContent, local_id: generateId(),
             parent_id: msg.parent_id, sibling_order: Date.now(), agent_id: msg.agent_id
         };
         await saveMessageToCloud(newMsg);
         
-        // 更新会话的 active_leaf_id 为新分支，并强制触发 AI 回复
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         
-        // 构造上下文，包含这轮新发出的消息
         const contextMsgs = msgs.slice(0, editingMsgIndex).concat([newMsg]);
-        
-        // 触发AI回复
         await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
     } catch (e) {
         console.error("编辑消息失败:", e);
@@ -2108,11 +2014,9 @@ async function saveEditedMessage() {
     }
 }
 
-/* ---------- 发送 ---------- */
 async function send(){
   if(busy || !currentConversationId) return;
   
-  // 如果在编辑模式，回车或发送按钮触发的是保存修改
   if (editingMsgIndex !== null) {
       await saveEditedMessage();
       return;
@@ -2144,19 +2048,12 @@ async function send(){
   }
 }
 
-/**
- * 通用 AI 响应生成
- * @param {Array} contextMsgs 提供的上下文消息数组
- * @param {String} parentId 当前要生成的消息所挂载的父节点 ID
- * @param {String} agentId 指定的角色 ID (如果不传则用当前激活的)
- */
 async function generateAIResponse(contextMsgs, parentId = null, agentId = null) {
   busy = true; setBusyUI(true);
 
   const actualParentId = parentId !== null ? parentId : activeLeafId;
   const actualAgentId = agentId || currentAgentId;
 
-  // 创建一个临时的 DOM 气泡进行流式渲染，不立刻推入 msgs 数组
   const bubble = addBubble('assistant', '', null, null, null, actualAgentId);
   const contentEl = bubble.querySelector('.content');
   const contentWrap = bubble.querySelector('.content-wrap');
@@ -2249,10 +2146,10 @@ async function generateAIResponse(contextMsgs, parentId = null, agentId = null) 
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
-    // 强制把完整数据写入云端，确保数据一致性
+    // 强一致保存落库
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
     
-    // 【核心修复】生成完毕后，强一致重载当前分支树
+    // 从新生成的这条消息出发探底，构建完整分支
     try {
         const res = await loadMessagesFromCloud(aiMsg.local_id);
         msgs = res.pathMsgs;
@@ -2268,7 +2165,6 @@ async function generateAIResponse(contextMsgs, parentId = null, agentId = null) 
   }
 }
 
-/* ---------- 重新生成 & 继续生成 & 切换分支 ---------- */
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
@@ -2277,7 +2173,6 @@ async function regenerateMessage(index) {
   let userMsgContext = [];
   const parentId = msg.parent_id;
   
-  // 找出当前要重新生成的AI消息，对应的上下文（到 parentId 为止）
   for (let i = index - 1; i >= 0; i--) {
       if (msgs[i].local_id === parentId) {
           userMsgContext = msgs.slice(0, i + 1);
@@ -2291,7 +2186,6 @@ async function regenerateMessage(index) {
       renderAgentSelector();
   }
 
-  // 【核心】抛弃本地截断，强依赖云端生成新分支并刷新树
   await generateAIResponse(userMsgContext, parentId, msg.agent_id || currentAgentId);
 }
 
@@ -2311,10 +2205,10 @@ async function continueGeneration(index) {
       _isContinue: true
   }]);
 
-  // 【核心】将当前消息的 local_id 作为父节点
   await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id || currentAgentId);
 }
 
+// 【核心修复】切换分支：传入目标兄弟节点ID，从该节点出发探底找最新叶子
 async function switchVersion(index, direction) {
   const msg = msgs[index];
   if (!msg || !msg._siblings) return;
@@ -2325,10 +2219,7 @@ async function switchVersion(index, direction) {
   
   busy = true; setBusyUI(true);
   try {
-      // 【核心修复】传入精确的目标节点 ID，禁止函数自动往下探底
       const res = await loadMessagesFromCloud(targetSibling.local_id);
-      
-      // 更新本地状态并重新渲染
       msgs = res.pathMsgs;
       activeLeafId = res.leafId;
       msgBox.innerHTML = '';
@@ -2338,7 +2229,6 @@ async function switchVersion(index, direction) {
   finally { busy = false; setBusyUI(false); }
 }
 
-/* ---------- 删除 ---------- */
 async function deleteMessage(index) {
     if (busy) return;
     if (!confirm('确定要删除这条消息吗？删除后无法恢复。')) return;
@@ -2352,7 +2242,6 @@ async function deleteMessage(index) {
         }
         await supabaseClient.from('chat_messages').delete().eq('local_id', msg.local_id);
         
-        // 重新加载，从剩余的最新分支
         const res = await loadMessagesFromCloud(msg.parent_id);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
@@ -2383,7 +2272,6 @@ function setBusyUI(b){
   if(newBtn) newBtn.disabled = b;
 }
 
-/* ---------- 角色设定 ---------- */
 function renderCharSettings() {
     const tabList = $('#agentTabList');
     if (!tabList) return;
@@ -2440,9 +2328,6 @@ function updateUserAvatarPreview(base64Str) {
     else preview.innerHTML = `<span>👤</span>`;
 }
 
-/* ================================================================
-   VIP 订单
-   ================================================================ */
 async function submitVipOrder() {
     const note = $('#paymentNoteInput').value.trim();
     if (!note) { alert('请填写付款单号后4位或备注，以便我们核对。'); return; }
@@ -2526,19 +2411,14 @@ window.approveOrder = async function(orderId, userId, planName) {
     } catch (e) { alert('操作失败: ' + e.message); }
 };
 
-/* ================================================================
-   事件绑定
-   ================================================================ */
 function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
-  // 底部导航
   document.querySelectorAll('.bottom-nav button').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
   });
 
-  // 关闭聊天
   $('#closeChatBtn').addEventListener('click', () => {
     if (busy) {
       if (!confirm('正在生成回复，确定要离开吗？')) return;
@@ -2547,10 +2427,8 @@ function bindEvents(){
     closeChatScreen();
   });
 
-  // 取消编辑
   $('#cancel-edit-input-btn').addEventListener('click', cancelEditMode);
 
-  // 发送
   $('#sendBtn').addEventListener('click', () => { if(busy){ abortCtrl && abortCtrl.abort(); return; } send(); });
   inputEl.addEventListener('input', autoResize);
   inputEl.addEventListener('keydown', e => { 
@@ -2560,10 +2438,8 @@ function bindEvents(){
       } 
   });
 
-  // VIP 提交
   $('#submitVipOrderBtn').addEventListener('click', submitVipOrder);
 
-  // 工具按钮
   $('#deepThinkBtn').addEventListener('click', function() { this.classList.toggle('active'); });
   $('#searchBtn').addEventListener('click', function() { this.classList.toggle('active'); });
   $('#attachBtn').addEventListener('click', () => { $('#fileInput').click(); });
@@ -2575,7 +2451,6 @@ function bindEvents(){
       }
   });
 
-  // 导出
   $('#exportBtn').addEventListener('click', () => {
       if(!msgs.length){ alert('还没有对话内容'); return; }
       const text = msgs.map(m => {
@@ -2591,7 +2466,6 @@ function bindEvents(){
       a.download = '群聊记录-' + new Date().toISOString().slice(0,10) + '.txt'; a.click();
   });
 
-  // 清空聊天
   $('#clearChatBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先打开一个会话'); return; }
       const conv = conversationsCache.find(c => c.id === currentConversationId);
@@ -2603,7 +2477,6 @@ function bindEvents(){
       if (USER_ID && currentConversationId) await supabaseClient.from('chat_messages').delete().eq('conversation_id', currentConversationId);
   });
 
-  // 获取模型
   $('#fetchModelsBtn').addEventListener('click', async () => {
     const btn = $('#fetchModelsBtn'); const modelListContainer = $('#modelListContainer');
     const apiBase = $('#apiBase').value.trim(); const apiKey = $('#apiKey').value.trim();
@@ -2633,7 +2506,6 @@ function bindEvents(){
     } finally { btn.textContent = '获取'; btn.disabled = false; }
   });
 
-  // 保存全局设置
   $('#applyBtn').addEventListener('click', async () => {
     cfg.apiBase = $('#apiBase').value.trim();
     cfg.apiKey = $('#apiKey').value.trim();
@@ -2647,7 +2519,6 @@ function bindEvents(){
     alert('全局设置已保存！');
   });
 
-  // 角色设定
   $('#openCharSettingsBtn').addEventListener('click', async () => {
       if (!currentConversationId) { alert('请先选择一个会话'); return; }
       currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
@@ -2668,7 +2539,6 @@ function bindEvents(){
       renderCharSettings();
   });
 
-  // 上传角色头像
   $('#avatarPreview').addEventListener('click', () => { $('#avatarFileInput').click(); });
   $('#avatarUploadText').addEventListener('click', () => { $('#avatarFileInput').click(); });
   $('#avatarFileInput').addEventListener('change', function(e) {
@@ -2697,7 +2567,6 @@ function bindEvents(){
       reader.readAsDataURL(file);
   });
 
-  // 上传用户头像
   $('#userAvatarPreview').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
   $('#userAvatarUploadText').addEventListener('click', () => { $('#userAvatarFileInput').click(); });
   $('#userAvatarFileInput').addEventListener('change', function(e) {
@@ -2746,14 +2615,12 @@ function bindEvents(){
       $('#char-settings-modal').classList.remove('show');
   });
 
-  // 退出
   $('#logoutBtn').addEventListener('click', async () => {
     if(!confirm('确定要退出登录吗？')) return;
     await supabaseClient.auth.signOut();
     window.location.reload();
   });
 
-  // 新建会话
   $('#newConvBtn').addEventListener('click', async () => {
     if (busy) { alert('请等待当前回复完成。'); return; }
     const newConv = await createConversation();
@@ -2764,7 +2631,6 @@ function bindEvents(){
     }
   });
 
-  // 消息操作
   msgBox.addEventListener('click', async (e) => {
     const target = e.target;
     if (target.classList.contains('regen-btn')) await regenerateMessage(parseInt(target.getAttribute('data-msg-index')));
@@ -2775,7 +2641,6 @@ function bindEvents(){
   });
 }
 
-/* ---------- 登录 ---------- */
 const authOverlay = $('#auth-overlay');
 const authEmail = $('#auth-email');
 const authPassword = $('#auth-password');
@@ -2813,7 +2678,6 @@ async function handleAuthAction() {
 }
 authLoginBtn.addEventListener('click', handleAuthAction);
 
-/* ---------- 启动 ---------- */
 async function init() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session && session.user) {
@@ -2854,12 +2718,10 @@ async function loadUserData() {
   conversationsCache = convs;
   renderConversationList(convs);
 
-  // 默认停留在"聊天" Tab
   switchTab('chat');
   setupRealtimeListener();
 }
 
-/* ---------- SW ---------- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw-chat.js?v=' + CURRENT_VERSION).then(reg => {
@@ -2883,7 +2745,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-/* ---------- 启动 ---------- */
 setupThemeUI();
 init();
 </script>
