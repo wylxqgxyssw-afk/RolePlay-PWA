@@ -1471,13 +1471,7 @@ async function saveMessageToCloud(msg) {
     }
 }
 
-// =====================================================================
 // 【核心】加载消息：探底 + 回溯 + 路径前驱修正 + 防自环/断链
-// - 探底：从起点开始按数据库 parent_id 关系往最新叶子找
-// - 回溯：从叶子往上，路径前驱（rawPath[i-1]）就是当前节点的真父节点
-// - 修正：渲染用 trueParentId，不信任数据库可能存在的脏 parent_id
-// - 保护：返回 _raw_parent_id 供后续修复判断
-// =====================================================================
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
@@ -1495,7 +1489,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
     const msgMap = new Map();
     allMsgs.forEach(m => msgMap.set(m.local_id, m));
 
-    // 1. 决定起点
     let startNodeId = targetNodeId;
     if (!startNodeId) {
         const { data: convData } = await supabaseClient.from('conversations')
@@ -1506,7 +1499,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         startNodeId = allMsgs[allMsgs.length - 1].local_id;
     }
 
-    // 2. 建 childrenMap（过滤自环）
     const childrenMap = new Map();
     allMsgs.forEach(m => {
         if (m.parent_id && m.parent_id !== m.local_id && msgMap.has(m.parent_id)) {
@@ -1515,7 +1507,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         }
     });
 
-    // 3. 探底：从起点往最新叶子找
     let targetLeafId = startNodeId;
     const visited = new Set();
     while (childrenMap.has(targetLeafId) && !visited.has(targetLeafId)) {
@@ -1525,7 +1516,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         targetLeafId = children[children.length - 1].local_id;
     }
 
-    // 4. 回溯构建路径（防自环/断链）
     const rawPath = [];
     let currId = targetLeafId;
     const backtrackVisited = new Set();
@@ -1538,17 +1528,14 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         currId = node.parent_id;
     }
 
-    // 5. 更新云端 active_leaf_id
     supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
 
-    // 6. 用路径前驱计算真父节点和兄弟
     const finalMsgs = rawPath.map((m, i) => {
         const trueParentId = i > 0 ? rawPath[i - 1].local_id : null;
 
-        // 找兄弟：所有 parent_id 指向 trueParentId 的消息（排除自环）
         let siblings = allMsgs.filter(x => {
-            if (x.local_id === m.local_id) return true; // 一定包含自己
-            if (x.parent_id === x.local_id) return false; // 排除自环
+            if (x.local_id === m.local_id) return true;
+            if (x.parent_id === x.local_id) return false;
             if (trueParentId === null) {
                 return !x.parent_id || !msgMap.has(x.parent_id);
             }
@@ -1564,8 +1551,8 @@ async function loadMessagesFromCloud(targetNodeId = null) {
             reasoning: m.reasoning,
             local_id: m.local_id,
             tokens: m.tokens,
-            parent_id: trueParentId,          // 渲染用：修正后的父节点
-            _raw_parent_id: m.parent_id || null, // 数据库原始值（供修复判断）
+            parent_id: trueParentId,
+            _raw_parent_id: m.parent_id || null,
             agent_id: m.agent_id,
             _sibTotal: siblings.length,
             _sibIndex: sibIndex >= 0 ? sibIndex : 0,
@@ -1795,7 +1782,8 @@ function updateVersionSwitcher(index, msg) {
     }
 }
 
-function addBubble(role, content, index = null, tokens = null, reasoning = null, agentId = null){
+// 【关键】addBubble 增加 insertBeforeNode 参数，支持精确插入位置（原地替换）
+function addBubble(role, content, index = null, tokens = null, reasoning = null, agentId = null, insertBeforeNode = null){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
   if (index !== null) wrap.setAttribute('data-msg-index', index);
@@ -1865,7 +1853,13 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   }
 
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
-  msgBox.appendChild(wrap);
+  
+  // 【关键】支持精确插入位置
+  if (insertBeforeNode && insertBeforeNode.parentNode === msgBox) {
+      msgBox.insertBefore(wrap, insertBeforeNode);
+  } else {
+      msgBox.appendChild(wrap);
+  }
 
   if (role === 'user' && index !== null) {
       const contentEl = wrap.querySelector('.content');
@@ -2004,10 +1998,7 @@ function cancelEditMode() {
     autoResize();
 }
 
-// =====================================================================
-// 【核心修复】编辑用户消息：真父节点 = msgs[editingMsgIndex-1].local_id
-// 并顺手修复旧用户消息的 parent_id（如果脏了）
-// =====================================================================
+// 【关键修复】编辑用户消息：整体重绘后生成 AI 回复（旧 A 和旧 B 的 DOM 全部移除）
 async function saveEditedMessage() {
     if (busy || editingMsgIndex === null) return;
     const msg = msgs[editingMsgIndex];
@@ -2025,10 +2016,8 @@ async function saveEditedMessage() {
     cancelEditMode();
     
     try {
-        // 真父节点：路径前驱
         const trueParentId = idxSnapshot > 0 ? msgs[idxSnapshot - 1].local_id : null;
 
-        // 顺手修复旧用户消息的 parent_id（如果脏了）
         if (msg._raw_parent_id !== undefined && msg._raw_parent_id !== trueParentId) {
             try {
                 await supabaseClient.from('chat_messages')
@@ -2047,7 +2036,15 @@ async function saveEditedMessage() {
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         
-        const contextMsgs = msgs.slice(0, idxSnapshot).concat([newMsg]);
+        // 【关键】整体重绘：从云端拉取新路径（此时旧A和旧B都不在路径上，DOM被全部移除）
+        const res = await loadMessagesFromCloud(newMsg.local_id);
+        msgs = res.pathMsgs;
+        activeLeafId = res.leafId;
+        msgBox.innerHTML = '';
+        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+        
+        // 然后生成 AI 回复（append 到 A' 末尾，视觉上就是新 AI 出现在新用户消息下面）
+        const contextMsgs = msgs.slice();
         await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
     } catch (e) {
         console.error("编辑消息失败:", e);
@@ -2091,19 +2088,25 @@ async function send(){
   }
 }
 
-// =====================================================================
-// 【核心修复】parentId 语义：
-//   - undefined → 兜底用 activeLeafId（正常发送/继续生成等）
-//   - null      → 明确表示根节点（开场白重新生成）
-//   - 具体值    → 使用该值作为父节点
-// =====================================================================
-async function generateAIResponse(contextMsgs, parentId, agentId = null) {
+// 【关键修复】generateAIResponse 增加 replaceMsgIndex 参数，支持原地替换
+async function generateAIResponse(contextMsgs, parentId, agentId = null, replaceMsgIndex = null) {
   busy = true; setBusyUI(true);
 
   const actualParentId = parentId !== undefined ? parentId : activeLeafId;
   const actualAgentId = agentId || currentAgentId;
 
-  const bubble = addBubble('assistant', '', null, null, null, actualAgentId);
+  // 【关键】如果指定了要替换的消息索引，先记录旧节点位置，移除旧气泡
+  let insertBeforeNode = null;
+  if (replaceMsgIndex !== null) {
+      const oldBubble = msgBox.querySelector(`.msg[data-msg-index="${replaceMsgIndex}"]`);
+      if (oldBubble) {
+          insertBeforeNode = oldBubble.nextSibling;
+          oldBubble.remove();
+          console.log(`[原地替换] 移除旧AI消息 DOM (index=${replaceMsgIndex})，新气泡将插入到原位置`);
+      }
+  }
+
+  const bubble = addBubble('assistant', '', null, null, null, actualAgentId, insertBeforeNode);
   const contentEl = bubble.querySelector('.content');
   const contentWrap = bubble.querySelector('.content-wrap');
 
@@ -2195,10 +2198,9 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null) {
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
-    // 强一致落库
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
     
-    // 从新 AI 消息出发探底（注意：此时旧 AI 消息的 parent_id 已经被顺手修复，所以新旧 AI 会成为真兄弟）
+    // 从新 AI 消息出发探底，重绘完整分支（此时新旧 AI 是兄弟，切换器正常显示）
     try {
         const res = await loadMessagesFromCloud(aiMsg.local_id);
         msgs = res.pathMsgs;
@@ -2214,20 +2216,15 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null) {
   }
 }
 
-// =====================================================================
-// 【核心修复】重新生成：真父节点 = msgs[index-1].local_id
-// 并顺手修复旧 AI 消息的 parent_id（如果脏了）
-// =====================================================================
+// 【关键修复】重新生成：传 replaceMsgIndex = index，让新气泡原地替换旧气泡
 async function regenerateMessage(index) {
   if (busy) return;
   const msg = msgs[index];
   if (!msg || msg.role !== 'assistant') return;
 
-  // 真父节点：路径前驱（msgs 数组是干净的、按路径前驱回溯出来的）
   const trueParentId = index > 0 ? msgs[index - 1].local_id : null;
   const userMsgContext = index > 0 ? msgs.slice(0, index) : [];
 
-  // 顺手修复旧 AI 消息的 parent_id（如果数据库里脏了）
   if (msg._raw_parent_id !== undefined && msg._raw_parent_id !== trueParentId) {
       try {
           await supabaseClient.from('chat_messages')
@@ -2242,8 +2239,8 @@ async function regenerateMessage(index) {
       renderAgentSelector();
   }
 
-  // 生成新 AI 消息，parent_id = 真父节点（与旧 AI 消息成为兄弟）
-  await generateAIResponse(userMsgContext, trueParentId, msg.agent_id || currentAgentId);
+  // 传 replaceMsgIndex = index，让新气泡原地替换旧气泡
+  await generateAIResponse(userMsgContext, trueParentId, msg.agent_id || currentAgentId, index);
 }
 
 async function continueGeneration(index) {
@@ -2262,7 +2259,7 @@ async function continueGeneration(index) {
       _isContinue: true
   }]);
 
-  // 继续生成：新 AI 消息的父节点 = 当前 AI 消息（形成"续说"的父子关系）
+  // 继续生成：追加到末尾（不替换）
   await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id || currentAgentId);
 }
 
