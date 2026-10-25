@@ -1998,21 +1998,55 @@ function cancelEditMode() {
     autoResize();
 }
 
-// 【关键修复】编辑用户消息：整体重绘后生成 AI 回复（旧 A 和旧 B 的 DOM 全部移除）
+// 【关键修复】编辑用户消息：如果内容不变直接重新生成下一条AI，如果变了则创建新分支
 async function saveEditedMessage() {
     if (busy || editingMsgIndex === null) return;
     const msg = msgs[editingMsgIndex];
     if (!msg) return;
     
     const newContent = $('#input').value.trim();
-    if (newContent === '' || newContent === msg.content) {
+    if (newContent === '') {
         cancelEditMode();
         return;
     }
     
+    const idxSnapshot = editingMsgIndex;
+    
+    // 【核心：内容未变】不创建新用户消息，直接对下一条 AI 消息重新生成
+    if (newContent === msg.content) {
+        cancelEditMode();
+        
+        // 找该用户消息之后最近的 AI 消息
+        let nextAiIdx = -1;
+        for (let i = idxSnapshot + 1; i < msgs.length; i++) {
+            if (msgs[i].role === 'assistant') {
+                nextAiIdx = i;
+                break;
+            }
+        }
+        
+        if (nextAiIdx >= 0) {
+            // 找到 AI 消息，走重新生成流程（原地替换，旧 AI 保留为分支）
+            await regenerateMessage(nextAiIdx);
+        } else {
+            // 边缘场景：该用户消息后没有 AI 回复，直接生成新的
+            busy = true;
+            setBusyUI(true);
+            try {
+                const contextMsgs = msgs.slice(0, idxSnapshot + 1);
+                await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id);
+            } catch (e) {
+                console.error("生成失败:", e);
+                busy = false;
+                setBusyUI(false);
+            }
+        }
+        return;
+    }
+    
+    // 【内容改变】：创建新用户消息兄弟，然后生成 AI 回复
     busy = true;
     setBusyUI(true);
-    const idxSnapshot = editingMsgIndex;
     cancelEditMode();
     
     try {
@@ -2036,14 +2070,14 @@ async function saveEditedMessage() {
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
         
-        // 【关键】整体重绘：从云端拉取新路径（此时旧A和旧B都不在路径上，DOM被全部移除）
+        // 整体重绘：从云端拉取新路径
         const res = await loadMessagesFromCloud(newMsg.local_id);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
         
-        // 然后生成 AI 回复（append 到 A' 末尾，视觉上就是新 AI 出现在新用户消息下面）
+        // 生成 AI 回复
         const contextMsgs = msgs.slice();
         await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
     } catch (e) {
