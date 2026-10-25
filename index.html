@@ -1546,6 +1546,7 @@ async function saveMessageToCloud(msg) {
     }
 }
 
+// 【核心纯净逻辑】loadMessagesFromCloud
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
@@ -1579,14 +1580,13 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         targetLeafId = convData?.active_leaf_id;
     }
 
-    // 如果还没找到，或者节点已失效，取最后一条消息
+    // 如果没找到有效节点，取最后一条消息
     if (!targetLeafId || !msgMap.has(targetLeafId)) {
         targetLeafId = allMsgs[allMsgs.length - 1].local_id;
     }
 
-    // =========================================================
-    // 【核心修复】探底逻辑：只有没传 targetNodeId 才往下探底找最新
-    // =========================================================
+    // 【重要】只有在“打开会话且未传targetNodeId”时，才允许“探底”寻找最新回复。
+    // 如果传了targetNodeId（主动切分支、重新生成、编辑等），直接停在传进来的节点，绝不乱动。
     if (!targetNodeId) {
         let currentId = targetLeafId;
         while (childrenMap.has(currentId)) {
@@ -1597,10 +1597,9 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         targetLeafId = currentId;
     }
 
-    // 更新云端的 active_leaf_id 为当前的最终叶子节点
+    // 更新云端活跃叶子节点
     supabaseClient.from('conversations').update({ active_leaf_id: targetLeafId }).eq('id', currentConversationId).then();
 
-    // 从 targetLeafId 往上回溯构建路径
     let currentPath = [];
     let currId = targetLeafId;
     while (currId) {
@@ -1610,7 +1609,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         currId = node.parent_id;
     }
 
-    // 计算每个节点在兄弟节点中的索引，用于渲染切换器
     const finalMsgs = currentPath.map(m => {
         let siblings = [];
         if (m.parent_id) siblings = childrenMap.get(m.parent_id) || [];
@@ -1632,6 +1630,7 @@ async function loadMessagesFromCloud(targetNodeId = null) {
 async function refreshCurrentChat() {
     if (busy || !currentConversationId) return;
     try {
+        // 必须传入当前正在查看的 activeLeafId，防止被后台强制拉到最新分支
         const res = await loadMessagesFromCloud(activeLeafId);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
@@ -1651,6 +1650,7 @@ function setupRealtimeListener() {
         .on('postgres_changes',
             { event: '*', schema: 'public', table: 'chat_messages', filter: `user_id=eq.${USER_ID}` },
             (payload) => {
+                // 只有当前会话且非 busy 状态下才允许刷新
                 if (payload.new && payload.new.conversation_id === currentConversationId) refreshCurrentChat();
             }
         )
@@ -1779,6 +1779,7 @@ async function switchConversation(convId, convObj = null) {
         for (let attempt = 0; attempt < 3; attempt++) {
             if (fetchId !== currentFetchId) return;
             try {
+                // 打开会话不传参，允许找最新节点
                 cloudRes = await loadMessagesFromCloud();
                 lastErr = null;
                 break;
@@ -1874,7 +1875,7 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
       actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
       actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
   } else {
-      // 用户气泡下方不再显示编辑和删除，但要保留切换器的容器
+      // 用户气泡下方不再显示编辑和删除
       actionsHtml = ''; 
   }
 
@@ -1918,7 +1919,7 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
           <div class="avatar">${avatarHtml}</div>
         </div>
         <div class="content"></div>
-        <div class="msg-actions"></div>`; /* 【核心修复】给用户气泡加上操作容器 */
+        <div class="msg-actions"></div>`; /* 添加了 msg-actions 容器 */
   }
 
   wrap.querySelector('.content').innerHTML = renderContent(content, false);
@@ -2248,9 +2249,10 @@ async function generateAIResponse(contextMsgs, parentId = null, agentId = null) 
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
   } finally {
+    // 强制把完整数据写入云端，确保数据一致性
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
     
-    // 【核心修复】生成完毕后，强制触发一次重新加载，从云端构建正确的兄弟节点树结构
+    // 【核心修复】生成完毕后，强一致重载当前分支树
     try {
         const res = await loadMessagesFromCloud(aiMsg.local_id);
         msgs = res.pathMsgs;
@@ -2289,7 +2291,7 @@ async function regenerateMessage(index) {
       renderAgentSelector();
   }
 
-  // 【核心修复】不再截断旧消息，直接基于 parentId 和上下文生成新分支
+  // 【核心】抛弃本地截断，强依赖云端生成新分支并刷新树
   await generateAIResponse(userMsgContext, parentId, msg.agent_id || currentAgentId);
 }
 
@@ -2309,7 +2311,7 @@ async function continueGeneration(index) {
       _isContinue: true
   }]);
 
-  // 【核心修复】将当前消息的 local_id 作为父节点
+  // 【核心】将当前消息的 local_id 作为父节点
   await generateAIResponse(contextMsgs, msg.local_id, msg.agent_id || currentAgentId);
 }
 
@@ -2320,10 +2322,13 @@ async function switchVersion(index, direction) {
   if (newIndex < 0 || newIndex >= msg._sibTotal) return;
   const targetSibling = msg._siblings[newIndex];
   if (!targetSibling) return;
+  
   busy = true; setBusyUI(true);
   try {
-      // 【核心修复】传入我们想要切换到的目标兄弟节点 ID，让加载函数顺着该分支去找尾部
+      // 【核心修复】传入精确的目标节点 ID，禁止函数自动往下探底
       const res = await loadMessagesFromCloud(targetSibling.local_id);
+      
+      // 更新本地状态并重新渲染
       msgs = res.pathMsgs;
       activeLeafId = res.leafId;
       msgBox.innerHTML = '';
