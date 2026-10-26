@@ -382,15 +382,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .reasoning-box { margin-bottom: 12px; font-size: calc(14px * var(--font-scale)); overflow: hidden; transition: all 0.3s ease; }
 .reasoning-header { padding: 4px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: calc(13px * var(--font-scale)); user-select: none; transition: color 0.2s; border-radius: 6px; }
 .reasoning-header:hover { color: var(--text); }
-.reasoning-header.thinking { color: var(--accent); }
-.reasoning-header .arrow-icon { width: 14px; height: 14px; transition: transform 0.3s ease; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; transform: rotate(-90deg); /* 默认向右 > */ }
-.reasoning-box:not(.collapsed) .reasoning-header .arrow-icon { transform: rotate(0deg); /* 展开时向下 v */ }
-.reasoning-box:not(.collapsed) .reasoning-header.thinking .arrow-icon { transform: rotate(0deg) translateY(1px); animation: pulse-arrow 1s infinite alternate; }
+.reasoning-header.thinking { color: var(--muted); }
+.reasoning-header .arrow-icon { width: 14px; height: 14px; transition: transform 0.3s ease; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* 正在思考时的上下双向箭头动态 */
+.reasoning-header .arrow-icon.up-down { animation: pulse-up-down 1.5s infinite alternate; }
 
-@keyframes pulse-arrow {
-    0% { transform: rotate(0deg) translateY(0px) scale(1); }
-    100% { transform: rotate(0deg) translateY(3px) scale(1.1); }
+@keyframes pulse-up-down {
+    0% { transform: translateY(-1px); }
+    100% { transform: translateY(1px); }
 }
+
+/* 默认（已思考且折叠）向右 */
+.reasoning-box.collapsed .reasoning-header .arrow-icon.right { transform: rotate(0deg); }
+/* 展开时向下 */
+.reasoning-box:not(.collapsed) .reasoning-header .arrow-icon.right { transform: rotate(90deg); }
 
 .reasoning-content { padding: 8px 0 8px 16px; color: var(--muted); font-size: calc(13px * var(--font-scale)); line-height: 1.6; white-space: pre-wrap; font-family: inherit; border-left: 2px solid var(--border); margin-left: 4px; margin-top: 4px; }
 .reasoning-box.collapsed .reasoning-content { display: none; }
@@ -1889,13 +1894,12 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   // ===== DeepSeek 风格渲染 =====
   let reasoningHtml = '';
   if (role === 'assistant' && reasoning) {
-      // 尝试获取保存的秒数，如果内存中没有则显示无时间
       const timeStr = (msgs[index] && msgs[index].reasoning_time) ? `（用时 ${msgs[index].reasoning_time} 秒）` : '';
       reasoningHtml = `
         <div class="reasoning-box collapsed">
             <div class="reasoning-header">
-                <svg class="arrow-icon" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
-                <span>已思考${timeStr}</span>
+                <span class="reasoning-label">已思考${timeStr}</span>
+                <svg class="arrow-icon right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
             </div>
             <div class="reasoning-content">${escapeHtml(reasoning)}</div>
         </div>`;
@@ -2218,11 +2222,11 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
 
   // ===== DeepSeek 风格初始状态构建 =====
   const rBox = document.createElement('div');
-  rBox.className = 'reasoning-box';
+  rBox.className = 'reasoning-box'; // 初始展开
   rBox.innerHTML = `
       <div class="reasoning-header thinking">
-          <svg class="arrow-icon" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"></path></svg>
-          <span class="reasoning-label">正在思考...</span>
+          <span class="reasoning-label">正在思考</span>
+          <svg class="arrow-icon up-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"></path></svg>
       </div>
       <div class="reasoning-content"></div>
   `;
@@ -2231,6 +2235,7 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
   const rHeader = rBox.querySelector('.reasoning-header');
   const rLabel = rBox.querySelector('.reasoning-label');
   const rContent = rBox.querySelector('.reasoning-content');
+  const rIcon = rBox.querySelector('.arrow-icon');
 
   rHeader.addEventListener('click', () => rBox.classList.toggle('collapsed'));
 
@@ -2265,8 +2270,12 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
             if (!hasStartedContent) {
                 hasStartedContent = true;
                 if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                // 思考完成，替换图标和文字
                 rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
                 rHeader.classList.remove('thinking');
+                rIcon.classList.remove('up-down');
+                rIcon.classList.add('right');
+                rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
                 rBox.classList.add('collapsed');
             }
             contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
@@ -2282,6 +2291,9 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
     if (!hasStartedContent) {
          rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
          rHeader.classList.remove('thinking');
+         rIcon.classList.remove('up-down');
+         rIcon.classList.add('right');
+         rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
          rBox.classList.add('collapsed');
     }
     if(full.trim()){
@@ -2305,6 +2317,9 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
   } catch(err) {
     if (timerInterval) clearInterval(timerInterval);
     rHeader.classList.remove('thinking');
+    rIcon.classList.remove('up-down');
+    rIcon.classList.add('right');
+    rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
     rBox.classList.add('collapsed');
     rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
@@ -2316,7 +2331,7 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
     try {
         const res = await loadMessagesFromCloud(aiMsg.local_id);
         msgs = res.pathMsgs;
-        // 尝试把刚才的秒数重新附加到刚拉取的对象上（因为上面存了，但拉取时会被覆盖，这里做个后备）
+        // 尝试把刚才的秒数重新附加到刚拉取的对象上
         if (msgs.length > 0) {
             const lastMsg = msgs[msgs.length - 1];
             if (lastMsg.local_id === aiMsg.local_id) lastMsg.reasoning_time = reasoningSeconds;
