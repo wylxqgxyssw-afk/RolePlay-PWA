@@ -3112,10 +3112,10 @@ async function loadUserData() {
   currentLoadedUserId = USER_ID;
   cfg = loadCfg();
   updateGlobalUI();
-  bindEvents();
-  await fetchGlobalSettings();
+   bindEvents();
+  await fetchGlobalSettings(); 
+  await checkFeatureFlags();   // 👈 新增这行，拉取配置后立刻判断
   renderAccountMini();
-
   let convs = await loadConversations();
   if (convs.length === 0) {
     const newConv = await createConversation();
