@@ -1342,7 +1342,32 @@ function saveCfg(){
   if(!USER_ID) return;
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
+// 👈 新增这个函数
+async function checkFeatureFlags() {
+    isNewVersionUser = false;
+    if (!USER_ID) return;
 
+    try {
+        const { data, error } = await supabaseClient
+            .from('app_config')
+            .select('beta_user_ids, is_global_release')
+            .eq('id', 'feature_flags')
+            .single();
+
+        if (error) throw error;
+
+        if (data) {
+            // 如果全局发布开启了，或者当前账号的 ID 在白名单里，就是新版本用户
+            const isInWhitelist = Array.isArray(data.beta_user_ids) && data.beta_user_ids.includes(USER_ID);
+            isNewVersionUser = data.is_global_release === true || isInWhitelist;
+        }
+    } catch (e) {
+        console.warn('检查灰度开关失败，默认使用旧版:', e);
+        isNewVersionUser = false;
+    }
+
+    console.log('🚀 当前账号是否使用新版本:', isNewVersionUser);
+}
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
