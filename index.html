@@ -3116,7 +3116,18 @@ async function loadUserData() {
   updateGlobalUI();
    bindEvents();
   await fetchGlobalSettings(); 
-  await checkFeatureFlags();   // 👈 新增这行，拉取配置后立刻判断
+    await checkFeatureFlags();   // 👈 拉取配置后立刻判断
+  
+  // 👈 新增：测试内测开关是否生效
+  if ($('#betaBadge')) {
+      if (isNewVersionUser) {
+          $('#betaBadge').style.display = 'inline-block'; // 内测账号显示“内测版”徽章
+      } else {
+          $('#betaBadge').style.display = 'none'; // 普通账号隐藏徽章
+      }
+  }
+  // 👆 测试代码结束
+
   renderAccountMini();
   let convs = await loadConversations();
   if (convs.length === 0) {
