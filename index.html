@@ -989,6 +989,7 @@ const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
+let isNewVersionUser = false; // 👈 新增这个变量，用来存当前是不是内测版
 let currentConversationId = null;
 let currentConversation = null; 
 let currentAgents = []; 
