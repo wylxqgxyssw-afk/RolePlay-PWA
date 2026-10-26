@@ -995,7 +995,9 @@ const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
-let isNewVersionUser = false;
+// ✅ 拆分：isBetaUser = 是否内测身份；isFeatureEnabled = 新功能是否可见
+let isBetaUser = false;
+let isFeatureEnabled = false;
 let currentConversationId = null;
 let currentConversation = null; 
 let currentAgents = []; 
@@ -1348,9 +1350,13 @@ function saveCfg(){
   if(!USER_ID) return;
   try{ localStorage.setItem('rp_cfg_' + USER_ID, JSON.stringify(cfg)); }catch(e){}
 }
-// 👈 新增这个函数
+
+// ✅ 拆分身份与功能：
+//   isBetaUser       → 只表示“是否内测身份”，用来显示内测徽章
+//   isFeatureEnabled → 表示“新功能是否可见”，所有账号都可以用，但内测身份不会因此改变
 async function checkFeatureFlags() {
-    isNewVersionUser = false;
+    isBetaUser = false;
+    isFeatureEnabled = false;
     if (!USER_ID) return;
 
     try {
@@ -1363,17 +1369,19 @@ async function checkFeatureFlags() {
         if (error) throw error;
 
         if (data) {
-            // 如果全局发布开启了，或者当前账号的 ID 在白名单里，就是新版本用户
             const isInWhitelist = Array.isArray(data.beta_user_ids) && data.beta_user_ids.includes(USER_ID);
-            isNewVersionUser = data.is_global_release === true || isInWhitelist;
+            isBetaUser = isInWhitelist;
+            isFeatureEnabled = data.is_global_release === true || isInWhitelist;
         }
     } catch (e) {
         console.warn('检查灰度开关失败，默认使用旧版:', e);
-        isNewVersionUser = false;
+        isBetaUser = false;
+        isFeatureEnabled = false;
     }
 
-    console.log('🚀 当前账号是否使用新版本:', isNewVersionUser);
+    console.log('🚀 当前账号 → isBetaUser:', isBetaUser, '| isFeatureEnabled:', isFeatureEnabled);
 }
+
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
@@ -1889,6 +1897,7 @@ function updateVersionSwitcher(index, msg) {
 }
 
 // 【关键】addBubble 增加 insertBeforeNode 参数，支持精确插入位置（原地替换）
+// ✅ 新功能可见性改用 isFeatureEnabled 判断（与内测身份解耦）
 function addBubble(role, content, index = null, tokens = null, reasoning = null, agentId = null, insertBeforeNode = null){
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role;
@@ -1907,8 +1916,8 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
 
   let actionsHtml = '';
   if (role === 'assistant') {
-      if (isNewVersionUser) {
-          // 👇 【内测版专属：图标模式】
+      if (isFeatureEnabled) {
+          // 👇 【新功能：图标模式】所有账号可见（受 is_global_release 控制）
           actionsHtml += `<button class="action-btn regen-btn" title="重新生成" data-msg-index="${index}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
           </button>`;
@@ -1932,7 +1941,7 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
               </div>
           `;
       } else {
-          // 👇 【普通用户：保留原来的文字模式】
+          // 👇 【旧功能：文字模式】仅当 is_global_release=false 且账号不在白名单时显示
           actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
           actionsHtml += `<button class="action-btn continue-btn" data-msg-index="${index}">继续生成</button>`;
           actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
@@ -3190,15 +3199,14 @@ async function loadUserData() {
   await fetchGlobalSettings(); 
     await checkFeatureFlags();   // 👈 拉取配置后立刻判断
   
-  // 👈 新增：测试内测开关是否生效
+  // ✅ 内测徽章只用 isBetaUser 判断，与“新功能是否全量”解耦
   if ($('#betaBadge')) {
-      if (isNewVersionUser) {
-          $('#betaBadge').style.display = 'inline-block'; // 内测账号显示“内测版”徽章
+      if (isBetaUser) {
+          $('#betaBadge').style.display = 'inline-block'; // 仅内测号显示“内测版”徽章
       } else {
-          $('#betaBadge').style.display = 'none'; // 普通账号隐藏徽章
+          $('#betaBadge').style.display = 'none';         // 普通账号隐藏徽章
       }
   }
-  // 👆 测试代码结束
 
   renderAccountMini();
   let convs = await loadConversations();
