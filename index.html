@@ -1,3 +1,12 @@
+没问题，我已经把刚才说的 `if (isNewVersionUser)` 判断逻辑完整地加入到了代码中。
+
+现在的效果是：
+*   **内测账号**：AI 回复底部是**全图标**（重新生成、继续生成、编辑、三个点更多/删除）。
+*   **普通账号**：AI 回复底部依然是**原版的文字**（重新生成、继续生成、编辑、删除）。
+
+这是修改后的**完整代码**，直接复制并覆盖你现有的 `index.html` 即可：
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -353,13 +362,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .cursor{display:inline-block;width:7px;height:1em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
 
-.msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 4px;padding: 0 4px;font-size: calc(12px * var(--font-scale));color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
+.msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 6px;padding: 0 4px;font-size: calc(12px * var(--font-scale));color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
 .msg-actions:hover { opacity: 1; }
 .msg.user .msg-actions { justify-content: flex-end; }
-.action-btn {background: none; border: none; color: var(--muted);cursor: pointer; padding: 2px 4px; font-size: calc(12px * var(--font-scale)); border-radius: 4px;}
+.action-btn {background: none; border: none; color: var(--muted);cursor: pointer; padding: 4px; font-size: calc(12px * var(--font-scale)); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; transition: 0.2s;}
 .action-btn:hover { color: var(--text); background: var(--border); }
 .action-btn.delete-btn { color: var(--danger); }
 .action-btn.delete-btn:hover { background: var(--danger-bg-soft2); }
+.action-btn svg { width: 15px; height: 15px; }
+
+/* 更多菜单的样式 */
+.more-actions-wrap { display: inline-flex; align-items: center; position: relative; }
+.more-menu { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px; z-index: 10; box-shadow: var(--shadow-md); min-width: 85px; margin-bottom: 6px; }
+.more-menu button { width: 100%; display: flex; align-items: center; gap: 6px; justify-content: center; padding: 8px 10px; font-size: 13px; border-radius: 4px; background: transparent; border: none; cursor: pointer; }
+.more-menu button:hover { background: var(--danger-bg-soft); }
 
 .version-switcher { display: flex; align-items: center; gap: 4px; margin: 0 4px; }
 .version-switcher span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -376,7 +392,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .version-switcher button:hover:not(:disabled) { color: var(--text); }
 .version-switcher button:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.token-display {font-family: monospace; font-size: calc(11px * var(--font-scale)); color: var(--token-fg);background: var(--token-bg); padding: 1px 6px; border-radius: 4px; margin-left: auto;}
+.token-display {font-family: monospace; font-size: calc(11px * var(--font-scale)); color: var(--token-fg);background: var(--token-bg); padding: 2px 6px; border-radius: 4px; margin-left: auto;}
 
 /* ===== DeepSeek 风格思考过程 ===== */
 .reasoning-box { margin-bottom: 12px; font-size: calc(14px * var(--font-scale)); overflow: hidden; transition: all 0.3s ease; }
@@ -384,7 +400,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .reasoning-header:hover { color: var(--text); }
 .reasoning-header.thinking { color: var(--muted); }
 .reasoning-header .arrow-icon { width: 14px; height: 14px; transition: transform 0.3s ease; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-/* 正在思考时的上下双向箭头动态 */
 .reasoning-header .arrow-icon.up-down { animation: pulse-up-down 1.5s infinite alternate; }
 
 @keyframes pulse-up-down {
@@ -392,9 +407,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
     100% { transform: translateY(1px); }
 }
 
-/* 默认（已思考且折叠）向右 */
 .reasoning-box.collapsed .reasoning-header .arrow-icon.right { transform: rotate(0deg); }
-/* 展开时向下 */
 .reasoning-box:not(.collapsed) .reasoning-header .arrow-icon.right { transform: rotate(90deg); }
 
 .reasoning-content { padding: 8px 0 8px 16px; color: var(--muted); font-size: calc(13px * var(--font-scale)); line-height: 1.6; white-space: pre-wrap; font-family: inherit; border-left: 2px solid var(--border); margin-left: 4px; margin-top: 4px; }
@@ -991,7 +1004,7 @@ const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
-let isNewVersionUser = false; // 👈 新增这个变量，用来存当前是不是内测版
+let isNewVersionUser = false;
 let currentConversationId = null;
 let currentConversation = null; 
 let currentAgents = []; 
@@ -1903,10 +1916,37 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
 
   let actionsHtml = '';
   if (role === 'assistant') {
-      actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
-      actionsHtml += `<button class="action-btn continue-btn" data-msg-index="${index}">继续生成</button>`;
-      actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
-      actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
+      if (isNewVersionUser) {
+          // 👇 【内测版专属：图标模式】
+          actionsHtml += `<button class="action-btn regen-btn" title="重新生成" data-msg-index="${index}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
+          </button>`;
+          actionsHtml += `<button class="action-btn continue-btn" title="继续生成" data-msg-index="${index}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+          </button>`;
+          actionsHtml += `<button class="action-btn edit-btn" title="编辑" data-msg-index="${index}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+          </button>`;
+          actionsHtml += `
+              <div class="more-actions-wrap">
+                  <button class="action-btn more-btn" title="更多" data-msg-index="${index}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                  </button>
+                  <div class="more-menu">
+                      <button class="delete-btn" data-msg-index="${index}">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                          删除
+                      </button>
+                  </div>
+              </div>
+          `;
+      } else {
+          // 👇 【普通用户：保留原来的文字模式】
+          actionsHtml += `<button class="action-btn regen-btn" data-msg-index="${index}">重新生成</button>`;
+          actionsHtml += `<button class="action-btn continue-btn" data-msg-index="${index}">继续生成</button>`;
+          actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
+          actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
+      }
   } else {
       actionsHtml = ''; 
   }
@@ -2846,13 +2886,54 @@ function bindEvents(){
     }
   });
 
+  // 监听对话区域点击事件，使用 closest 兼容点击到 SVG 内部
   msgBox.addEventListener('click', async (e) => {
-    const target = e.target;
-    if (target.classList.contains('regen-btn')) await regenerateMessage(parseInt(target.getAttribute('data-msg-index')));
-    else if (target.classList.contains('continue-btn')) await continueGeneration(parseInt(target.getAttribute('data-msg-index')));
-    else if (target.classList.contains('version-btn')) switchVersion(parseInt(target.getAttribute('data-msg-index')), parseInt(target.getAttribute('data-direction')));
-    else if (target.classList.contains('edit-btn')) openEditModal(parseInt(target.getAttribute('data-msg-index')));
-    else if (target.classList.contains('delete-btn')) await deleteMessage(parseInt(target.getAttribute('data-msg-index')));
+    // 优先处理“更多”菜单的显示与隐藏
+    const moreBtn = e.target.closest('.more-btn');
+    if (moreBtn) {
+        e.stopPropagation();
+        const menu = moreBtn.nextElementSibling;
+        if (menu) {
+            const isHidden = menu.style.display === 'none' || menu.style.display === '';
+            // 先关闭所有已打开的菜单
+            document.querySelectorAll('.more-menu').forEach(m => m.style.display = 'none');
+            // 切换当前菜单
+            menu.style.display = isHidden ? 'block' : 'none';
+        }
+        return;
+    }
+
+    // 如果点的是其他区域（非菜单内部），则关闭菜单
+    if (!e.target.closest('.more-actions-wrap')) {
+        document.querySelectorAll('.more-menu').forEach(m => m.style.display = 'none');
+    }
+
+    // 查找最近的带有操作类名的按钮
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    const index = parseInt(btn.getAttribute('data-msg-index'));
+    if (isNaN(index)) return;
+
+    if (btn.classList.contains('regen-btn')) {
+        await regenerateMessage(index);
+    } else if (btn.classList.contains('continue-btn')) {
+        await continueGeneration(index);
+    } else if (btn.classList.contains('version-btn')) {
+        switchVersion(index, parseInt(btn.getAttribute('data-direction')));
+    } else if (btn.classList.contains('edit-btn')) {
+        openEditModal(index);
+    } else if (btn.classList.contains('delete-btn')) {
+        document.querySelectorAll('.more-menu').forEach(m => m.style.display = 'none'); // 点击删除后自动收起菜单
+        await deleteMessage(index);
+    }
+  });
+
+  // 点击全局任何地方，收起所有打开的“更多”菜单
+  document.addEventListener('click', (e) => {
+      if (!e.target.closest('.more-actions-wrap')) {
+          document.querySelectorAll('.more-menu').forEach(m => m.style.display = 'none');
+      }
   });
 
   // ==================== 账号管理事件 ====================
@@ -3169,3 +3250,4 @@ init();
 </script>
 </body>
 </html>
+```
