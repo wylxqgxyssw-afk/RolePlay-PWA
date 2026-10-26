@@ -2178,24 +2178,87 @@ function cancelEditMode() {
     autoResize();
 }
 
-// 【关键修复】编辑用户消息：如果内容不变直接重新生成下一条AI，如果变了则创建新分支
+// 【修改】编辑消息：
+// - 用户消息：内容没变则重新生成下一条 AI；内容改变则创建新用户消息兄弟 + 生成 AI 回复（语义不变）
+// - AI 消息：只保存修改后的新版本（兄弟节点，可 ‹ 1/2 › 切换），不触发任何生成
 async function saveEditedMessage() {
     if (busy || editingMsgIndex === null) return;
     const msg = msgs[editingMsgIndex];
     if (!msg) return;
-    
+
     const newContent = $('#input').value.trim();
     if (newContent === '') {
         cancelEditMode();
         return;
     }
-    
+
+    // 快照当前编辑位置（cancelEditMode 会清空 editingMsgIndex）
     const idxSnapshot = editingMsgIndex;
-    
-    // 【核心：内容未变】不创建新用户消息，直接对下一条 AI 消息重新生成
+
+    // ============================================================
+    // 【新增分支】AI 消息编辑：只保存新版本，不继续发送 / 不触发生成
+    // ============================================================
+    if (msg.role === 'assistant') {
+
+        // 情况A：内容没变 → 直接取消编辑，什么都不做
+        if (newContent === msg.content) {
+            cancelEditMode();
+            return;
+        }
+
+        // 情况B：内容改变 → 创建 AI 消息兄弟节点（保留版本切换），刷新显示，不触发生成
+        // 细节2：自己维护 busy 状态（因为不走 generateAIResponse）
+        busy = true;
+        setBusyUI(true);
+        cancelEditMode();
+
+        try {
+            // 细节3：父节点 = 原 AI 消息的父节点（即上一条消息），而不是 msg.local_id
+            const trueParentId = idxSnapshot > 0 ? msgs[idxSnapshot - 1].local_id : null;
+
+            // agent_id 沿用原 AI 消息的，避免新版本头像/名字跑偏
+            const newAiMsg = {
+                role: 'assistant',
+                content: newContent,
+                local_id: generateId(),
+                parent_id: trueParentId,
+                sibling_order: Date.now(),
+                agent_id: msg.agent_id || currentAgentId,
+                reasoning: null,
+                tokens: null
+            };
+            await saveMessageToCloud(newAiMsg);
+
+            activeLeafId = newAiMsg.local_id;
+            await supabaseClient.from('conversations')
+                .update({ active_leaf_id: activeLeafId })
+                .eq('id', currentConversationId);
+
+            // 从新节点出发重新加载完整分支树，这样 siblings 和 ‹ 1/2 › 切换器能正确显示
+            const res = await loadMessagesFromCloud(newAiMsg.local_id);
+            msgs = res.pathMsgs;
+            activeLeafId = res.leafId;
+            msgBox.innerHTML = '';
+            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+
+            // ❗关键：这里刻意不调用 generateAIResponse —— 编辑 AI 就是改它自己，不触发新一轮生成
+        } catch (e) {
+            console.error("编辑 AI 消息失败:", e);
+            alert("编辑 AI 消息失败: " + e.message);
+        } finally {
+            busy = false;
+            setBusyUI(false);
+        }
+        return;
+    }
+    // ============================================================
+    // 【新增分支结束】以下是用户消息编辑的原有逻辑，一字未改
+    // ============================================================
+
+    // 【内容未变】不创建新用户消息，直接对下一条 AI 消息重新生成
     if (newContent === msg.content) {
         cancelEditMode();
-        
+
         // 找该用户消息之后最近的 AI 消息
         let nextAiIdx = -1;
         for (let i = idxSnapshot + 1; i < msgs.length; i++) {
@@ -2204,7 +2267,7 @@ async function saveEditedMessage() {
                 break;
             }
         }
-        
+
         if (nextAiIdx >= 0) {
             // 找到 AI 消息，走重新生成流程（原地替换，旧 AI 保留为分支）
             await regenerateMessage(nextAiIdx);
@@ -2223,12 +2286,12 @@ async function saveEditedMessage() {
         }
         return;
     }
-    
+
     // 【内容改变】：创建新用户消息兄弟，然后生成 AI 回复
     busy = true;
     setBusyUI(true);
     cancelEditMode();
-    
+
     try {
         const trueParentId = idxSnapshot > 0 ? msgs[idxSnapshot - 1].local_id : null;
 
@@ -2246,17 +2309,17 @@ async function saveEditedMessage() {
             parent_id: trueParentId, sibling_order: Date.now(), agent_id: msg.agent_id
         };
         await saveMessageToCloud(newMsg);
-        
+
         activeLeafId = newMsg.local_id;
         await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
-        
+
         // 整体重绘：从云端拉取新路径
         const res = await loadMessagesFromCloud(newMsg.local_id);
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
-        
+
         // 生成 AI 回复
         const contextMsgs = msgs.slice();
         await generateAIResponse(contextMsgs, newMsg.local_id, newMsg.agent_id);
@@ -2267,7 +2330,6 @@ async function saveEditedMessage() {
         setBusyUI(false);
     }
 }
-
 async function send(){
   if(busy || !currentConversationId) return;
   
