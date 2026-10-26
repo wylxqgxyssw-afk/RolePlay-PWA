@@ -57,6 +57,10 @@ html[data-theme="dark"]{
   --font-scale: 1; 
   --global-font-size: 15px;
   --global-line-height: 1.72;
+  --user-font-size: 15px;
+  --user-line-height: 1.72;
+  --assistant-font-size: 15px;
+  --assistant-line-height: 1.72;
   --user-bubble-max-width: 78%;
 }
 
@@ -337,7 +341,7 @@ input[type=checkbox]{
 .msg.user .avatar { width: calc(38px * var(--font-scale)); height: calc(38px * var(--font-scale)); border-radius: 50%; background: var(--panel-2); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: calc(20px * var(--font-scale)); font-weight: bold; flex-shrink: 0; user-select: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2); overflow: hidden; }
 .msg.user .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg.user .meta { margin: 0; padding: 0; font-size: calc(14px * var(--font-scale)); font-weight: 600; color: var(--text); text-align: right; }
-.msg.user .content { background: var(--bubble-user-bg); color: var(--bubble-user-fg); border-radius: 18px; border: none; padding: 11px 15px; font-size: var(--global-font-size); line-height: var(--global-line-height); word-break: break-word; overflow-wrap: anywhere; cursor: pointer; transition: filter 0.2s; }
+.msg.user .content { background: var(--bubble-user-bg); color: var(--bubble-user-fg); border-radius: 18px; border: none; padding: 11px 15px; font-size: var(--user-font-size); line-height: var(--user-line-height); word-break: break-word; overflow-wrap: anywhere; cursor: pointer; transition: filter 0.2s; }
 .msg.user .content:active { filter: brightness(0.9); }
 
 .msg.assistant { align-self: flex-start; max-width: 100%; }
@@ -346,7 +350,7 @@ input[type=checkbox]{
 .msg.assistant .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .msg.assistant .meta { margin: 0; padding: 0; font-size: calc(14px * var(--font-scale)); font-weight: 600; color: var(--text); }
 .msg.assistant .meta .vip-icon { color: var(--vip-gold); font-size: 1.1em; margin-left: 4px; }
-.msg.assistant .content { background: transparent; border: none; padding: 0; color: var(--text); font-size: var(--global-font-size); line-height: var(--global-line-height); word-break: break-word; overflow-wrap: anywhere; }
+.msg.assistant .content { background: transparent; border: none; padding: 0; color: var(--text); font-size: var(--assistant-font-size); line-height: var(--assistant-line-height); word-break: break-word; overflow-wrap: anywhere; }
 .msg.assistant .content code { background: var(--code-bg); color: var(--code-fg); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
 .msg.assistant .content pre { background: var(--pre-bg); padding: 12px; border-radius: 8px; overflow-x: auto; margin: 10px 0; }
 .msg.assistant .content pre code { background: transparent; padding: 0; color: inherit; }
@@ -901,17 +905,30 @@ input[type=checkbox]{
           <input type="checkbox" id="chkHideAvatarName">
         </div>
 
+        <!-- 字体与行间距：用户和 AI 分开调节 -->
         <div class="settings-row" style="margin-top:16px;">
-          <label>全局字体大小</label>
-          <span class="val" id="valGlobalFontSize">15px</span>
+          <label>我的消息字体大小</label>
+          <span class="val" id="valUserFontSize">15px</span>
         </div>
-        <input type="range" id="rangeGlobalFontSize" min="12" max="24" step="0.5" value="15">
+        <input type="range" id="rangeUserFontSize" min="12" max="24" step="0.5" value="15">
 
         <div class="settings-row">
-          <label>全局行间距</label>
-          <span class="val" id="valGlobalLineHeight">1.72</span>
+          <label>我的消息行间距</label>
+          <span class="val" id="valUserLineHeight">1.72</span>
         </div>
-        <input type="range" id="rangeGlobalLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
+        <input type="range" id="rangeUserLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
+
+        <div class="settings-row">
+          <label>AI 消息字体大小</label>
+          <span class="val" id="valAssistantFontSize">15px</span>
+        </div>
+        <input type="range" id="rangeAssistantFontSize" min="12" max="24" step="0.5" value="15">
+
+        <div class="settings-row">
+          <label>AI 消息行间距</label>
+          <span class="val" id="valAssistantLineHeight">1.72</span>
+        </div>
+        <input type="range" id="rangeAssistantLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
 
         <div class="settings-row">
           <label>气泡最大宽度</label>
@@ -1040,9 +1057,14 @@ let editingAgentId = null;
 let currentTab = 'chat';
 
 // 【新增】hideAvatarName：隐藏头像和名字（全局外观设置，所有账号通用）
+// 字体与行间距：用户和 AI 分开调节
 let styleConfig = {
-    fontSize: 15,
-    lineHeight: 1.72,
+    fontSize: 15, // 保留作为全局界面缩放基础（不再用于消息正文）
+    lineHeight: 1.72, // 保留但不再用于消息正文
+    userFontSize: 15,
+    userLineHeight: 1.72,
+    assistantFontSize: 15,
+    assistantLineHeight: 1.72,
     userBubbleWidth: 78,
     hideAvatarName: false
 };
@@ -1147,15 +1169,23 @@ function applyStyleConfig() {
     const scale = styleConfig.fontSize / 15;
     document.documentElement.style.setProperty('--font-scale', scale);
     document.documentElement.style.setProperty('--global-font-size', styleConfig.fontSize + 'px');
-    document.documentElement.style.setProperty('--global-line-height', styleConfig.lineHeight);
+    document.documentElement.style.setProperty('--global-line-height', styleConfig.lineHeight); // 保留，但消息正文不再使用
+    document.documentElement.style.setProperty('--user-font-size', styleConfig.userFontSize + 'px');
+    document.documentElement.style.setProperty('--user-line-height', styleConfig.userLineHeight);
+    document.documentElement.style.setProperty('--assistant-font-size', styleConfig.assistantFontSize + 'px');
+    document.documentElement.style.setProperty('--assistant-line-height', styleConfig.assistantLineHeight);
     document.documentElement.style.setProperty('--user-bubble-max-width', styleConfig.userBubbleWidth + '%');
     
-    if($('#valGlobalFontSize')) $('#valGlobalFontSize').textContent = styleConfig.fontSize + 'px';
-    if($('#valGlobalLineHeight')) $('#valGlobalLineHeight').textContent = styleConfig.lineHeight;
+    if($('#valUserFontSize')) $('#valUserFontSize').textContent = styleConfig.userFontSize + 'px';
+    if($('#valUserLineHeight')) $('#valUserLineHeight').textContent = styleConfig.userLineHeight;
+    if($('#valAssistantFontSize')) $('#valAssistantFontSize').textContent = styleConfig.assistantFontSize + 'px';
+    if($('#valAssistantLineHeight')) $('#valAssistantLineHeight').textContent = styleConfig.assistantLineHeight;
     if($('#valUserBubbleWidth')) $('#valUserBubbleWidth').textContent = styleConfig.userBubbleWidth + '%';
     
-    if($('#rangeGlobalFontSize')) $('#rangeGlobalFontSize').value = styleConfig.fontSize;
-    if($('#rangeGlobalLineHeight')) $('#rangeGlobalLineHeight').value = styleConfig.lineHeight;
+    if($('#rangeUserFontSize')) $('#rangeUserFontSize').value = styleConfig.userFontSize;
+    if($('#rangeUserLineHeight')) $('#rangeUserLineHeight').value = styleConfig.userLineHeight;
+    if($('#rangeAssistantFontSize')) $('#rangeAssistantFontSize').value = styleConfig.assistantFontSize;
+    if($('#rangeAssistantLineHeight')) $('#rangeAssistantLineHeight').value = styleConfig.assistantLineHeight;
     if($('#rangeUserBubbleWidth')) $('#rangeUserBubbleWidth').value = styleConfig.userBubbleWidth;
 
     // 【新增】应用"隐藏头像和名字"
@@ -1191,6 +1221,10 @@ async function syncAppearanceToCloud() {
             theme_updated_at: Date.now(),
             fontSize: styleConfig.fontSize,
             lineHeight: styleConfig.lineHeight,
+            userFontSize: styleConfig.userFontSize,
+            userLineHeight: styleConfig.userLineHeight,
+            assistantFontSize: styleConfig.assistantFontSize,
+            assistantLineHeight: styleConfig.assistantLineHeight,
             userBubbleWidth: styleConfig.userBubbleWidth,
             hideAvatarName: !!styleConfig.hideAvatarName   // 【新增】同步到云端
         };
@@ -1253,11 +1287,15 @@ function setupThemeUI(){
       });
   });
 
-  if($('#rangeGlobalFontSize')) {
-      $('#rangeGlobalFontSize').addEventListener('input', (e) => { styleConfig.fontSize = parseFloat(e.target.value); applyStyleConfig(); });
-      $('#rangeGlobalFontSize').addEventListener('change', () => syncAppearanceToCloud());
-      $('#rangeGlobalLineHeight').addEventListener('input', (e) => { styleConfig.lineHeight = parseFloat(e.target.value); applyStyleConfig(); });
-      $('#rangeGlobalLineHeight').addEventListener('change', () => syncAppearanceToCloud());
+  if($('#rangeUserFontSize')) {
+      $('#rangeUserFontSize').addEventListener('input', (e) => { styleConfig.userFontSize = parseFloat(e.target.value); applyStyleConfig(); });
+      $('#rangeUserFontSize').addEventListener('change', () => syncAppearanceToCloud());
+      $('#rangeUserLineHeight').addEventListener('input', (e) => { styleConfig.userLineHeight = parseFloat(e.target.value); applyStyleConfig(); });
+      $('#rangeUserLineHeight').addEventListener('change', () => syncAppearanceToCloud());
+      $('#rangeAssistantFontSize').addEventListener('input', (e) => { styleConfig.assistantFontSize = parseFloat(e.target.value); applyStyleConfig(); });
+      $('#rangeAssistantFontSize').addEventListener('change', () => syncAppearanceToCloud());
+      $('#rangeAssistantLineHeight').addEventListener('input', (e) => { styleConfig.assistantLineHeight = parseFloat(e.target.value); applyStyleConfig(); });
+      $('#rangeAssistantLineHeight').addEventListener('change', () => syncAppearanceToCloud());
       $('#rangeUserBubbleWidth').addEventListener('input', (e) => { styleConfig.userBubbleWidth = parseInt(e.target.value); applyStyleConfig(); });
       $('#rangeUserBubbleWidth').addEventListener('change', () => syncAppearanceToCloud());
   }
@@ -1448,12 +1486,14 @@ async function fetchGlobalSettings() {
                 if (app.defaultAvatar) applyGlobalAvatar(app.defaultAvatar);
                 if (app.defaultUserAvatar) applyGlobalUserAvatar(app.defaultUserAvatar);
                 
+                // 保留旧字段作为默认值
                 if (app.fontSize !== undefined) styleConfig.fontSize = Number(app.fontSize);
-                else if (app.userFontSize !== undefined) styleConfig.fontSize = Number(app.userFontSize);
-                
                 if (app.lineHeight !== undefined) styleConfig.lineHeight = Number(app.lineHeight);
-                else if (app.userLineHeight !== undefined) styleConfig.lineHeight = Number(app.userLineHeight);
-                
+                // 新字段，如果不存在则用旧的或默认
+                styleConfig.userFontSize = app.userFontSize !== undefined ? Number(app.userFontSize) : (app.fontSize !== undefined ? Number(app.fontSize) : 15);
+                styleConfig.userLineHeight = app.userLineHeight !== undefined ? Number(app.userLineHeight) : (app.lineHeight !== undefined ? Number(app.lineHeight) : 1.72);
+                styleConfig.assistantFontSize = app.assistantFontSize !== undefined ? Number(app.assistantFontSize) : (app.fontSize !== undefined ? Number(app.fontSize) : 15);
+                styleConfig.assistantLineHeight = app.assistantLineHeight !== undefined ? Number(app.assistantLineHeight) : (app.lineHeight !== undefined ? Number(app.lineHeight) : 1.72);
                 if (app.userBubbleWidth !== undefined) styleConfig.userBubbleWidth = Number(app.userBubbleWidth);
 
                 // 【新增】读取"隐藏头像和名字"设置
@@ -1493,6 +1533,10 @@ async function saveGlobalSettings() {
                 defaultUserAvatar: globalDefaultUserAvatar,
                 fontSize: styleConfig.fontSize,
                 lineHeight: styleConfig.lineHeight,
+                userFontSize: styleConfig.userFontSize,
+                userLineHeight: styleConfig.userLineHeight,
+                assistantFontSize: styleConfig.assistantFontSize,
+                assistantLineHeight: styleConfig.assistantLineHeight,
                 userBubbleWidth: styleConfig.userBubbleWidth,
                 hideAvatarName: !!styleConfig.hideAvatarName   // 【新增】随全局设置一起保存
             }
