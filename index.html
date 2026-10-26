@@ -260,6 +260,12 @@ input[type=range]{padding:0;background:none;border:none;-webkit-appearance:none;
 input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--border);border-radius:2px;}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--accent);margin-top:-5.5px;cursor:pointer;}
 
+/* 复选框（隐藏头像名字开关） */
+input[type=checkbox]{
+  width:22px; height:22px; padding:0; margin:0; flex-shrink:0;
+  accent-color:var(--accent); cursor:pointer; border-radius:4px;
+}
+
 .btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:calc(13.5px * var(--font-scale));transition:.15s;}
 .btn:hover{border-color:var(--accent);}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
@@ -352,6 +358,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
 .muted{color:var(--muted);}
 .cursor{display:inline-block;width:7px;height:1em;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite;}
 @keyframes blink{50%{opacity:0;}}
+
+/* ===== 【新增】隐藏头像和名字 ===== */
+#messages.hide-avatar-name .msg-header { display: none !important; }
 
 .msg-actions {display: flex;align-items: center;gap: 8px;margin-top: 6px;padding: 0 4px;font-size: calc(12px * var(--font-scale));color: var(--muted);opacity: 0.6;transition: opacity 0.2s;flex-wrap: wrap;}
 .msg-actions:hover { opacity: 1; }
@@ -886,6 +895,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;heigh
           <button class="theme-btn" data-theme-value="auto">跟随系统</button>
         </div>
 
+        <!-- 【新增】隐藏头像和名字开关（全局通用，不受内测限制） -->
+        <div class="settings-row" style="margin-top:16px;">
+          <label for="chkHideAvatarName" style="cursor:pointer; margin:0;">隐藏头像和名字（当前对话）</label>
+          <input type="checkbox" id="chkHideAvatarName">
+        </div>
+
         <div class="settings-row" style="margin-top:16px;">
           <label>全局字体大小</label>
           <span class="val" id="valGlobalFontSize">15px</span>
@@ -1024,10 +1039,12 @@ let editingAgentId = null;
 
 let currentTab = 'chat';
 
+// 【新增】hideAvatarName：隐藏头像和名字（全局外观设置，所有账号通用）
 let styleConfig = {
     fontSize: 15,
     lineHeight: 1.72,
-    userBubbleWidth: 78
+    userBubbleWidth: 78,
+    hideAvatarName: false
 };
 
 const DEFAULTS = {
@@ -1140,6 +1157,10 @@ function applyStyleConfig() {
     if($('#rangeGlobalFontSize')) $('#rangeGlobalFontSize').value = styleConfig.fontSize;
     if($('#rangeGlobalLineHeight')) $('#rangeGlobalLineHeight').value = styleConfig.lineHeight;
     if($('#rangeUserBubbleWidth')) $('#rangeUserBubbleWidth').value = styleConfig.userBubbleWidth;
+
+    // 【新增】应用"隐藏头像和名字"
+    if (msgBox) msgBox.classList.toggle('hide-avatar-name', !!styleConfig.hideAvatarName);
+    if ($('#chkHideAvatarName')) $('#chkHideAvatarName').checked = !!styleConfig.hideAvatarName;
 }
 
 function applyGlobalAvatar(base64) {
@@ -1170,7 +1191,8 @@ async function syncAppearanceToCloud() {
             theme_updated_at: Date.now(),
             fontSize: styleConfig.fontSize,
             lineHeight: styleConfig.lineHeight,
-            userBubbleWidth: styleConfig.userBubbleWidth
+            userBubbleWidth: styleConfig.userBubbleWidth,
+            hideAvatarName: !!styleConfig.hideAvatarName   // 【新增】同步到云端
         };
         if (globalDefaultAvatar) appearanceData.defaultAvatar = globalDefaultAvatar;
         if (globalDefaultUserAvatar) appearanceData.defaultUserAvatar = globalDefaultUserAvatar;
@@ -1238,6 +1260,15 @@ function setupThemeUI(){
       $('#rangeGlobalLineHeight').addEventListener('change', () => syncAppearanceToCloud());
       $('#rangeUserBubbleWidth').addEventListener('input', (e) => { styleConfig.userBubbleWidth = parseInt(e.target.value); applyStyleConfig(); });
       $('#rangeUserBubbleWidth').addEventListener('change', () => syncAppearanceToCloud());
+  }
+
+  // 【新增】隐藏头像和名字 - 所有账号通用，实时生效并同步云端
+  if ($('#chkHideAvatarName')) {
+      $('#chkHideAvatarName').addEventListener('change', (e) => {
+          styleConfig.hideAvatarName = !!e.target.checked;
+          applyStyleConfig();
+          syncAppearanceToCloud();
+      });
   }
 
   if($('#globalAvatarPreview')) {
@@ -1424,6 +1455,10 @@ async function fetchGlobalSettings() {
                 else if (app.userLineHeight !== undefined) styleConfig.lineHeight = Number(app.userLineHeight);
                 
                 if (app.userBubbleWidth !== undefined) styleConfig.userBubbleWidth = Number(app.userBubbleWidth);
+
+                // 【新增】读取"隐藏头像和名字"设置
+                if (app.hideAvatarName !== undefined) styleConfig.hideAvatarName = !!app.hideAvatarName;
+
                 applyStyleConfig();
             }
 
@@ -1458,7 +1493,8 @@ async function saveGlobalSettings() {
                 defaultUserAvatar: globalDefaultUserAvatar,
                 fontSize: styleConfig.fontSize,
                 lineHeight: styleConfig.lineHeight,
-                userBubbleWidth: styleConfig.userBubbleWidth
+                userBubbleWidth: styleConfig.userBubbleWidth,
+                hideAvatarName: !!styleConfig.hideAvatarName   // 【新增】随全局设置一起保存
             }
         });
         if (error) { console.error('❌ 保存全局配置失败:', error.message); updateCloudStatusUI(false); }
@@ -2558,6 +2594,8 @@ function renderCharSettings() {
         $('#modalGreeting').value = currentEditAgent.greeting || '';
         updateAvatarPreview(currentEditAgent.avatar);
     }
+    // 【新增】打开角色设定时，同步开关状态
+    if ($('#chkHideAvatarName')) $('#chkHideAvatarName').checked = !!styleConfig.hideAvatarName;
 }
 
 function saveFormToCurrentAgent() {
