@@ -223,24 +223,24 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     display: flex;
     align-items: center;
     gap: 12px;
-    background: var(--bg); /* 气泡内的卡片用底色反衬 */
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 10px 14px;
-    min-width: 200px;
+    width: fit-content;
+    max-width: 100%;
 }
 .bubble-file-card .file-icon {
     width: 36px;
     height: 36px;
-    background: #4d6bfe;
-    color: #fff;
-    border-radius: 8px;
+    background: transparent; /* 去掉蓝色背景 */
+    color: #4d6bfe; /* 图标变蓝 */
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
-.bubble-file-card .file-icon svg { width: 20px; height: 20px; }
+.bubble-file-card .file-icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; }
 .bubble-file-card .file-info { display: flex; flex-direction: column; }
 .bubble-file-card .file-name {
     font-size: calc(14px * var(--font-scale));
@@ -255,6 +255,23 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     font-size: calc(12px * var(--font-scale));
     color: var(--muted);
     margin-top: 2px;
+}
+
+/* 带附件时的特殊气泡处理，去除外层自带的背景 */
+.msg.user .content.has-attachment {
+    background: transparent;
+    padding: 0;
+    align-items: flex-end;
+}
+.content.has-attachment .text-bubble {
+    background: var(--bubble-user-bg);
+    border-radius: 18px;
+    padding: 11px 15px;
+    color: var(--bubble-user-fg);
+    max-width: 100%;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    cursor: pointer;
 }
 /* ============================================ */
 
@@ -335,8 +352,9 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .attachment-preview-container { display: none; flex-wrap: wrap; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
 .attachment-preview-container.show { display: flex; }
 .file-card { position: relative; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; max-width: 240px; animation: pop .2s ease; }
-.file-card .file-icon { width: 32px; height: 32px; background: #4d6bfe; color: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.file-card .file-icon svg { width: 18px; height: 18px; }
+/* 预览区图标去掉蓝色背景 */
+.file-card .file-icon { width: 32px; height: 32px; background: transparent; color: #4d6bfe; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.file-card .file-icon svg { width: 24px; height: 24px; }
 .file-card .file-info { display: flex; flex-direction: column; min-width: 0; }
 .file-card .file-name { font-size: calc(13px * var(--font-scale)); color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
 .file-card .file-size { font-size: calc(11px * var(--font-scale)); color: var(--muted); }
@@ -1919,7 +1937,7 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
         <div class="msg-actions"></div>`;
   }
 
-  // 【核心】判断是否为带附件的用户消息
+  // 【核心修改点】判断是否为带附件的用户消息
   let isAttachmentMsg = false;
   let attachmentData = null;
   if (role === 'user') {
@@ -1933,8 +1951,12 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   }
 
   if (isAttachmentMsg) {
-      // 渲染卡片 + 文字
+      // 分离文件和文字
+      const contentEl = wrap.querySelector('.content');
+      contentEl.classList.add('has-attachment');
+      
       let html = '';
+      // 渲染文件卡片
       if (attachmentData.files && attachmentData.files.length > 0) {
           attachmentData.files.forEach(f => {
               html += `
@@ -1949,10 +1971,11 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
               </div>`;
           });
       }
+      // 渲染文字气泡
       if (attachmentData.text) {
-          html += `<div style="margin-top:4px;">${renderContent(attachmentData.text, false)}</div>`;
+          html += `<div class="text-bubble">${renderContent(attachmentData.text, false)}</div>`;
       }
-      wrap.querySelector('.content').innerHTML = html;
+      contentEl.innerHTML = html;
   } else {
       // 普通纯文本渲染
       wrap.querySelector('.content').innerHTML = renderContent(content, false);
@@ -2028,7 +2051,7 @@ function buildMessages(contextMsgs){
           }
           
           let userContent = m.content;
-          // 【核心】在构建上下文时，把 JSON 拆解成 AI 能读懂的文字
+          // 还原文件内容给 AI
           try {
               const parsed = JSON.parse(m.content);
               if (parsed && parsed._type === 'attachment') {
@@ -2103,9 +2126,8 @@ function openEditModal(index) {
     
     editingMsgIndex = index;
     
-    // 【核心】处理待编辑的附件消息
     let textToEdit = msg.content;
-    pendingFiles = []; // 清空当前的附件
+    pendingFiles = [];
     
     try {
         const parsed = JSON.parse(msg.content);
@@ -2113,7 +2135,6 @@ function openEditModal(index) {
             textToEdit = parsed.text || '';
             if (parsed.files) {
                 parsed.files.forEach(f => {
-                    // 这里为了能编辑，重构一下 pendingFiles 的结构
                     pendingFiles.push({ name: f.name, content: f.content, type: 'text', file: {size: 0} });
                 });
             }
@@ -2150,7 +2171,6 @@ async function saveEditedMessage() {
         return;
     }
 
-    // 构建新的内容
     let newContent = text;
     if (pendingFiles.length > 0) {
         const payload = {
@@ -2158,7 +2178,7 @@ async function saveEditedMessage() {
             text: text,
             files: pendingFiles.map(f => ({
                 name: f.name,
-                size: f.file.size ? (f.file.size / 1024).toFixed(2) + 'KB' : '未知',
+                size: f.file.size ? (f.file.size / 1024).toFixed(2) + 'KB' : (f.size || '未知'),
                 content: f.content
             }))
         };
@@ -2293,7 +2313,6 @@ async function send(){
   const input = $('#input');
   const text = input.value.trim();
 
-  // 【核心】组装带有附件的消息
   let contentToSend = text;
   if (pendingFiles.length > 0) {
       const payload = {
@@ -2301,7 +2320,7 @@ async function send(){
           text: text,
           files: pendingFiles.map(f => ({
               name: f.name,
-              size: f.file.size ? (f.file.size / 1024).toFixed(2) + 'KB' : '未知',
+              size: f.file.size ? (f.file.size / 1024).toFixed(2) + 'KB' : (f.size || '未知'),
               content: f.content
           }))
       };
@@ -2314,7 +2333,6 @@ async function send(){
   setBusyUI(true);
   input.value = ''; autoResize();
   
-  // 发送后清空附件卡片
   pendingFiles = [];
   renderPendingFiles();
 
