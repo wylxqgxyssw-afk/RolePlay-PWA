@@ -538,6 +538,40 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .account-item .acc-avatar img { width: 100%; height: 100%; object-fit: cover; }
 #accountMiniAvatar { width:42px; height:42px; border-radius:50%; border:1px solid var(--border); display:flex; align-items:center; justify-content:center; overflow:hidden; margin:0; }
 #accountMiniAvatar img { width:100%; height:100%; object-fit:cover; }
+
+/* ===== API 历史记录下拉 ===== */
+.api-input-row { display: flex; gap: 6px; align-items: center; position: relative; }
+.api-input-row > input { flex: 1; }
+.api-hist-btn { padding: 8px 12px; font-size: 12px; flex-shrink: 0; }
+.api-history-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.api-history-panel.show { display: block; }
+.api-history-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; }
+.api-history-item:hover { background: var(--panel-2); }
+.api-history-item .api-hist-text {
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.api-history-item .api-hist-act { padding: 3px 8px; font-size: 11px; flex-shrink: 0; }
+.api-history-item .api-hist-del { color: var(--danger); border-color: var(--danger); }
+.api-history-empty { padding: 10px; font-size: 12px; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
@@ -786,9 +820,17 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
       <div class="settings-group">
         <div class="settings-group-title">全局接口配置</div>
         <label>API 地址（Base URL）</label>
-        <input id="apiBase" placeholder="https://api.openai.com/v1" spellcheck="false">
+        <div class="api-input-row">
+          <input id="apiBase" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
+          <button class="btn sm api-hist-btn" id="apiBaseHistoryBtn" type="button" title="历史记录">▾</button>
+          <div class="api-history-panel" id="apiBaseHistoryPanel"></div>
+        </div>
         <label>API Key</label>
-        <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false">
+        <div class="api-input-row">
+          <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off">
+          <button class="btn sm api-hist-btn" id="apiKeyHistoryBtn" type="button" title="历史记录">▾</button>
+          <div class="api-history-panel" id="apiKeyHistoryPanel"></div>
+        </div>
         <label>模型名</label>
         <div style="display:flex; gap:6px; align-items:center;">
           <input id="model" placeholder="gpt-4o-mini" spellcheck="false" style="flex:1;">
@@ -1106,6 +1148,7 @@ function switchSettingsTab(tab) {
 }
 
 function openSettingsModal(defaultTab = 'role') {
+  closeAllApiHistoryPanels();
   if (currentConversation) {
     currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
     if (currentAgents.length === 0) {
@@ -1250,7 +1293,10 @@ function setupThemeUI(){
   });
 
   /* 弹窗关闭 */
-  const closeSettings = () => document.getElementById('char-settings-modal').classList.remove('show');
+  const closeSettings = () => {
+      closeAllApiHistoryPanels();
+      document.getElementById('char-settings-modal').classList.remove('show');
+  };
   if($('#closeSettingsBtn')) $('#closeSettingsBtn').addEventListener('click', closeSettings);
   if($('#cancelCharSettingsBtn')) $('#cancelCharSettingsBtn').addEventListener('click', () => {
       currentAgents = currentConversation ? (currentConversation.agents || []) : [];
@@ -1264,7 +1310,10 @@ function setupThemeUI(){
 
   /* 设置内部 tab 切换 */
   document.querySelectorAll('.settings-tab').forEach(tab => {
-      tab.addEventListener('click', () => switchSettingsTab(tab.getAttribute('data-stab')));
+      tab.addEventListener('click', () => {
+          switchSettingsTab(tab.getAttribute('data-stab'));
+          closeAllApiHistoryPanels();
+      });
   });
 
   /* 会员 */
@@ -2910,6 +2959,96 @@ window.removePendingFile = function(index) {
     renderPendingFiles();
 }
 
+/* ==================== API 历史记录模块 ==================== */
+const API_HISTORY_KEY = 'rp_api_history_';
+const API_HISTORY_MAX = 10;
+
+function loadApiHistory() {
+    if (!USER_ID) return { apiBase: [], apiKey: [] };
+    try {
+        const raw = localStorage.getItem(API_HISTORY_KEY + USER_ID);
+        const obj = raw ? JSON.parse(raw) : {};
+        return {
+            apiBase: Array.isArray(obj.apiBase) ? obj.apiBase : [],
+            apiKey: Array.isArray(obj.apiKey) ? obj.apiKey : []
+        };
+    } catch(e) { return { apiBase: [], apiKey: [] }; }
+}
+
+function saveApiHistory(hist) {
+    if (!USER_ID) return;
+    try { localStorage.setItem(API_HISTORY_KEY + USER_ID, JSON.stringify(hist)); } catch(e) {}
+}
+
+function pushApiHistory(field, value) {
+    value = String(value || '').trim();
+    if (!value) return;
+    const hist = loadApiHistory();
+    const list = hist[field];
+    const existing = list.find(x => x.v === value);
+    if (existing) {
+        existing.t = Date.now();
+    } else {
+        list.unshift({ v: value, t: Date.now() });
+    }
+    list.sort((a, b) => b.t - a.t);
+    hist[field] = list.slice(0, API_HISTORY_MAX);
+    saveApiHistory(hist);
+}
+
+function removeApiHistory(field, value) {
+    const hist = loadApiHistory();
+    hist[field] = hist[field].filter(x => x.v !== value);
+    saveApiHistory(hist);
+}
+
+function maskKey(k) {
+    if (!k) return '';
+    if (k.length <= 8) return k.slice(0, 2) + '••••';
+    return k.slice(0, 4) + '••••••' + k.slice(-4);
+}
+
+function renderApiHistory(field) {
+    const panelId = field === 'apiBase' ? 'apiBaseHistoryPanel' : 'apiKeyHistoryPanel';
+    const inputId  = field === 'apiBase' ? 'apiBase' : 'apiKey';
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    const hist = loadApiHistory()[field];
+    panel.innerHTML = '';
+    if (hist.length === 0) {
+        panel.innerHTML = '<div class="api-history-empty">暂无历史记录</div>';
+        return;
+    }
+    hist.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'api-history-item';
+        const text = field === 'apiKey' ? maskKey(item.v) : item.v;
+        row.innerHTML = `
+            <span class="api-hist-text" title="${escapeHtml(item.v)}">${escapeHtml(text)}</span>
+            <button class="btn sm api-hist-act api-hist-fill" type="button">填入</button>
+            <button class="btn sm api-hist-act api-hist-del" type="button">删</button>
+        `;
+        row.querySelector('.api-hist-fill').addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const el = document.getElementById(inputId);
+            if (el) el.value = item.v;
+            closeAllApiHistoryPanels();
+        });
+        row.querySelector('.api-hist-del').addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            removeApiHistory(field, item.v);
+            renderApiHistory(field);
+        });
+        panel.appendChild(row);
+    });
+}
+
+function closeAllApiHistoryPanels() {
+    document.querySelectorAll('.api-history-panel').forEach(p => p.classList.remove('show'));
+}
+/* ==================== API 历史记录模块结束 ==================== */
+
 function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
@@ -2956,6 +3095,31 @@ function bindEvents(){
           if (dx < -80) closeSidebar();
       }, { passive: true });
   }
+
+  /* API 历史记录下拉 */
+  ['apiBase', 'apiKey'].forEach(field => {
+      const btnId = field + 'HistoryBtn';
+      const panelId = field + 'HistoryPanel';
+      const btn = document.getElementById(btnId);
+      const panel = document.getElementById(panelId);
+      if (!btn || !panel) return;
+
+      btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const wasOpen = panel.classList.contains('show');
+          closeAllApiHistoryPanels();
+          if (!wasOpen) {
+              renderApiHistory(field);
+              panel.classList.add('show');
+          }
+      });
+  });
+
+  document.addEventListener('click', (e) => {
+      if (!e.target.closest('.api-input-row')) {
+          closeAllApiHistoryPanels();
+      }
+  });
 
   $('#cancel-edit-input-btn').addEventListener('click', cancelEditMode);
 
@@ -3117,7 +3281,10 @@ function bindEvents(){
     cfg.ctxLimit = Number($('#ctxLimit').value);
     cfg.userName = $('#userName').value.trim();
     cfg.userPrompt = $('#userPrompt').value.trim();
-    saveCfg(); await saveGlobalSettings();
+    saveCfg();
+    pushApiHistory('apiBase', cfg.apiBase);
+    pushApiHistory('apiKey', cfg.apiKey);
+    await saveGlobalSettings();
     alert('全局设置已保存！');
   });
 
@@ -3210,7 +3377,10 @@ function bindEvents(){
       cfg.userName = $('#userName').value.trim();
       cfg.userPrompt = $('#userPrompt').value.trim();
       saveCfg();
+      pushApiHistory('apiBase', cfg.apiBase);
+      pushApiHistory('apiKey', cfg.apiKey);
       await saveGlobalSettings();
+      closeAllApiHistoryPanels();
       $('#char-settings-modal').classList.remove('show');
       alert('设置已保存');
   });
