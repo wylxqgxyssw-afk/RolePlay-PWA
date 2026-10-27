@@ -28,6 +28,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<!-- 【新增】引入 mammoth.js 用于解析 .docx 文件 -->
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 
 <style>
 *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
@@ -463,6 +465,80 @@ input[type=checkbox]{
 .attach-option svg { width: 28px; height: 28px; color: var(--text); }
 .attach-option span { font-size: calc(13px * var(--font-scale)); color: var(--text); }
 
+/* ===== 【新增】待发送附件预览区 ===== */
+.attachment-preview-container {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+}
+.attachment-preview-container.show {
+    display: flex;
+}
+.file-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    max-width: 240px;
+    animation: pop .2s ease;
+}
+.file-card .file-icon {
+    width: 32px;
+    height: 32px;
+    background: #4d6bfe;
+    color: #fff;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.file-card .file-icon svg { width: 18px; height: 18px; }
+.file-card .file-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.file-card .file-name {
+    font-size: calc(13px * var(--font-scale));
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+.file-card .file-size {
+    font-size: calc(11px * var(--font-scale));
+    color: var(--muted);
+}
+.file-card .remove-file-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #666;
+    color: #fff;
+    border: 2px solid var(--bg);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    transition: background 0.2s;
+}
+.file-card .remove-file-btn:hover { background: var(--danger); }
+
 #edit-input-header {
   display: none;
   align-items: center; 
@@ -785,6 +861,9 @@ input[type=checkbox]{
         <span>修改输入</span>
         <button id="cancel-edit-input-btn">✕</button>
       </div>
+
+      <!-- 【新增】待发送附件预览区 -->
+      <div id="attachmentPreviewContainer" class="attachment-preview-container"></div>
       
       <div class="composer-input-area">
         <textarea id="input" rows="1" placeholder="发消息"></textarea>
@@ -829,7 +908,7 @@ input[type=checkbox]{
       </div>
       
       <input type="file" id="albumInput" style="display: none;" accept="image/*">
-      <input type="file" id="fileInput" style="display: none;" accept=".txt,.md,.json,.csv">
+      <input type="file" id="fileInput" style="display: none;" accept=".txt,.md,.json,.csv,.docx,.pdf">
     </div>
     
     <div class="ai-disclaimer">回答由 AI 生成，仅供参考</div>
@@ -1104,6 +1183,9 @@ let editingMsgIndex = null;
 let editingAgentId = null;
 
 let currentTab = 'chat';
+
+// 【新增】用于暂存待发送附件的数组
+let pendingFiles = [];
 
 let styleConfig = {
     fontSize: 15, 
@@ -2388,12 +2470,37 @@ async function send(){
   }
 
   const input = $('#input');
-  const text = input.value.trim();
+  let text = input.value.trim();
+
+  // 【新增】如果存在文件附件，将它们的内容与输入框的文字合并
+  if (pendingFiles.length > 0) {
+      let filesContent = '';
+      pendingFiles.forEach(f => {
+          if (f.type === 'image') {
+              // 图片转为 Markdown Base64 格式
+              filesContent += `\n![图片](${f.content})\n`;
+          } else {
+              // 文本类文件，直接追加内容
+              filesContent += `\n[文件内容开始：${f.name}]\n${f.content}\n[文件内容结束]\n`;
+          }
+      });
+      
+      if (text) {
+          text = `【用户发送了附件】\n${filesContent}\n\n【用户的问题/留言】：\n${text}`;
+      } else {
+          text = `【用户发送了附件】\n${filesContent}`;
+      }
+  }
+
   if(!text) return;
 
   busy = true;
   setBusyUI(true);
   input.value = ''; autoResize();
+  
+  // 发送后清空附件卡片
+  pendingFiles = [];
+  renderPendingFiles();
 
   try {
       const userMsg = { role: 'user', content: text, local_id: generateId(), parent_id: activeLeafId, sibling_order: Date.now() };
@@ -2804,6 +2911,51 @@ window.approveOrder = async function(orderId, userId, planName) {
     } catch (e) { alert('操作失败: ' + e.message); }
 };
 
+// 【新增】渲染附件卡片
+function renderPendingFiles() {
+    const container = $('#attachmentPreviewContainer');
+    if (!container) return;
+    
+    if (pendingFiles.length === 0) {
+        container.classList.remove('show');
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.classList.add('show');
+    container.innerHTML = '';
+    
+    pendingFiles.forEach((file, index) => {
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        
+        // 计算文件大小
+        let sizeText = '';
+        if (file.file && file.file.size) {
+            const sizeKB = file.file.size / 1024;
+            sizeText = sizeKB > 1024 ? (sizeKB / 1024).toFixed(2) + 'MB' : sizeKB.toFixed(2) + 'KB';
+        }
+        
+        card.innerHTML = `
+            <div class="file-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </div>
+            <div class="file-info">
+                <span class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+                <span class="file-size">${sizeText || '已解析'}</span>
+            </div>
+            <div class="remove-file-btn" onclick="removePendingFile(${index})">✕</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+// 【新增】移除附件
+window.removePendingFile = function(index) {
+    pendingFiles.splice(index, 1);
+    renderPendingFiles();
+}
+
 function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
@@ -2870,31 +3022,53 @@ function bindEvents(){
           const reader = new FileReader();
           reader.onload = function(event) {
               const base64 = event.target.result;
-              const currentText = $('#input').value;
-              $('#input').value = currentText + (currentText ? '\n' : '') + `![图片](${base64})`;
-              $('#input').dispatchEvent(new Event('input')); 
-              $('#input').focus();
+              pendingFiles.push({ file: file, name: file.name, type: 'image', content: base64 });
+              renderPendingFiles();
           };
           reader.readAsDataURL(file);
           this.value = '';
       });
       
-      // 处理文本文件
+      // 处理文件
       $('#fileInput').addEventListener('change', function(e) {
           const file = e.target.files[0];
           if (!file) return;
-          if (file.type.startsWith('text/') || /\.(txt|md|json|csv)$/i.test(file.name)) {
+          
+          const ext = file.name.split('.').pop().toLowerCase();
+          
+          // 处理 .docx 文件
+          if (ext === 'docx') {
+              const reader = new FileReader();
+              reader.onload = function(event) {
+                  const arrayBuffer = event.target.result;
+                  mammoth.extractRawText({ arrayBuffer: arrayBuffer })
+                      .then(function(result) {
+                          const text = result.value;
+                          pendingFiles.push({ file: file, name: file.name, type: 'text', content: text });
+                          renderPendingFiles();
+                      })
+                      .catch(function(err) {
+                          alert('解析 Word 文件失败: ' + err.message);
+                      });
+              };
+              reader.readAsArrayBuffer(file);
+          } 
+          // 处理纯文本文件
+          else if (file.type.startsWith('text/') || /\.(txt|md|json|csv)$/i.test(file.name)) {
               const reader = new FileReader();
               reader.onload = function(event) {
                   const text = event.target.result;
-                  const currentText = $('#input').value;
-                  $('#input').value = currentText + (currentText ? '\n' : '') + text;
-                  $('#input').dispatchEvent(new Event('input'));
-                  $('#input').focus();
+                  pendingFiles.push({ file: file, name: file.name, type: 'text', content: text });
+                  renderPendingFiles();
               };
               reader.readAsText(file);
-          } else {
-              alert(`暂不支持解析此类型文件 (${file.name})，请仅上传文本类文件。`);
+          } 
+          // 处理 PDF（暂不支持提取，提示用户）
+          else if (ext === 'pdf') {
+              alert('暂不支持直接解析 PDF 文件的文字内容，请复制文字后发送。');
+          }
+          else {
+              alert(`暂不支持解析此类型文件 (${file.name})，请仅上传文本类或 Word 文件。`);
           }
           this.value = '';
       });
