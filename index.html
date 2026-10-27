@@ -28,7 +28,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-<!-- 引入 mammoth.js 用于解析 .docx 文件 -->
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 
 <style>
@@ -103,30 +102,78 @@ body{
 }
 button{font-family:inherit;}
 
-.main-app{ height:100%; height:100dvh; display:flex; flex-direction:column; background:var(--bg); overflow:hidden; }
-.tab-page{ flex:1; display:flex; flex-direction:column; overflow:hidden; min-height:0; }
-.tab-page.hidden{display:none;}
+.main-app{ height:100%; height:100dvh; display:flex; flex-direction:column; background:var(--bg); overflow:hidden; position:relative; }
 
-.tab-header{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px; padding-top:calc(14px + env(safe-area-inset-top)); border-bottom:1px solid var(--border); background:var(--panel); flex-shrink:0; }
-.tab-header h2{ margin:0; font-size: calc(18px * var(--font-scale)); font-weight:600; }
-.tab-header .header-action{ background:none; border:none; color:var(--accent); font-size: calc(24px * var(--font-scale)); cursor:pointer; padding:4px 10px; border-radius:8px; line-height:1; }
-.tab-header .header-action:hover{background:var(--panel-2);}
+/* ============ 侧边栏抽屉 ============ */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 84%;
+  max-width: 340px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  z-index: 300;
+  transform: translateX(-100%);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 250;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s;
+}
+.sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
 
-.tab-content{ flex:1; overflow-y:auto; padding:12px 16px 24px; -webkit-overflow-scrolling:touch; }
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-title { font-size: calc(16px * var(--font-scale)); font-weight: 600; }
+.sidebar-header .header-action {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: calc(24px * var(--font-scale));
+  cursor: pointer;
+  padding: 2px 10px;
+  border-radius: 8px;
+  line-height: 1;
+}
+.sidebar-header .header-action:hover { background: var(--panel-2); }
 
-.bottom-nav{ display:flex; border-top:1px solid var(--border); background:var(--panel); padding-bottom:env(safe-area-inset-bottom); flex-shrink:0; z-index:50; }
-.bottom-nav button{ flex:1; padding:8px 0 10px; background:none; border:none; color:var(--muted); font-size: calc(11px * var(--font-scale)); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; transition:color 0.2s; }
-.bottom-nav button.active{color:var(--accent);}
-.bottom-nav button svg{ width: calc(22px * var(--font-scale)); height: calc(22px * var(--font-scale)); stroke-width:2; }
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
 
-.coming-soon{ display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; text-align:center; color:var(--muted); padding:40px 24px; }
-.coming-soon .emoji{ font-size:64px; margin-bottom:18px; animation:floatEmoji 3s ease-in-out infinite; }
-@keyframes floatEmoji{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
-.coming-soon h3{ font-size: calc(18px * var(--font-scale)); margin:0 0 10px; color:var(--text); font-weight:600; }
-.coming-soon p{ font-size: calc(13px * var(--font-scale)); margin:0; line-height:1.6; }
-
-.chat-screen{ position:fixed; inset:0; z-index:100; background:var(--bg); display:flex; flex-direction:column; min-height:0; }
-.chat-screen.hidden{display:none;}
+/* ============ 聊天主区 ============ */
+.chat-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
 
 #auth-overlay{position:fixed;inset:0;z-index:999;background:var(--auth-overlay-bg);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity 0.3s;}
 #auth-overlay.hidden{opacity:0;pointer-events:none;}
@@ -151,13 +198,14 @@ button{font-family:inherit;}
 #cloud-status-bar.online .status-dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
 #cloud-status-bar.offline .status-dot { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
 
-.conv-item {padding: 14px 14px; border-radius: 12px; cursor: pointer; margin-bottom: 8px; border: 1px solid var(--border); transition: 0.2s; display: flex; justify-content: space-between; align-items: center; background:var(--panel);}
-.conv-item:hover { border-color:var(--accent); background: var(--panel-2); }
+.conv-item {padding: 14px 14px; border-radius: 12px; cursor: pointer; margin-bottom: 8px; border: 1px solid var(--border); transition: 0.2s; display: flex; justify-content: space-between; align-items: center; background:var(--panel-2);}
+.conv-item:hover { border-color:var(--accent); }
+.conv-item.active { background: var(--conv-active-bg); border-color: var(--accent); }
 .conv-item .conv-name { font-size: calc(15px * var(--font-scale)); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;}
 .conv-item .conv-actions { display: flex; align-items: center; gap: 4px; }
 .conv-item .conv-pin { color: var(--muted); cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: calc(14px * var(--font-scale)); transition: 0.2s;}
-.conv-item .conv-pin:hover { color: var(--accent); background: var(--panel-2); }
-.conv-item .conv-pin.pinned { opacity: 1; color: var(--accent); }
+.conv-item .conv-pin:hover { color: var(--accent); }
+.conv-item .conv-pin.pinned { color: var(--accent); }
 .conv-item .conv-delete { color: var(--danger); cursor: pointer; padding: 6px 8px; border-radius: 6px; font-size: calc(14px * var(--font-scale));}
 .conv-item .conv-delete:hover { background: var(--danger-bg); }
 
@@ -183,12 +231,13 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .btn-clear-chat:hover{background:var(--danger-bg-soft);}
 .icon-btn{background:none;border:none;color:var(--muted);font-size:calc(18px * var(--font-scale));cursor:pointer;padding:6px 10px;border-radius:8px;line-height:1;}
 .icon-btn:hover{color:var(--text);background:var(--panel-2);}
+.icon-btn svg { width: 22px; height: 22px; }
 
-.settings-list-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 16px 16px; background: var(--panel); border: 1px solid var(--border); color: var(--text); font-size: calc(15px * var(--font-scale)); text-align: left; cursor: pointer; transition: background 0.2s; border-radius:12px; margin-bottom:10px; }
+.settings-list-item { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 14px 16px; background: var(--panel); border: 1px solid var(--border); color: var(--text); font-size: calc(14px * var(--font-scale)); text-align: left; cursor: pointer; transition: background 0.2s; border-radius:12px; margin-bottom:10px; }
 .settings-list-item:hover { background: var(--panel-2); }
 .settings-list-item .arrow { color: var(--muted); font-size: calc(18px * var(--font-scale)); }
 
-.settings-group { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding: 16px 16px; margin-bottom:12px; }
+.settings-group { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding: 14px 14px; margin-bottom:12px; }
 .settings-group-title { font-size: calc(14px * var(--font-scale)); font-weight: 600; margin-bottom: 12px; color: var(--text); }
 .settings-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 16px; }
 .settings-row label { margin: 0; font-size: calc(13.5px * var(--font-scale)); color: var(--text); }
@@ -198,18 +247,16 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .theme-btn { flex: 1; padding: 10px 0; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); font-size: calc(13px * var(--font-scale)); cursor: pointer; transition: 0.2s; }
 .theme-btn.active { background: rgba(77,107,254,0.1); border-color: var(--accent); color: var(--accent); }
 
-.chat-head{ display:flex;align-items:center;gap:10px; padding:12px 16px; padding-top:calc(12px + env(safe-area-inset-top)); background-color:var(--bg); border-bottom:1px solid var(--border); flex-shrink:0; }
-.chat-head .title{display:flex;flex-direction:column;line-height:1.3;flex:1;min-width:0;}
+/* ============ 聊天头部 ============ */
+.chat-head{ display:flex;align-items:center;gap:8px; padding:10px 12px; padding-top:calc(10px + env(safe-area-inset-top)); background-color:var(--bg); border-bottom:1px solid var(--border); flex-shrink:0; }
+.chat-head .title{display:flex;flex-direction:column;line-height:1.3;flex:1;min-width:0;padding-left:4px;}
 .chat-head .title .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(16px * var(--font-scale));}
-.head-actions{display:flex;gap:6px;align-items:center;}
-#closeChatBtn{font-size:calc(22px * var(--font-scale));color:var(--muted);padding:6px 12px;}
-#closeChatBtn:hover{color:var(--danger);background:var(--danger-bg-soft);}
+.head-actions{display:flex;gap:2px;align-items:center;}
 
 #messages { flex: 1; overflow-y: auto; padding: 22px 18px 10px; display: flex; flex-direction: column; gap: 22px; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; background-color: var(--bg); }
 .msg { display: flex; flex-direction: column; animation: pop .18s ease; }
 @keyframes pop { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-/* 用户气泡容器 */
 .msg.user { align-self: flex-end; max-width: var(--user-bubble-max-width); }
 .msg.user .msg-header { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-bottom: 12px; }
 .msg.user .avatar { width: calc(38px * var(--font-scale)); height: calc(38px * var(--font-scale)); border-radius: 50%; background: var(--panel-2); color: var(--text); display: flex; align-items: center; justify-content: center; font-size: calc(20px * var(--font-scale)); font-weight: bold; flex-shrink: 0; user-select: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2); overflow: hidden; }
@@ -218,7 +265,6 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .msg.user .content { background: var(--bubble-user-bg); color: var(--bubble-user-fg); border-radius: 18px; border: none; padding: 11px 15px; font-size: var(--user-font-size); line-height: var(--user-line-height); word-break: break-word; overflow-wrap: anywhere; cursor: pointer; transition: filter 0.2s; display: flex; flex-direction: column; gap: 8px; }
 .msg.user .content:active { filter: brightness(0.9); }
 
-/* ===== 【核心新增】聊天气泡内的文件卡片样式 ===== */
 .bubble-file-card {
     display: flex;
     align-items: center;
@@ -231,13 +277,9 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     max-width: 100%;
 }
 .bubble-file-card .file-icon {
-    width: 36px;
-    height: 36px;
-    background: transparent; /* 去掉蓝色背景 */
-    color: #4d6bfe; /* 图标变蓝 */
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 36px; height: 36px;
+    color: #4d6bfe;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
 .bubble-file-card .file-icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; }
@@ -246,9 +288,7 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     font-size: calc(14px * var(--font-scale));
     font-weight: 500;
     color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 180px;
 }
 .bubble-file-card .file-size {
@@ -257,7 +297,6 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     margin-top: 2px;
 }
 
-/* 带附件时的特殊气泡处理，去除外层自带的背景 */
 .msg.user .content.has-attachment {
     background: transparent;
     padding: 0;
@@ -269,11 +308,9 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     padding: 11px 15px;
     color: var(--bubble-user-fg);
     max-width: 100%;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    word-break: break-word; overflow-wrap: anywhere;
     cursor: pointer;
 }
-/* ============================================ */
 
 .msg.assistant { align-self: flex-start; max-width: 100%; }
 .msg.assistant .msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -307,7 +344,7 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 
 .more-actions-wrap { display: inline-flex; align-items: center; position: relative; }
 .more-menu { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px; z-index: 10; box-shadow: var(--shadow-md); min-width: 85px; margin-bottom: 6px; }
-.more-menu button { width: 100%; display: flex; align-items: center; gap: 6px; justify-content: center; padding: 8px 10px; font-size: 13px; border-radius: 4px; background: transparent; border: none; cursor: pointer; }
+.more-menu button { width: 100%; display: flex; align-items: center; gap: 6px; justify-content: center; padding: 8px 10px; font-size: 13px; border-radius: 4px; background: transparent; border: none; cursor: pointer; color: var(--text); }
 .more-menu button:hover { background: var(--danger-bg-soft); }
 
 .version-switcher { display: flex; align-items: center; gap: 4px; margin: 0 4px; }
@@ -352,8 +389,7 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .attachment-preview-container { display: none; flex-wrap: wrap; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
 .attachment-preview-container.show { display: flex; }
 .file-card { position: relative; display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; max-width: 240px; animation: pop .2s ease; }
-/* 预览区图标去掉蓝色背景 */
-.file-card .file-icon { width: 32px; height: 32px; background: transparent; color: #4d6bfe; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.file-card .file-icon { width: 32px; height: 32px; color: #4d6bfe; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .file-card .file-icon svg { width: 24px; height: 24px; }
 .file-card .file-info { display: flex; flex-direction: column; min-width: 0; }
 .file-card .file-name { font-size: calc(13px * var(--font-scale)); color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
@@ -388,15 +424,64 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .send-btn.stop { background: var(--stop-bg); cursor: pointer; }
 .send-btn svg { width: calc(16px * var(--font-scale)); height: calc(16px * var(--font-scale)); display: block; }
 
+/* ============ 设置弹窗 ============ */
 #char-settings-modal { position: fixed; inset: 0; z-index: 200; background: var(--overlay-bg); display: none; align-items: center; justify-content: center; padding: 20px; transition: opacity 0.3s; }
 #char-settings-modal.show { display: flex; }
-.char-settings-card { width: 100%; max-width: 550px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: var(--shadow-lg); max-height: 90vh; display: flex; flex-direction: column; overflow-y: auto; }
-.char-settings-card h3 { font-size: calc(18px * var(--font-scale)); margin: 0 0 16px 0; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+.char-settings-card { width: 100%; max-width: 560px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-lg); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+.char-settings-card h3 { font-size: calc(17px * var(--font-scale)); margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .char-settings-card .form-group { margin-bottom: 14px; }
 .char-settings-card label { font-size: calc(12px * var(--font-scale)); color: var(--muted); margin-bottom: 6px; display: block; }
 .char-settings-card textarea { min-height: 80px; }
 
-.agent-tab-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 16px; border-bottom: 1px dashed var(--border); }
+.settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+}
+.settings-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: calc(13px * var(--font-scale));
+  font-weight: 600;
+  transition: 0.2s;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active {
+  color: var(--accent);
+  background: rgba(77,107,254,0.1);
+}
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0;
+}
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px dashed var(--border);
+  padding-top: 16px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+.hidden { display: none !important; }
+
+.agent-tab-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px dashed var(--border); }
 .agent-tab { padding: 6px 12px; border-radius: 20px; background: var(--panel-2); border: 1px solid var(--border); font-size: calc(13px * var(--font-scale)); white-space: nowrap; cursor: pointer; transition: 0.2s; }
 .agent-tab.active { background: rgba(77,107,254,0.1); border-color: var(--accent); color: var(--accent); }
 .agent-tab .del-agent { margin-left: 6px; color: var(--danger); font-weight: bold; }
@@ -488,42 +573,190 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 
 <div class="main-app" id="mainApp">
 
-  <div class="tab-page" id="tabChat">
-    <div class="tab-header">
-      <h2>聊天</h2>
-      <button class="header-action" id="newConvBtn" title="新建群聊">＋</button>
+  <!-- ============ 侧边栏 ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">会话</span>
+      <button class="header-action" id="newConvBtn" title="新建会话">＋</button>
     </div>
     <div id="cloud-status-bar" class="online">
       <span class="status-dot"></span>
       <span id="cloud-status-text">云端已连接</span>
     </div>
-    <div class="tab-content">
+    <div class="sidebar-list" id="sidebarList">
       <div id="conversationListContainer"></div>
     </div>
+    <div class="sidebar-footer">
+      <button class="settings-list-item" id="openSettingsFromSidebar" style="margin-bottom:0;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:18px;">⚙️</span>
+          <span>设置</span>
+        </div>
+        <span class="arrow">›</span>
+      </button>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- ============ 聊天主界面 ============ -->
+  <div class="chat-screen" id="chatScreen">
+    <header class="chat-head">
+      <button class="icon-btn" id="openSidebarBtn" title="会话列表">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <div class="title">
+        <span class="n" id="headName">聊天</span>
+      </div>
+      <div class="head-actions">
+        <button class="icon-btn" id="openCharSettingsBtn" title="角色设定 / 设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="messages"></div>
+
+    <div class="composer-wrap">
+      <div id="agent-selector-bar"></div>
+      <div class="composer">
+        
+        <div id="edit-input-header">
+          <span>修改输入</span>
+          <button id="cancel-edit-input-btn">✕</button>
+        </div>
+
+        <div id="attachmentPreviewContainer" class="attachment-preview-container"></div>
+        
+        <div class="composer-input-area">
+          <textarea id="input" rows="1" placeholder="发消息"></textarea>
+        </div>
+        <div class="composer-toolbar">
+          <div class="toolbar-left">
+            <button class="tool-btn" id="deepThinkBtn" title="深度思考">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><path d="M12 6v6l4 2"></path></svg>
+              <span>深度思考</span>
+            </button>
+            <button class="tool-btn" id="searchBtn" title="智能搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>智能搜索</span>
+            </button>
+          </div>
+          <div class="toolbar-right">
+            <button class="tool-btn icon-only" id="attachBtn" title="上传文件">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            </button>
+            <button id="sendBtn" class="send-btn" title="发送">
+              <svg id="sendIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                <line x1="12" y1="19" x2="12" y2="5"></line>
+                <polyline points="5 12 12 5 19 12"></polyline>
+              </svg>
+              <svg id="stopIcon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none; width: 14px; height: 14px;">
+                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="attachMenu" class="attach-menu">
+            <div class="attach-option" id="attachAlbumBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                <span>相册</span>
+            </div>
+            <div class="attach-option" id="attachFileBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span>文件</span>
+            </div>
+        </div>
+        
+        <input type="file" id="albumInput" style="display: none;" accept="image/*">
+        <input type="file" id="fileInput" style="display: none;" accept=".txt,.md,.json,.csv,.docx,.pdf">
+      </div>
+      
+      <div class="ai-disclaimer">回答由 AI 生成，仅供参考</div>
+    </div>
   </div>
+</div>
 
-  <div class="tab-page hidden" id="tabComing">
-    <div class="tab-header">
-      <h2>敬请期待</h2>
+<!-- ============ 设置弹窗（角色 + 全局） ============ -->
+<div id="char-settings-modal">
+  <div class="char-settings-card">
+    <div class="settings-modal-header">
+      <h3>🎭 设置 <span id="betaBadge" style="display:none; background:var(--vip-gold); color:#000; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:bold; margin-left:6px;">内测版</span></h3>
+      <button class="icon-btn" id="closeSettingsBtn">✕</button>
     </div>
-    <div class="coming-soon">
-      <div class="emoji">🚧</div>
-      <h3>敬请期待</h3>
-      <p>更多精彩玩法正在开发中<br>即将与您见面</p>
-    </div>
-  </div>
 
-  <div class="tab-page hidden" id="tabMe">
-    <div class="tab-header">
-      <h2>我的</h2>
-<div id="betaBadge" style="display:none; background:var(--vip-gold); color:#000; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:bold; margin-left:10px; align-self:center;">内测版</div>
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-stab="role">当前角色</button>
+      <button class="settings-tab" data-stab="global">全局设置</button>
     </div>
-    <div class="tab-content">
 
-      <button class="settings-list-item" id="goToVip">
+    <!-- 当前角色 tab -->
+    <div class="settings-body" id="settingsTabRole">
+      <button class="settings-list-item" id="openAccountBtn" style="margin-bottom:14px; background:var(--panel-2);">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="avatar-preview" id="accountMiniAvatar">
+            <span style="font-size:20px;">👤</span>
+          </div>
+          <div style="text-align:left;">
+            <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
+            <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
+          </div>
+        </div>
+        <span class="arrow">›</span>
+      </button>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span class="settings-group-title" style="margin:0;">角色列表</span>
+        <button class="btn sm" id="addAgentBtn" style="font-size:calc(12px * var(--font-scale)); padding: 4px 8px;">➕ 添加角色</button>
+      </div>
+      <div class="agent-tab-list" id="agentTabList"></div>
+
+      <div id="agentEditForm">
+        <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">AI 角色头像</div>
+        <div class="avatar-upload-container">
+          <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
+            <span>🤖</span>
+          </div>
+          <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
+          <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+        </div>
+        <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px; border-top:1px dashed var(--border); padding-top:16px;">当前对话你的头像</div>
+        <div class="avatar-upload-container">
+          <div class="avatar-preview" id="userAvatarPreview" title="点击更换你的头像">
+            <span>👤</span>
+          </div>
+          <div class="avatar-upload-text" id="userAvatarUploadText">点击更换你的头像</div>
+          <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;">
+        </div>
+        <div class="form-group" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
+          <label>角色名</label>
+          <input id="modalCharName" spellcheck="false">
+        </div>
+        <div class="form-group">
+          <label>角色人设 / 世界观</label>
+          <textarea id="modalCharPrompt" rows="4" spellcheck="false"></textarea>
+        </div>
+        <div class="form-group">
+          <label>开场白（仅在群里没记录时发送）</label>
+          <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全局设置 tab -->
+    <div class="settings-body hidden" id="settingsTabGlobal">
+
+      <button class="settings-list-item" id="goToVip" style="background:var(--vip-gold-bg); border-color:var(--vip-gold-border);">
         <div style="display:flex; align-items:center;">
           <span style="margin-right:10px; font-size:20px;">👑</span>
-          <span>开通会员</span>
+          <span style="color:var(--vip-gold); font-weight:600;">开通会员</span>
         </div>
         <span class="arrow">›</span>
       </button>
@@ -579,118 +812,65 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
         <textarea id="userPrompt" rows="3" spellcheck="false"></textarea>
       </div>
 
+      <div class="settings-group">
+        <div class="settings-group-title">外观设置</div>
+        <div class="theme-btn-group" style="margin-top:0;">
+          <button class="theme-btn" data-theme-value="light">浅色</button>
+          <button class="theme-btn" data-theme-value="dark">深色</button>
+          <button class="theme-btn" data-theme-value="auto">跟随系统</button>
+        </div>
+        <div class="settings-row" style="margin-top:16px;">
+          <label for="chkHideAvatarName" style="cursor:pointer; margin:0;">隐藏头像和名字</label>
+          <input type="checkbox" id="chkHideAvatarName">
+        </div>
+        <div class="settings-row" style="margin-top:16px;">
+          <label>我的消息字体大小</label>
+          <span class="val" id="valUserFontSize">15px</span>
+        </div>
+        <input type="range" id="rangeUserFontSize" min="12" max="24" step="0.5" value="15">
+        <div class="settings-row">
+          <label>我的消息行间距</label>
+          <span class="val" id="valUserLineHeight">1.72</span>
+        </div>
+        <input type="range" id="rangeUserLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
+        <div class="settings-row">
+          <label>AI 消息字体大小</label>
+          <span class="val" id="valAssistantFontSize">15px</span>
+        </div>
+        <input type="range" id="rangeAssistantFontSize" min="12" max="24" step="0.5" value="15">
+        <div class="settings-row">
+          <label>AI 消息行间距</label>
+          <span class="val" id="valAssistantLineHeight">1.72</span>
+        </div>
+        <input type="range" id="rangeAssistantLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
+        <div class="settings-row">
+          <label>气泡最大宽度</label>
+          <span class="val" id="valUserBubbleWidth">78%</span>
+        </div>
+        <input type="range" id="rangeUserBubbleWidth" min="40" max="95" step="1" value="78">
+      </div>
+
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
         <button class="btn primary" id="applyBtn" style="width:100%;">保存全局设置</button>
         <button class="btn btn-clear-chat" id="clearChatBtn" style="width:100%;">清空当前会话记录</button>
         <button class="btn btn-logout" id="logoutBtn" style="width:100%;">退出登录</button>
       </div>
 
-      <div style="text-align:center; padding:24px 0 10px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
+      <div style="text-align:center; padding:20px 0 6px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
         <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.2</span></span>
       </div>
     </div>
-  </div>
 
-  <nav class="bottom-nav" id="bottomNav">
-    <button data-tab="chat" class="active">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-      <span>聊天</span>
-    </button>
-    <button data-tab="coming">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-      </svg>
-      <span>敬请期待</span>
-    </button>
-    <button data-tab="me">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      <span>我的</span>
-    </button>
-  </nav>
-</div>
-
-<div class="chat-screen hidden" id="chatScreen">
-  <header class="chat-head">
-    <div class="title">
-      <span class="n" id="headName">群聊</span>
-    </div>
-    <div class="head-actions">
-      <button class="btn sm" id="openCharSettingsBtn" title="角色设定" style="padding: 6px 10px; display: flex; align-items: center; justify-content: center;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>
+    <div class="settings-footer">
+      <button class="btn" id="exportBtn" style="display: flex; align-items: center; gap: 6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        导出
       </button>
-      <button class="icon-btn" id="closeChatBtn" title="返回">✕</button>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn" id="cancelCharSettingsBtn">取消</button>
+        <button class="btn primary" id="saveCharSettingsBtn">保存</button>
+      </div>
     </div>
-  </header>
-
-  <div id="messages"></div>
-
-  <div class="composer-wrap">
-    <div id="agent-selector-bar"></div>
-    <div class="composer">
-      
-      <div id="edit-input-header">
-        <span>修改输入</span>
-        <button id="cancel-edit-input-btn">✕</button>
-      </div>
-
-      <!-- 待发送附件预览区 -->
-      <div id="attachmentPreviewContainer" class="attachment-preview-container"></div>
-      
-      <div class="composer-input-area">
-        <textarea id="input" rows="1" placeholder="发消息"></textarea>
-      </div>
-      <div class="composer-toolbar">
-        <div class="toolbar-left">
-          <button class="tool-btn" id="deepThinkBtn" title="深度思考">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><path d="M12 6v6l4 2"></path></svg>
-            <span>深度思考</span>
-          </button>
-          <button class="tool-btn" id="searchBtn" title="智能搜索">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <span>智能搜索</span>
-          </button>
-        </div>
-        <div class="toolbar-right">
-          <button class="tool-btn icon-only" id="attachBtn" title="上传文件">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-          </button>
-          <button id="sendBtn" class="send-btn" title="发送">
-            <svg id="sendIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
-              <line x1="12" y1="19" x2="12" y2="5"></line>
-              <polyline points="5 12 12 5 19 12"></polyline>
-            </svg>
-            <svg id="stopIcon" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display: none; width: 14px; height: 14px;">
-              <rect x="6" y="6" width="12" height="12" rx="2"></rect>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- 弹窗菜单 -->
-      <div id="attachMenu" class="attach-menu">
-          <div class="attach-option" id="attachAlbumBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-              <span>相册</span>
-          </div>
-          <div class="attach-option" id="attachFileBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-              <span>文件</span>
-          </div>
-      </div>
-      
-      <input type="file" id="albumInput" style="display: none;" accept="image/*">
-      <input type="file" id="fileInput" style="display: none;" accept=".txt,.md,.json,.csv,.docx,.pdf">
-    </div>
-    
-    <div class="ai-disclaimer">回答由 AI 生成，仅供参考</div>
   </div>
 </div>
 
@@ -733,105 +913,6 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
     <div id="adminOrderList" style="flex:1; overflow-y:auto; min-height:100px; margin-bottom:16px;"></div>
     <div class="actions" style="display:flex; justify-content:flex-end;">
       <button class="btn" id="closeAdminModal">关闭</button>
-    </div>
-  </div>
-</div>
-
-<div id="char-settings-modal">
-  <div class="char-settings-card">
-    <h3>
-      🎭 角色设定
-      <button class="btn sm" id="addAgentBtn" style="font-size:calc(12px * var(--font-scale)); padding: 4px 8px;">➕ 添加角色</button>
-    </h3>
-    <button class="settings-list-item" id="openAccountBtn" style="margin-bottom:16px; background:var(--panel-2);">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div class="avatar-preview" id="accountMiniAvatar">
-          <span style="font-size:20px;">👤</span>
-        </div>
-        <div style="text-align:left;">
-          <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
-          <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
-        </div>
-      </div>
-      <span class="arrow">›</span>
-    </button>
-    <div class="agent-tab-list" id="agentTabList"></div>
-    <div id="agentEditForm">
-      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">AI 角色头像</div>
-      <div class="avatar-upload-container">
-        <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
-          <span>🤖</span>
-        </div>
-        <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
-        <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
-      </div>
-      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px; border-top:1px dashed var(--border); padding-top:16px;">当前对话你的头像</div>
-      <div class="avatar-upload-container">
-        <div class="avatar-preview" id="userAvatarPreview" title="点击更换你的头像">
-          <span>👤</span>
-        </div>
-        <div class="avatar-upload-text" id="userAvatarUploadText">点击更换你的头像</div>
-        <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;">
-      </div>
-      <div class="form-group" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
-        <label>角色名</label>
-        <input id="modalCharName" spellcheck="false">
-      </div>
-      <div class="form-group">
-        <label>角色人设 / 世界观</label>
-        <textarea id="modalCharPrompt" rows="4" spellcheck="false"></textarea>
-      </div>
-      <div class="form-group">
-        <label>开场白（仅在群里没记录时发送）</label>
-        <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
-      </div>
-      <div style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
-        <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">外观设置</div>
-        <div class="theme-btn-group" style="margin-top:0;">
-          <button class="theme-btn" data-theme-value="light">浅色</button>
-          <button class="theme-btn" data-theme-value="dark">深色</button>
-          <button class="theme-btn" data-theme-value="auto">跟随系统</button>
-        </div>
-        <div class="settings-row" style="margin-top:16px;">
-          <label for="chkHideAvatarName" style="cursor:pointer; margin:0;">隐藏头像和名字（当前对话）</label>
-          <input type="checkbox" id="chkHideAvatarName">
-        </div>
-        <div class="settings-row" style="margin-top:16px;">
-          <label>我的消息字体大小</label>
-          <span class="val" id="valUserFontSize">15px</span>
-        </div>
-        <input type="range" id="rangeUserFontSize" min="12" max="24" step="0.5" value="15">
-        <div class="settings-row">
-          <label>我的消息行间距</label>
-          <span class="val" id="valUserLineHeight">1.72</span>
-        </div>
-        <input type="range" id="rangeUserLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
-        <div class="settings-row">
-          <label>AI 消息字体大小</label>
-          <span class="val" id="valAssistantFontSize">15px</span>
-        </div>
-        <input type="range" id="rangeAssistantFontSize" min="12" max="24" step="0.5" value="15">
-        <div class="settings-row">
-          <label>AI 消息行间距</label>
-          <span class="val" id="valAssistantLineHeight">1.72</span>
-        </div>
-        <input type="range" id="rangeAssistantLineHeight" min="1.2" max="2.5" step="0.05" value="1.72">
-        <div class="settings-row">
-          <label>气泡最大宽度</label>
-          <span class="val" id="valUserBubbleWidth">78%</span>
-        </div>
-        <input type="range" id="rangeUserBubbleWidth" min="40" max="95" step="1" value="78">
-      </div>
-    </div>
-    <div class="actions" style="justify-content: space-between; align-items: center; border-top: 1px dashed var(--border); padding-top: 16px; margin-top: 16px;">
-      <button class="btn" id="exportBtn" style="display: flex; align-items: center; gap: 6px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        导出记录
-      </button>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn" id="cancelCharSettingsBtn">取消</button>
-        <button class="btn primary" id="saveCharSettingsBtn">保存设定</button>
-      </div>
     </div>
   </div>
 </div>
@@ -931,9 +1012,6 @@ let selectedVipPlan = { name: '月卡', amount: 30 };
 let editingMsgIndex = null;
 let editingAgentId = null;
 
-let currentTab = 'chat';
-
-// 用于暂存待发送附件的数组
 let pendingFiles = [];
 
 let styleConfig = {
@@ -992,29 +1070,57 @@ function renderContent(s, isStreaming = false){
 
 function autoResize(){ inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 180) + 'px'; }
 
-function switchTab(tab) {
-  closeChatScreen();
-  currentTab = tab;
-  document.querySelectorAll('.tab-page').forEach(p => p.classList.add('hidden'));
-  const pageMap = { chat: 'tabChat', coming: 'tabComing', me: 'tabMe' };
-  const pageId = pageMap[tab] || 'tabChat';
-  const page = document.getElementById(pageId);
-  if (page) page.classList.remove('hidden');
-  document.querySelectorAll('.bottom-nav button').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+/* ============ 侧边栏控制 ============ */
+function openSidebar() {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (sb) sb.classList.add('open');
+  if (bd) bd.classList.add('show');
+}
+function closeSidebar() {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (sb) sb.classList.remove('open');
+  if (bd) bd.classList.remove('show');
+}
+
+/* 兼容旧调用名 */
+function openChatScreen() { closeSidebar(); }
+function closeChatScreen() { openSidebar(); }
+function switchTab() { /* 已弃用 */ }
+
+/* ============ 设置弹窗 tab 切换 ============ */
+function switchSettingsTab(tab) {
+  document.querySelectorAll('.settings-tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-stab') === tab);
   });
+  const roleTab = document.getElementById('settingsTabRole');
+  const globalTab = document.getElementById('settingsTabGlobal');
+  if (tab === 'role') {
+    roleTab.classList.remove('hidden');
+    globalTab.classList.add('hidden');
+  } else {
+    roleTab.classList.add('hidden');
+    globalTab.classList.remove('hidden');
+  }
 }
 
-function openChatScreen() {
-  const el = document.getElementById('chatScreen');
-  if (el) el.classList.remove('hidden');
+function openSettingsModal(defaultTab = 'role') {
+  if (currentConversation) {
+    currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
+    if (currentAgents.length === 0) {
+      currentAgents.push({ id: generateId(), name: '新角色', prompt: '', greeting: '', avatar: '' });
+    }
+    editingAgentId = currentAgents[0].id;
+    renderCharSettings();
+    updateUserAvatarPreview(currentConversation.user_avatar);
+  }
+  renderAccountMini();
+  switchSettingsTab(defaultTab);
+  document.getElementById('char-settings-modal').classList.add('show');
 }
 
-function closeChatScreen() {
-  const el = document.getElementById('chatScreen');
-  if (el) el.classList.add('hidden');
-}
-
+/* ============ 主题相关 ============ */
 const THEME_KEY = 'rp_theme';
 const THEME_TS_KEY = 'rp_theme_ts';
 
@@ -1143,6 +1249,25 @@ function setupThemeUI(){
       if (e.key === THEME_KEY && e.newValue) applyTheme(e.newValue, { persist: false });
   });
 
+  /* 弹窗关闭 */
+  const closeSettings = () => document.getElementById('char-settings-modal').classList.remove('show');
+  if($('#closeSettingsBtn')) $('#closeSettingsBtn').addEventListener('click', closeSettings);
+  if($('#cancelCharSettingsBtn')) $('#cancelCharSettingsBtn').addEventListener('click', () => {
+      currentAgents = currentConversation ? (currentConversation.agents || []) : [];
+      if (currentAgents.length > 0) currentAgentId = currentAgents[0].id;
+      renderAgentSelector();
+      closeSettings();
+  });
+  if($('#char-settings-modal')) $('#char-settings-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'char-settings-modal') closeSettings();
+  });
+
+  /* 设置内部 tab 切换 */
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchSettingsTab(tab.getAttribute('data-stab')));
+  });
+
+  /* 会员 */
   if($('#goToVip')) $('#goToVip').addEventListener('click', () => $('#vip-modal').classList.add('show'));
   if($('#closeVipModal')) $('#closeVipModal').addEventListener('click', () => $('#vip-modal').classList.remove('show'));
 
@@ -1300,23 +1425,20 @@ async function checkFeatureFlags() {
     isBetaUser = false;
     isFeatureEnabled = false;
     if (!USER_ID) return;
-
     try {
         const { data, error } = await supabaseClient
             .from('app_config')
             .select('beta_user_ids, is_global_release')
             .eq('id', 'feature_flags')
             .single();
-
         if (error) throw error;
-
         if (data) {
             const isInWhitelist = Array.isArray(data.beta_user_ids) && data.beta_user_ids.includes(USER_ID);
             isBetaUser = isInWhitelist;
             isFeatureEnabled = data.is_global_release === true || isInWhitelist;
         }
     } catch (e) {
-        console.warn('检查灰度开关失败，默认使用旧版:', e);
+        console.warn('检查灰度开关失败:', e);
         isBetaUser = false;
         isFeatureEnabled = false;
     }
@@ -1481,13 +1603,12 @@ async function togglePinConversation(convId, currentStatus) {
 
 async function deleteConversation(convId) {
     if (!USER_ID || !convId) return;
-    if (!confirm('确定要删除这个群聊及所有聊天记录吗？')) return;
+    if (!confirm('确定要删除这个会话及所有聊天记录吗？')) return;
     try {
         await supabaseClient.from('conversations').delete().eq('id', convId);
         await supabaseClient.from('chat_messages').delete().eq('conversation_id', convId);
         conversationsCache = conversationsCache.filter(c => c.id !== convId);
         if (currentConversationId === convId) {
-            closeChatScreen();
             currentConversationId = null;
             currentConversation = null;
             currentAgents = [];
@@ -1499,7 +1620,10 @@ async function deleteConversation(convId) {
             if (newConv) {
                 conversationsCache = [newConv];
                 renderConversationList(conversationsCache);
+                await switchConversation(newConv.id, newConv);
             }
+        } else if (!currentConversationId) {
+            await switchConversation(conversationsCache[0].id, conversationsCache[0]);
         }
     } catch (e) { console.error('❌ 删除会话异常:', e); updateCloudStatusUI(false); }
 }
@@ -1670,12 +1794,13 @@ function renderConversationList(convs) {
     if (!container) return;
     container.innerHTML = '';
     if (!convs || convs.length === 0) {
-        container.innerHTML = '<div class="muted" style="text-align:center; padding:60px 20px; font-size:calc(13px * var(--font-scale));">还没有会话<br><br>点击右上角 ＋ 新建群聊</div>';
+        container.innerHTML = '<div class="muted" style="text-align:center; padding:60px 20px; font-size:calc(13px * var(--font-scale));">还没有会话<br><br>点击右上角 ＋ 新建会话</div>';
         return;
     }
     convs.forEach(c => {
         const item = document.createElement('div');
         item.className = 'conv-item';
+        if (c.id === currentConversationId) item.classList.add('active');
         item.setAttribute('data-id', c.id);
         const isPinned = c.is_pinned || false;
         const pinIcon = isPinned ? '📍' : '📌';
@@ -1691,6 +1816,7 @@ function renderConversationList(convs) {
         item.addEventListener('click', (e) => {
             if (!e.target.classList.contains('conv-delete') && !e.target.classList.contains('conv-pin')) {
                 switchConversation(c.id, c);
+                closeSidebar();
             }
         });
         item.querySelector('.conv-delete').addEventListener('click', (e) => {
@@ -1724,7 +1850,7 @@ function renderAgentSelector() {
 function updateCurrentConversationUI(conv) {
     if (!conv) return;
     if ($('#headName')) {
-        $('#headName').textContent = (conv.agents && conv.agents.length > 0) ? `${conv.agents[0].name} 等` : (conv.agent_name || '群聊');
+        $('#headName').textContent = (conv.agents && conv.agents.length > 0) ? `${conv.agents[0].name} 等` : (conv.agent_name || '聊天');
     }
     document.querySelectorAll('.conv-item').forEach(el => {
         el.classList.toggle('active', el.getAttribute('data-id') === conv.id);
@@ -1762,8 +1888,6 @@ async function switchConversation(convId, convObj = null) {
     updateCurrentConversationUI(conv);
     renderAgentSelector();
     msgBox.innerHTML = '<div class="muted" style="text-align:center;margin:auto;font-size:calc(13px * var(--font-scale));">正在加载聊天记录...</div>';
-
-    openChatScreen();
 
     try {
         let cloudRes = null;
@@ -1818,6 +1942,15 @@ async function switchConversation(convId, convObj = null) {
     } finally {
         if (fetchId === currentFetchId) scrollBottom(true);
     }
+}
+
+async function autoOpenLastConversation() {
+    if (!conversationsCache || conversationsCache.length === 0) return;
+    let lastId = null;
+    try { lastId = localStorage.getItem('rp_last_conv_' + USER_ID); } catch(e) {}
+    let target = conversationsCache.find(c => c.id === lastId);
+    if (!target) target = conversationsCache[0];
+    if (target) await switchConversation(target.id, target);
 }
 
 function updateVersionSwitcher(index, msg) {
@@ -1889,8 +2022,6 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
           actionsHtml += `<button class="action-btn edit-btn" data-msg-index="${index}">编辑</button>`;
           actionsHtml += `<button class="action-btn delete-btn" data-msg-index="${index}">删除</button>`;
       }
-  } else {
-      actionsHtml = ''; 
   }
 
   let tokenHtml = '';
@@ -1937,7 +2068,6 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
         <div class="msg-actions"></div>`;
   }
 
-  // 【核心修改点】判断是否为带附件的用户消息
   let isAttachmentMsg = false;
   let attachmentData = null;
   if (role === 'user') {
@@ -1951,12 +2081,10 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
   }
 
   if (isAttachmentMsg) {
-      // 分离文件和文字
       const contentEl = wrap.querySelector('.content');
       contentEl.classList.add('has-attachment');
       
       let html = '';
-      // 渲染文件卡片
       if (attachmentData.files && attachmentData.files.length > 0) {
           attachmentData.files.forEach(f => {
               html += `
@@ -1971,13 +2099,11 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
               </div>`;
           });
       }
-      // 渲染文字气泡
       if (attachmentData.text) {
           html += `<div class="text-bubble">${renderContent(attachmentData.text, false)}</div>`;
       }
       contentEl.innerHTML = html;
   } else {
-      // 普通纯文本渲染
       wrap.querySelector('.content').innerHTML = renderContent(content, false);
   }
 
@@ -2022,7 +2148,7 @@ function scrollBottom(force){
 
 function endpoint(){
   let base = String(cfg.apiBase || '').trim().replace(/\/+$/, '');
-  if(!base) throw new Error('请先在"我的"页填写 API 地址');
+  if(!base) throw new Error('请先在设置中填写 API 地址');
   if(/\/chat\/completions$/i.test(base)) return base;
   return base + '/chat/completions';
 }
@@ -2051,7 +2177,6 @@ function buildMessages(contextMsgs){
           }
           
           let userContent = m.content;
-          // 还原文件内容给 AI
           try {
               const parsed = JSON.parse(m.content);
               if (parsed && parsed._type === 'attachment') {
@@ -2366,7 +2491,6 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
       if (oldBubble) {
           insertBeforeNode = oldBubble.nextSibling;
           oldBubble.remove();
-          console.log(`[原地替换] 移除旧AI消息 DOM (index=${replaceMsgIndex})，新气泡将插入到原位置`);
       }
   }
 
@@ -2511,7 +2635,6 @@ async function regenerateMessage(index) {
           await supabaseClient.from('chat_messages')
               .update({ parent_id: trueParentId })
               .eq('local_id', msg.local_id);
-          console.log(`[修复] AI消息 ${msg.local_id} 的 parent_id: ${msg._raw_parent_id} → ${trueParentId}`);
       } catch (e) { console.error('修复旧AI消息 parent_id 失败:', e); }
   }
 
@@ -2791,17 +2914,48 @@ function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
-  document.querySelectorAll('.bottom-nav button').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+  /* 侧边栏 */
+  if($('#openSidebarBtn')) $('#openSidebarBtn').addEventListener('click', openSidebar);
+  if($('#sidebarBackdrop')) $('#sidebarBackdrop').addEventListener('click', closeSidebar);
+  if($('#openSettingsFromSidebar')) $('#openSettingsFromSidebar').addEventListener('click', () => {
+      closeSidebar();
+      openSettingsModal('global');
   });
 
-  $('#closeChatBtn').addEventListener('click', () => {
-    if (busy) {
-      if (!confirm('正在生成回复，确定要离开吗？')) return;
-    }
-    cancelEditMode();
-    closeChatScreen();
-  });
+  /* 手势：屏幕左边缘右滑打开 */
+  let touchStartX = 0, touchStartY = 0, dragging = false;
+  document.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
+      touchStartX = x; touchStartY = y;
+      const sb = document.getElementById('sidebar');
+      if (x < 30 && !sb.classList.contains('open')) dragging = true;
+      else dragging = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (Math.abs(dy) > Math.abs(dx)) { dragging = false; return; }
+      if (dx > 80) { openSidebar(); dragging = false; }
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => { dragging = false; });
+
+  /* 侧栏内左滑关闭 */
+  let sbStartX = 0;
+  const sidebarEl = document.getElementById('sidebar');
+  if (sidebarEl) {
+      sidebarEl.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 1) sbStartX = e.touches[0].clientX;
+      }, { passive: true });
+      sidebarEl.addEventListener('touchmove', (e) => {
+          const dx = e.touches[0].clientX - sbStartX;
+          if (dx < -80) closeSidebar();
+      }, { passive: true });
+  }
 
   $('#cancel-edit-input-btn').addEventListener('click', cancelEditMode);
 
@@ -2819,7 +2973,7 @@ function bindEvents(){
   $('#deepThinkBtn').addEventListener('click', function() { this.classList.toggle('active'); });
   $('#searchBtn').addEventListener('click', function() { this.classList.toggle('active'); });
 
-  // 上传功能逻辑
+  /* 附件 */
   const attachBtn = $('#attachBtn');
   const attachMenu = $('#attachMenu');
   
@@ -2845,7 +2999,6 @@ function bindEvents(){
           attachMenu.classList.remove('show');
       });
       
-      // 处理相册图片
       $('#albumInput').addEventListener('change', function(e) {
           const file = e.target.files[0];
           if (!file) return;
@@ -2859,7 +3012,6 @@ function bindEvents(){
           this.value = '';
       });
       
-      // 处理文件
       $('#fileInput').addEventListener('change', function(e) {
           const file = e.target.files[0];
           if (!file) return;
@@ -2943,7 +3095,7 @@ function bindEvents(){
       models.forEach(m => {
         const modelId = m.id || m.model || m.name || String(m);
         const item = document.createElement('div'); item.textContent = modelId;
-        item.style.cssText = 'padding:6px 10px; font-size:calc(13px * var(--font-scale)); cursor:pointer; border-radius:4px;';
+        item.style.cssText = 'padding:6px 10px; font-size:calc(13px * var(--font-scale)); cursor:pointer; border-radius:4px; color:var(--text);';
         item.onmouseover = () => item.style.background = 'var(--border)';
         item.onmouseout = () => item.style.background = 'transparent';
         item.onclick = () => { $('#model').value = modelId; cfg.model = modelId; saveCfg(); modelListContainer.style.display = 'none'; };
@@ -2969,20 +3121,10 @@ function bindEvents(){
     alert('全局设置已保存！');
   });
 
-  $('#openCharSettingsBtn').addEventListener('click', async () => {
-      if (!currentConversationId) { alert('请先选择一个会话'); return; }
-      renderAccountMini();
-      currentAgents = JSON.parse(JSON.stringify(currentConversation.agents || []));
-      if (currentAgents.length === 0) {
-          currentAgents.push({ id: generateId(), name: '新角色', prompt: '', greeting: '', avatar: '' });
-      }
-      editingAgentId = currentAgents[0].id;
-      renderCharSettings();
-      updateUserAvatarPreview(currentConversation.user_avatar);
-      $('#char-settings-modal').classList.add('show');
-  });
+  $('#openCharSettingsBtn').addEventListener('click', () => openSettingsModal('role'));
 
   $('#addAgentBtn').addEventListener('click', () => {
+      if (!currentConversation) { alert('请先选择一个会话'); return; }
       saveFormToCurrentAgent();
       const newAgent = { id: generateId(), name: '新角色', prompt: '请在这里输入角色设定...', greeting: '', avatar: '' };
       currentAgents.push(newAgent);
@@ -3036,7 +3178,7 @@ function bindEvents(){
               const sy = (img.height - minSize) / 2;
               ctx.drawImage(img, sx, sy, minSize, minSize, 0, 0, size, size);
               const base64 = canvas.toDataURL('image/jpeg', 0.8);
-              currentConversation.tempUserAvatar = base64;
+              if (currentConversation) currentConversation.tempUserAvatar = base64;
               updateUserAvatarPreview(base64);
               e.target.value = '';
           };
@@ -3045,25 +3187,32 @@ function bindEvents(){
       reader.readAsDataURL(file);
   });
 
-  $('#cancelCharSettingsBtn').addEventListener('click', () => {
-      currentAgents = currentConversation.agents || [];
-      if (currentAgents.length > 0) currentAgentId = currentAgents[0].id;
-      renderAgentSelector();
-      $('#char-settings-modal').classList.remove('show');
-  });
-
   $('#saveCharSettingsBtn').addEventListener('click', async () => {
-      saveFormToCurrentAgent();
-      const userAvatar = currentConversation.tempUserAvatar !== undefined ? currentConversation.tempUserAvatar : currentConversation.user_avatar;
-      currentConversation.user_avatar = userAvatar;
-      await saveConversationSettings(currentConversationId, currentAgents, userAvatar);
-      currentConversation.agents = currentAgents;
-      if (!currentAgents.find(a => a.id === currentAgentId)) currentAgentId = currentAgents[0].id;
-      updateCurrentConversationUI(currentConversation);
-      renderAgentSelector();
-      msgBox.innerHTML = '';
-      msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+      if (currentConversationId && currentConversation) {
+          saveFormToCurrentAgent();
+          const userAvatar = currentConversation.tempUserAvatar !== undefined ? currentConversation.tempUserAvatar : currentConversation.user_avatar;
+          currentConversation.user_avatar = userAvatar;
+          await saveConversationSettings(currentConversationId, currentAgents, userAvatar);
+          currentConversation.agents = currentAgents;
+          if (!currentAgents.find(a => a.id === currentAgentId)) currentAgentId = currentAgents[0].id;
+          updateCurrentConversationUI(currentConversation);
+          renderAgentSelector();
+          msgBox.innerHTML = '';
+          msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+      }
+      /* 全局保存 */
+      cfg.apiBase = $('#apiBase').value.trim();
+      cfg.apiKey = $('#apiKey').value.trim();
+      cfg.model = $('#model').value.trim();
+      cfg.temperature = Number($('#temperature').value);
+      cfg.maxTokens = Number($('#maxTokens').value);
+      cfg.ctxLimit = Number($('#ctxLimit').value);
+      cfg.userName = $('#userName').value.trim();
+      cfg.userPrompt = $('#userPrompt').value.trim();
+      saveCfg();
+      await saveGlobalSettings();
       $('#char-settings-modal').classList.remove('show');
+      alert('设置已保存');
   });
 
   $('#logoutBtn').addEventListener('click', async () => {
@@ -3079,6 +3228,7 @@ function bindEvents(){
       conversationsCache.unshift(newConv);
       renderConversationList(conversationsCache);
       await switchConversation(newConv.id, newConv);
+      closeSidebar();
     }
   });
 
@@ -3383,9 +3533,9 @@ async function loadUserData() {
   currentLoadedUserId = USER_ID;
   cfg = loadCfg();
   updateGlobalUI();
-   bindEvents();
+  bindEvents();
   await fetchGlobalSettings(); 
-    await checkFeatureFlags();
+  await checkFeatureFlags();
   
   if ($('#betaBadge')) {
       if (isBetaUser) {
@@ -3404,7 +3554,9 @@ async function loadUserData() {
   conversationsCache = convs;
   renderConversationList(convs);
 
-  switchTab('chat');
+  /* 自动打开上次会话或第一个会话 */
+  await autoOpenLastConversation();
+
   setupRealtimeListener();
 }
 
