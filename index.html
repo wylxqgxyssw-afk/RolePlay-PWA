@@ -894,11 +894,34 @@ html[data-theme="dark"] .floating-ball {
       <button class="settings-tab locked" data-stab="global" id="globalSettingsTab">全局设置 <span class="tab-lock">🔒</span><span class="tab-locked-text">未完成</span></button>
     </div>
 
-    <!-- 当前角色 tab：仅保留“指令”编辑 -->
+    <!-- 当前角色 tab：保留“接口配置”和“指令”编辑 -->
     <div class="settings-body" id="settingsTabRole">
-      <div class="form-group">
+      
+      <div class="settings-group">
+        <div class="settings-group-title">接口配置</div>
+        <label>API 地址（Base URL）</label>
+        <div class="api-input-row">
+          <input id="apiBase" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
+          <button class="btn sm api-hist-btn" id="apiBaseHistoryBtn" type="button" title="历史记录">▾</button>
+          <div class="api-history-panel" id="apiBaseHistoryPanel"></div>
+        </div>
+        <label>API Key</label>
+        <div class="api-input-row">
+          <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off">
+          <button class="btn sm api-hist-btn" id="apiKeyHistoryBtn" type="button" title="历史记录">▾</button>
+          <div class="api-history-panel" id="apiKeyHistoryPanel"></div>
+        </div>
+        <label>模型名</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input id="model" placeholder="gpt-4o-mini" spellcheck="false" style="flex:1;">
+          <button class="btn sm" id="fetchModelsBtn" style="white-space:nowrap;">获取</button>
+        </div>
+        <div id="modelListContainer" style="display:none; margin-top:8px; max-height:150px; overflow-y:auto; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:4px;"></div>
+      </div>
+
+      <div class="form-group" style="margin-top: 16px;">
         <label>指令</label>
-        <textarea id="modalCharPrompt" rows="14" spellcheck="false" placeholder="请在这里输入角色设定、世界观、说话风格等指令..."></textarea>
+        <textarea id="modalCharPrompt" rows="10" spellcheck="false" placeholder="请在这里输入角色设定、世界观、说话风格等指令..."></textarea>
       </div>
       <div style="font-size: calc(12px * var(--font-scale)); color: var(--muted); padding: 6px 4px 0; line-height: 1.6;">
         提示：角色名、头像、开场白等请到「全局设置」中修改。
@@ -985,26 +1008,7 @@ html[data-theme="dark"] .floating-ball {
       </div>
 
       <div class="settings-group">
-        <div class="settings-group-title">全局接口配置</div>
-        <label>API 地址（Base URL）</label>
-        <div class="api-input-row">
-          <input id="apiBase" placeholder="https://api.openai.com/v1" spellcheck="false" autocomplete="off">
-          <button class="btn sm api-hist-btn" id="apiBaseHistoryBtn" type="button" title="历史记录">▾</button>
-          <div class="api-history-panel" id="apiBaseHistoryPanel"></div>
-        </div>
-        <label>API Key</label>
-        <div class="api-input-row">
-          <input id="apiKey" type="password" placeholder="sk-..." spellcheck="false" autocomplete="off">
-          <button class="btn sm api-hist-btn" id="apiKeyHistoryBtn" type="button" title="历史记录">▾</button>
-          <div class="api-history-panel" id="apiKeyHistoryPanel"></div>
-        </div>
-        <label>模型名</label>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <input id="model" placeholder="gpt-4o-mini" spellcheck="false" style="flex:1;">
-          <button class="btn sm" id="fetchModelsBtn" style="white-space:nowrap;">获取</button>
-        </div>
-        <div id="modelListContainer" style="display:none; margin-top:8px; max-height:150px; overflow-y:auto; background:var(--panel-2); border:1px solid var(--border); border-radius:9px; padding:4px;"></div>
-
+        <div class="settings-group-title">接口高级参数</div>
         <label>温度 <span id="tempVal">0.85</span></label>
         <input id="temperature" type="range" min="0" max="2" step="0.05" value="0.85">
         <label>单次最大回复长度（tokens）</label>
