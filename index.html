@@ -1142,7 +1142,7 @@ html[data-theme="dark"] .floating-ball {
   </div>
 </div>
 
-<!-- ============ 悬浮球（只保留账号） ============ -->
+<!-- ============ 悬浮球（仅保留账号） ============ -->
 <div id="floating-ball-container" class="floating-ball-container" style="position:fixed; z-index:1000; touch-action:none;">
   <div id="floating-ball" class="floating-ball">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px; height:24px;">
@@ -1314,13 +1314,23 @@ function openChatScreen() { closeSidebar(); }
 function closeChatScreen() { openSidebar(); }
 function switchTab() { /* 已弃用 */ }
 
+/* ============ 安全权限验证（防控制台绕过） ============ */
+function hasGlobalSettingsPermission() {
+    // 1. 检查闭包变量
+    if (!isFeatureEnabled) return false;
+    // 2. 检查 DOM 上的安全标记
+    if (document.body.getAttribute('data-rp-auth-unlocked') !== 'true') return false;
+    return true;
+}
+
 /* ============ 全局设置 Tab 锁状态更新 ============ */
 function updateGlobalSettingsTabLock() {
   const globalTab = document.getElementById('globalSettingsTab');
   if (!globalTab) return;
   const lockIcon = globalTab.querySelector('.tab-lock');
   const lockedText = globalTab.querySelector('.tab-locked-text');
-  if (isFeatureEnabled) {
+  
+  if (hasGlobalSettingsPermission()) {
     // 内测版 / 全局发布：解锁
     globalTab.classList.remove('locked');
     if (lockIcon) lockIcon.textContent = '🔓';
@@ -1336,7 +1346,7 @@ function updateGlobalSettingsTabLock() {
 /* ============ 设置弹窗 tab 切换 ============ */
 function switchSettingsTab(tab) {
   // 全局设置 tab 未解锁时，强制回退到当前角色
-  if (tab === 'global' && !isFeatureEnabled) {
+  if (tab === 'global' && !hasGlobalSettingsPermission()) {
     return;
   }
   document.querySelectorAll('.settings-tab').forEach(t => {
@@ -1366,7 +1376,7 @@ function openSettingsModal(defaultTab = 'role') {
   }
   renderAccountMini();
   // 未解锁全局设置时，强制使用 role tab
-  if (defaultTab === 'global' && !isFeatureEnabled) defaultTab = 'role';
+  if (defaultTab === 'global' && !hasGlobalSettingsPermission()) defaultTab = 'role';
   switchSettingsTab(defaultTab);
   document.getElementById('char-settings-modal').classList.add('show');
 }
@@ -1520,8 +1530,9 @@ function setupThemeUI(){
   document.querySelectorAll('.settings-tab').forEach(tab => {
       tab.addEventListener('click', () => {
           const stab = tab.getAttribute('data-stab');
-          // 全局设置未解锁时，点击锁不生效
-          if (stab === 'global' && !isFeatureEnabled) {
+          // 安全校验
+          if (stab === 'global' && !hasGlobalSettingsPermission()) {
+              alert('内测功能尚未开放，请等待版本更新。');
               return;
           }
           switchSettingsTab(stab);
@@ -1695,14 +1706,29 @@ async function checkFeatureFlags() {
             .single();
         if (error) throw error;
         if (data) {
-            const isInWhitelist = Array.isArray(data.beta_user_ids) && data.beta_user_ids.includes(USER_ID);
+            // 兼容 text[] 和 jsonb 格式
+            let whitelist = [];
+            if (Array.isArray(data.beta_user_ids)) {
+                whitelist = data.beta_user_ids;
+            } else if (typeof data.beta_user_ids === 'string') {
+                try { whitelist = JSON.parse(data.beta_user_ids); } catch(e){}
+            }
+            const isInWhitelist = whitelist.includes(USER_ID);
             isBetaUser = isInWhitelist;
             isFeatureEnabled = data.is_global_release === true || isInWhitelist;
+            
+            // 设置安全标记，防止控制台篡改 isFeatureEnabled 变量
+            if (isFeatureEnabled) {
+                document.body.setAttribute('data-rp-auth-unlocked', 'true');
+            } else {
+                document.body.removeAttribute('data-rp-auth-unlocked');
+            }
         }
     } catch (e) {
         console.warn('检查灰度开关失败:', e);
         isBetaUser = false;
         isFeatureEnabled = false;
+        document.body.removeAttribute('data-rp-auth-unlocked');
     }
 }
 
