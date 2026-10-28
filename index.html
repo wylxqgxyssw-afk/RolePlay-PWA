@@ -424,11 +424,37 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 .send-btn.stop { background: var(--stop-bg); cursor: pointer; }
 .send-btn svg { width: calc(16px * var(--font-scale)); height: calc(16px * var(--font-scale)); display: block; }
 
-/* ============ 设置弹窗 ============ */
-#char-settings-modal { position: fixed; inset: 0; z-index: 200; background: var(--overlay-bg); display: none; align-items: center; justify-content: center; padding: 20px; transition: opacity 0.3s; }
+/* ============ 设置弹窗（全屏） ============ */
+#char-settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  display: none;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  transition: opacity 0.3s;
+}
 #char-settings-modal.show { display: flex; }
-.char-settings-card { width: 100%; max-width: 560px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow-lg); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
-.char-settings-card h3 { font-size: calc(17px * var(--font-scale)); margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.char-settings-card {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  height: 100dvh;
+  background: var(--panel);
+  border: none;
+  border-radius: 0;
+  padding: 16px 16px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  box-shadow: none;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.char-settings-card h3 { font-size: calc(18px * var(--font-scale)); margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .char-settings-card .form-group { margin-bottom: 14px; }
 .char-settings-card label { font-size: calc(12px * var(--font-scale)); color: var(--muted); margin-bottom: 6px; display: block; }
 .char-settings-card textarea { min-height: 80px; }
@@ -472,12 +498,13 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
 }
 .settings-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   border-top: 1px dashed var(--border);
-  padding-top: 16px;
+  padding-top: 14px;
   margin-top: 12px;
   flex-shrink: 0;
+  gap: 10px;
 }
 .hidden { display: none !important; }
 
@@ -525,9 +552,12 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
   .tool-btn { padding: 6px; border-radius: 50%; border: none; background: transparent; }
   .tool-btn.active { background: rgba(77, 107, 254, 0.1); color: var(--accent); }
   .vip-plans { flex-direction: column; }
+  .char-settings-card { padding: 12px; padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
 }
-::-webkit-scrollbar{width:9px;height:9px;}
-::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:5px;}
+
+/* 极细滚动条 */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:2px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--scrollbar-thumb-hover);}
 ::-webkit-scrollbar-track{background:transparent;}
 
@@ -781,11 +811,11 @@ html[data-theme="dark"] .floating-ball {
   </div>
 </div>
 
-<!-- ============ 设置弹窗（角色 + 全局） ============ -->
+<!-- ============ 设置弹窗（全屏，角色 + 全局） ============ -->
 <div id="char-settings-modal">
   <div class="char-settings-card">
     <div class="settings-modal-header">
-      <h3>🎭 设置 <span id="betaBadge" style="display:none; background:var(--vip-gold); color:#000; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:bold; margin-left:6px;">内测版</span></h3>
+      <h3>设定 <span id="betaBadge" style="display:none; background:var(--vip-gold); color:#000; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:bold; margin-left:6px;">内测版</span></h3>
       <button class="icon-btn" id="closeSettingsBtn">✕</button>
     </div>
 
@@ -794,8 +824,20 @@ html[data-theme="dark"] .floating-ball {
       <button class="settings-tab" data-stab="global">全局设置</button>
     </div>
 
-    <!-- 当前角色 tab -->
+    <!-- 当前角色 tab：仅保留“指令”编辑 -->
     <div class="settings-body" id="settingsTabRole">
+      <div class="form-group">
+        <label>指令</label>
+        <textarea id="modalCharPrompt" rows="14" spellcheck="false" placeholder="请在这里输入角色设定、世界观、说话风格等指令..."></textarea>
+      </div>
+      <div style="font-size: calc(12px * var(--font-scale)); color: var(--muted); padding: 6px 4px 0; line-height: 1.6;">
+        提示：角色名、头像、开场白等请到「全局设置」中修改。
+      </div>
+    </div>
+
+    <!-- 全局设置 tab -->
+    <div class="settings-body hidden" id="settingsTabGlobal">
+
       <button class="settings-list-item" id="openAccountBtn" style="margin-bottom:14px; background:var(--panel-2);">
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="avatar-preview" id="accountMiniAvatar">
@@ -815,40 +857,32 @@ html[data-theme="dark"] .floating-ball {
       </div>
       <div class="agent-tab-list" id="agentTabList"></div>
 
-      <div id="agentEditForm">
-        <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">AI 角色头像</div>
-        <div class="avatar-upload-container">
-          <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
-            <span>🤖</span>
-          </div>
-          <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
-          <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px;">AI 角色头像</div>
+      <div class="avatar-upload-container">
+        <div class="avatar-preview" id="avatarPreview" title="点击更换头像">
+          <span>🤖</span>
         </div>
-        <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px; border-top:1px dashed var(--border); padding-top:16px;">当前对话你的头像</div>
-        <div class="avatar-upload-container">
-          <div class="avatar-preview" id="userAvatarPreview" title="点击更换你的头像">
-            <span>👤</span>
-          </div>
-          <div class="avatar-upload-text" id="userAvatarUploadText">点击更换你的头像</div>
-          <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;">
-        </div>
-        <div class="form-group" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
-          <label>角色名</label>
-          <input id="modalCharName" spellcheck="false">
-        </div>
-        <div class="form-group">
-          <label>角色人设 / 世界观</label>
-          <textarea id="modalCharPrompt" rows="4" spellcheck="false"></textarea>
-        </div>
-        <div class="form-group">
-          <label>开场白（仅在群里没记录时发送）</label>
-          <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
-        </div>
+        <div class="avatar-upload-text" id="avatarUploadText">点击更换头像</div>
+        <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
       </div>
-    </div>
 
-    <!-- 全局设置 tab -->
-    <div class="settings-body hidden" id="settingsTabGlobal">
+      <div class="settings-group-title" style="font-size:calc(13px * var(--font-scale)); margin-bottom:8px; border-top:1px dashed var(--border); padding-top:16px;">当前对话你的头像</div>
+      <div class="avatar-upload-container">
+        <div class="avatar-preview" id="userAvatarPreview" title="点击更换你的头像">
+          <span>👤</span>
+        </div>
+        <div class="avatar-upload-text" id="userAvatarUploadText">点击更换你的头像</div>
+        <input type="file" id="userAvatarFileInput" accept="image/*" style="display: none;">
+      </div>
+
+      <div class="form-group" style="margin-top:16px; border-top:1px dashed var(--border); padding-top:16px;">
+        <label>角色名</label>
+        <input id="modalCharName" spellcheck="false">
+      </div>
+      <div class="form-group">
+        <label>开场白（仅在群里没记录时发送）</label>
+        <textarea id="modalGreeting" rows="2" spellcheck="false"></textarea>
+      </div>
 
       <button class="settings-list-item" id="goToVip" style="background:var(--vip-gold-bg); border-color:var(--vip-gold-border);">
         <div style="display:flex; align-items:center;">
@@ -956,6 +990,10 @@ html[data-theme="dark"] .floating-ball {
       </div>
 
       <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
+        <button class="btn" id="exportBtn" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          导出聊天记录
+        </button>
         <button class="btn primary" id="applyBtn" style="width:100%;">保存全局设置</button>
         <button class="btn btn-clear-chat" id="clearChatBtn" style="width:100%;">清空当前会话记录</button>
         <button class="btn btn-logout" id="logoutBtn" style="width:100%;">退出登录</button>
@@ -967,14 +1005,8 @@ html[data-theme="dark"] .floating-ball {
     </div>
 
     <div class="settings-footer">
-      <button class="btn" id="exportBtn" style="display: flex; align-items: center; gap: 6px;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        导出
-      </button>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn" id="cancelCharSettingsBtn">取消</button>
-        <button class="btn primary" id="saveCharSettingsBtn">保存</button>
-      </div>
+      <button class="btn" id="cancelCharSettingsBtn">取消</button>
+      <button class="btn primary" id="saveCharSettingsBtn">保存</button>
     </div>
   </div>
 </div>
