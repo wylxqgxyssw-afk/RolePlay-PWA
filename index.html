@@ -526,6 +526,29 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
   color: var(--accent);
   background: rgba(77,107,254,0.1);
 }
+/* 全局设置 Tab 加锁样式 */
+.settings-tab.locked {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: transparent !important;
+}
+.settings-tab.locked:hover {
+  color: var(--muted);
+}
+.settings-tab .tab-lock {
+  font-size: 11px;
+  margin-left: 4px;
+  vertical-align: middle;
+  display: inline-block;
+}
+.settings-tab .tab-locked-text {
+  font-size: 10px;
+  color: var(--danger);
+  margin-left: 3px;
+  font-weight: normal;
+  opacity: 0.9;
+}
 .settings-body {
   flex: 1;
   overflow-y: auto;
@@ -868,7 +891,7 @@ html[data-theme="dark"] .floating-ball {
 
     <div class="settings-tabs">
       <button class="settings-tab active" data-stab="role">当前角色</button>
-      <button class="settings-tab" data-stab="global">全局设置</button>
+      <button class="settings-tab locked" data-stab="global" id="globalSettingsTab">全局设置 <span class="tab-lock">🔒</span><span class="tab-locked-text">未完成</span></button>
     </div>
 
     <!-- 当前角色 tab：仅保留“指令”编辑 -->
@@ -1119,7 +1142,7 @@ html[data-theme="dark"] .floating-ball {
   </div>
 </div>
 
-<!-- ============ 悬浮球 ============ -->
+<!-- ============ 悬浮球（只保留账号） ============ -->
 <div id="floating-ball-container" class="floating-ball-container" style="position:fixed; z-index:1000; touch-action:none;">
   <div id="floating-ball" class="floating-ball">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:24px; height:24px;">
@@ -1130,9 +1153,6 @@ html[data-theme="dark"] .floating-ball {
   
   <div id="floating-menu" class="floating-menu">
     <div class="menu-item" id="fab-account">账号 <span class="arrow">›</span></div>
-    <div class="menu-item" id="fab-appearance">美化与背景 <span class="arrow">›</span></div>
-    <div class="menu-item" id="fab-role">角色设定 <span class="arrow">›</span></div>
-    <div class="menu-item" id="fab-refresh">刷新页面 <span class="arrow">›</span></div>
   </div>
 </div>
 
@@ -1294,8 +1314,31 @@ function openChatScreen() { closeSidebar(); }
 function closeChatScreen() { openSidebar(); }
 function switchTab() { /* 已弃用 */ }
 
+/* ============ 全局设置 Tab 锁状态更新 ============ */
+function updateGlobalSettingsTabLock() {
+  const globalTab = document.getElementById('globalSettingsTab');
+  if (!globalTab) return;
+  const lockIcon = globalTab.querySelector('.tab-lock');
+  const lockedText = globalTab.querySelector('.tab-locked-text');
+  if (isFeatureEnabled) {
+    // 内测版 / 全局发布：解锁
+    globalTab.classList.remove('locked');
+    if (lockIcon) lockIcon.textContent = '🔓';
+    if (lockedText) lockedText.style.display = 'none';
+  } else {
+    // 普通版本：保持锁上
+    globalTab.classList.add('locked');
+    if (lockIcon) lockIcon.textContent = '🔒';
+    if (lockedText) lockedText.style.display = 'inline';
+  }
+}
+
 /* ============ 设置弹窗 tab 切换 ============ */
 function switchSettingsTab(tab) {
+  // 全局设置 tab 未解锁时，强制回退到当前角色
+  if (tab === 'global' && !isFeatureEnabled) {
+    return;
+  }
   document.querySelectorAll('.settings-tab').forEach(t => {
     t.classList.toggle('active', t.getAttribute('data-stab') === tab);
   });
@@ -1322,6 +1365,8 @@ function openSettingsModal(defaultTab = 'role') {
     updateUserAvatarPreview(currentConversation.user_avatar);
   }
   renderAccountMini();
+  // 未解锁全局设置时，强制使用 role tab
+  if (defaultTab === 'global' && !isFeatureEnabled) defaultTab = 'role';
   switchSettingsTab(defaultTab);
   document.getElementById('char-settings-modal').classList.add('show');
 }
@@ -1474,7 +1519,12 @@ function setupThemeUI(){
   /* 设置内部 tab 切换 */
   document.querySelectorAll('.settings-tab').forEach(tab => {
       tab.addEventListener('click', () => {
-          switchSettingsTab(tab.getAttribute('data-stab'));
+          const stab = tab.getAttribute('data-stab');
+          // 全局设置未解锁时，点击锁不生效
+          if (stab === 'global' && !isFeatureEnabled) {
+              return;
+          }
+          switchSettingsTab(stab);
           closeAllApiHistoryPanels();
       });
   });
@@ -4035,7 +4085,7 @@ function initFloatingBall() {
     if (rect.top > maxY) fabContainer.style.top = maxY + 'px';
   });
 
-  // 绑定菜单点击事件
+  // 绑定菜单点击事件 —— 仅保留「账号」
   document.getElementById('fab-account').addEventListener('click', () => {
     fabMenu.classList.remove('show');
     if (typeof saveCurrentAccountToCache === 'function') saveCurrentAccountToCache();
@@ -4043,30 +4093,6 @@ function initFloatingBall() {
     if (typeof renderAccountModal === 'function') renderAccountModal();
     const accModal = document.getElementById('account-modal');
     if (accModal) accModal.classList.add('show');
-  });
-
-  document.getElementById('fab-appearance').addEventListener('click', () => {
-    fabMenu.classList.remove('show');
-    if (typeof openSettingsModal === 'function') {
-      openSettingsModal('global');
-      setTimeout(() => {
-        const appearanceTitle = Array.from(document.querySelectorAll('.settings-group-title')).find(el => el.textContent.includes('外观设置'));
-        if (appearanceTitle) {
-          appearanceTitle.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    }
-  });
-
-  document.getElementById('fab-role').addEventListener('click', () => {
-    fabMenu.classList.remove('show');
-    const btn = document.getElementById('openCharSettingsBtn');
-    if (btn) btn.click();
-  });
-
-  document.getElementById('fab-refresh').addEventListener('click', () => {
-    fabMenu.classList.remove('show');
-    window.location.reload();
   });
 }
 
@@ -4315,7 +4341,8 @@ async function loadUserData() {
   bindEvents();
   await fetchGlobalSettings(); 
   await checkFeatureFlags();
-  
+
+  // 更新内测徽章 & 全局设置 Tab 锁状态
   if ($('#betaBadge')) {
       if (isBetaUser) {
           $('#betaBadge').style.display = 'inline-block';
@@ -4323,6 +4350,7 @@ async function loadUserData() {
           $('#betaBadge').style.display = 'none';
       }
   }
+  updateGlobalSettingsTabLock();
 
   renderAccountMini();
   let convs = await loadConversations();
