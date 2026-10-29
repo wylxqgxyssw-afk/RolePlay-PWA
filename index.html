@@ -526,7 +526,6 @@ input[type=checkbox]{ width:22px; height:22px; padding:0; margin:0; flex-shrink:
   color: var(--accent);
   background: rgba(77,107,254,0.1);
 }
-/* 全局设置 Tab 加锁样式 */
 .settings-tab.locked {
   color: var(--muted);
   cursor: not-allowed;
@@ -1920,9 +1919,22 @@ async function deleteConversation(convId) {
     } catch (e) { console.error('❌ 删除会话异常:', e); updateCloudStatusUI(false); }
 }
 
+/* ============================================================
+   【改动 1】saveMessageToCloud：
+   把 reasoning_time 塞进 tokens 字段（jsonb）里持久化，
+   这样不需要改 SQL 表结构。
+   ============================================================ */
 async function saveMessageToCloud(msg) {
     if (!USER_ID || !currentConversationId) return;
     try {
+        let tokensPayload = msg.tokens || null;
+        if (msg.reasoning_time !== undefined && msg.reasoning_time !== null) {
+            if (tokensPayload && typeof tokensPayload === 'object') {
+                tokensPayload = Object.assign({}, tokensPayload, { _reasoning_time: msg.reasoning_time });
+            } else {
+                tokensPayload = { _reasoning_time: msg.reasoning_time };
+            }
+        }
         const payload = {
             user_id: USER_ID,
             conversation_id: currentConversationId,
@@ -1930,7 +1942,7 @@ async function saveMessageToCloud(msg) {
             role: msg.role,
             content: msg.content,
             reasoning: msg.reasoning || null,
-            tokens: msg.tokens || null,
+            tokens: tokensPayload,
             parent_id: msg.parent_id || null,
             sibling_order: msg.sibling_order || 0,
             agent_id: msg.agent_id || null
@@ -1948,6 +1960,10 @@ async function saveMessageToCloud(msg) {
     }
 }
 
+/* ============================================================
+   【改动 2】loadMessagesFromCloud：
+   从 tokens._reasoning_time 中恢复 reasoning_time。
+   ============================================================ */
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
@@ -2021,6 +2037,14 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         siblings.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
         const sibIndex = siblings.findIndex(x => x.local_id === m.local_id);
 
+        // 从 tokens 里恢复 reasoning_time（不依赖 SQL 字段）
+        let restoredReasoningTime = null;
+        if (m.tokens && typeof m.tokens === 'object' && m.tokens._reasoning_time !== undefined && m.tokens._reasoning_time !== null) {
+            restoredReasoningTime = m.tokens._reasoning_time;
+        } else if (m.reasoning_time !== undefined && m.reasoning_time !== null) {
+            restoredReasoningTime = m.reasoning_time;
+        }
+
         return {
             role: m.role,
             content: m.content,
@@ -2030,6 +2054,7 @@ async function loadMessagesFromCloud(targetNodeId = null) {
             parent_id: trueParentId,
             _raw_parent_id: m.parent_id || null,
             agent_id: m.agent_id,
+            reasoning_time: restoredReasoningTime,
             _sibTotal: siblings.length,
             _sibIndex: sibIndex >= 0 ? sibIndex : 0,
             _siblings: siblings
@@ -2566,9 +2591,16 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
       if (totalVal > 0) tokenHtml = `<span class="token-display" title="总 Token: ${totalVal}">T: ${totalVal}</span>`;
   }
 
+  /* ============================================================
+     【改动 3】addBubble 里恢复 reasoning_time 显示：
+     不论 0 秒还是多少秒都正确显示出来（只要不是 null/undefined）。
+     ============================================================ */
   let reasoningHtml = '';
   if (role === 'assistant' && reasoning) {
-      const timeStr = (msgs[index] && msgs[index].reasoning_time) ? `（用时 ${msgs[index].reasoning_time} 秒）` : '';
+      const rt = (msgs[index] && msgs[index].reasoning_time !== undefined && msgs[index].reasoning_time !== null)
+                  ? msgs[index].reasoning_time
+                  : null;
+      const timeStr = (rt !== null) ? `（用时 ${rt} 秒）` : '';
       reasoningHtml = `
         <div class="reasoning-box collapsed">
             <div class="reasoning-header">
@@ -3013,11 +3045,18 @@ async function send(){
   }
 }
 
+/* ============================================================
+   【改动 4】generateAIResponse：
+   · 开启深度思考：最终 reasoning_time 强制 ≥ 10 秒
+   · 关闭深度思考：保持真实秒数
+   · 最终 fallback 一定把 reasoning_time 写入 aiMsg，并回填到 msgs
+   ============================================================ */
 async function generateAIResponse(contextMsgs, parentId, agentId = null, replaceMsgIndex = null) {
   busy = true; setBusyUI(true);
 
   const actualParentId = parentId !== undefined ? parentId : activeLeafId;
   const actualAgentId = agentId || currentAgentId;
+  const deepThinkActive = $('#deepThinkBtn').classList.contains('active');
 
   let insertBeforeNode = null;
   if (replaceMsgIndex !== null) {
@@ -3054,7 +3093,8 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
 
   const aiMsg = { 
       role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null, 
-      parent_id: actualParentId, sibling_order: Date.now(), agent_id: actualAgentId 
+      parent_id: actualParentId, sibling_order: Date.now(), agent_id: actualAgentId,
+      reasoning_time: null
   };
 
   await saveMessageToCloud(aiMsg);
@@ -3098,6 +3138,12 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
     });
 
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    // 【改动】根据深度思考开关决定最终展示秒数
+    if (deepThinkActive) {
+        reasoningSeconds = Math.max(reasoningSeconds, 10);
+    }
+
     if (!hasStartedContent) {
          rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
          rHeader.classList.remove('thinking');
@@ -3105,7 +3151,11 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
          rIcon.classList.add('right');
          rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
          rBox.classList.add('collapsed');
+    } else {
+         // 如果正文已经开始输出，也把 label 更新为最终秒数（深度思考开启时会被抬到 10）
+         rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
     }
+
     if(full.trim()){
       contentEl.innerHTML = renderContent(full, false);
       aiMsg.content = full;
@@ -3123,6 +3173,7 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
     } else if (!aiMsg.content) {
         contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
         aiMsg.content = '（模型返回了空内容）';
+        aiMsg.reasoning_time = reasoningSeconds;
     }
   } catch(err) {
     if (timerInterval) clearInterval(timerInterval);
@@ -3134,6 +3185,8 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
     rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
     contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
     if (!aiMsg.content) aiMsg.content = '（请求失败）';
+    // 失败场景也记录一下时长，方便复现时显示
+    aiMsg.reasoning_time = reasoningSeconds;
   } finally {
     try { await saveMessageToCloud(aiMsg); } catch(e) {}
     
@@ -3142,7 +3195,9 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
         msgs = res.pathMsgs;
         if (msgs.length > 0) {
             const lastMsg = msgs[msgs.length - 1];
-            if (lastMsg.local_id === aiMsg.local_id) lastMsg.reasoning_time = reasoningSeconds;
+            if (lastMsg.local_id === aiMsg.local_id) {
+                lastMsg.reasoning_time = reasoningSeconds;
+            }
         }
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
