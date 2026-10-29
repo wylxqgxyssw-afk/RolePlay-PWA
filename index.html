@@ -724,7 +724,6 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
   <div class="vip-card">
     <h3>👑 开通会员</h3>
     <p style="font-size:calc(13px * var(--font-scale)); color:var(--muted); margin-top:-8px; margin-bottom:16px;">解锁无限畅聊，享受高级特权。</p>
-    <p style="font-size:calc(12px * var(--font-scale)); color:var(--vip-gold); margin-top:-8px; margin-bottom:12px;">👑 会员专享：解锁「⭐ 固定对话」专属频道</p>
     <div class="vip-plans" id="vipPlans">
       <div class="vip-plan active" data-plan="月卡" data-amount="30"><div class="p-name">月卡</div><div class="p-price">¥30<span>/月</span></div></div>
       <div class="vip-plan" data-plan="季卡" data-amount="80"><div class="p-name">季卡</div><div class="p-price">¥80<span>/季</span></div></div>
@@ -875,7 +874,7 @@ const DEFAULTS = {
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// ★ 新增：系统固定对话时 active_leaf_id 只存本地，避免多用户互相覆盖
+// 系统固定对话时 active_leaf_id 只存本地，避免多用户互相覆盖
 async function persistActiveLeafId(leafId) {
     if (!currentConversationId) return;
     if (currentConversation && currentConversation.is_system_fixed) {
@@ -1470,7 +1469,7 @@ async function saveGlobalSettings() {
     } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
 }
 
-// ★ 修正：所有用户都拉取固定对话
+// ★ 所有人都会拉取系统固定对话
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
@@ -1786,6 +1785,7 @@ function formatConvDate(dateStr) {
     return `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
 
+// ★ 调整排序：固定对话在最上，其后是普通置顶，再是时间分组
 function renderConversationList(convs) {
     const container = $('#conversationListContainer');
     if (!container) return;
@@ -1798,6 +1798,16 @@ function renderConversationList(convs) {
     const pinnedConvs  = convs.filter(c => !c.is_system_fixed && c.is_pinned);
     const unpinnedConvs= convs.filter(c => !c.is_system_fixed && !c.is_pinned);
 
+    // 1. 固定对话（最上方）
+    if (fixedConvs.length > 0) {
+        const title = document.createElement('div');
+        title.className = 'conv-group-title';
+        title.textContent = '⭐ 固定对话';
+        container.appendChild(title);
+        fixedConvs.forEach(c => container.appendChild(createConvItem(c)));
+    }
+
+    // 2. 其他置顶（在固定对话下面）
     if (pinnedConvs.length > 0) {
         const title = document.createElement('div');
         title.className = 'conv-group-title';
@@ -1805,14 +1815,8 @@ function renderConversationList(convs) {
         container.appendChild(title);
         pinnedConvs.forEach(c => container.appendChild(createConvItem(c)));
     }
-    // 所有人都会看到固定对话组
-    if (fixedConvs.length > 0) {
-        const title = document.createElement('div');
-        title.className = 'conv-group-title';
-        title.textContent = '⭐ 固定对话（VIP）';
-        container.appendChild(title);
-        fixedConvs.forEach(c => container.appendChild(createConvItem(c)));
-    }
+
+    // 3. 历史分组
     const groups = {};
     unpinnedConvs.forEach(c => {
         const groupName = formatConvDate(c.created_at);
@@ -1828,6 +1832,7 @@ function renderConversationList(convs) {
     });
 }
 
+// ★ 所有人点击都能进，且不再有锁图标，左侧显示星星
 function createConvItem(c) {
     const item = document.createElement('div');
     item.className = 'conv-item';
@@ -1835,15 +1840,10 @@ function createConvItem(c) {
     item.setAttribute('data-id', c.id);
     const displayName = (c.agents && c.agents.length > 0) ? c.agents[0].name : (c.agent_name || '未命名');
     
-    // ★ 图标区分：VIP 显示星星，非 VIP 显示锁
-    let starPrefix = '';
-    if (c.is_system_fixed) {
-        if (currentVipStatus.is_vip) {
-            starPrefix = '<span style="margin-right:6px; color:var(--vip-gold);">⭐</span>';
-        } else {
-            starPrefix = '<span style="margin-right:6px; color:var(--muted);">🔒</span>';
-        }
-    }
+    // 固定对话统一加星星在最左边
+    const starPrefix = c.is_system_fixed
+        ? '<span style="margin-right:8px; color:var(--vip-gold); font-size:15px; flex-shrink:0;">⭐</span>'
+        : '';
 
     if (isMultiSelectMode) {
         const isChecked = selectedConvs.has(c.id);
@@ -1863,7 +1863,7 @@ function createConvItem(c) {
 
     const startPress = (e) => {
         if (isMultiSelectMode) return;
-        if (c.is_system_fixed) return;
+        if (c.is_system_fixed) return; // 固定对话不可长按弹菜单
         isLongPress = false;
         if (e.touches && e.touches.length > 0) {
             pressStartX = e.touches[0].clientX;
@@ -1895,12 +1895,7 @@ function createConvItem(c) {
         if (isMultiSelectMode) { toggleSelectConv(c.id); return; }
         if (isLongPress) { e.preventDefault(); return; }
         
-        // ★ 拦截非会员点击
-        if (c.is_system_fixed && !currentVipStatus.is_vip) {
-            alert('该频道为会员专属，请先开通会员！');
-            return;
-        }
-
+        // ★ 不再有非会员拦截，所有人直接进
         switchConversation(c.id, c);
         closeSidebar();
     });
@@ -2071,11 +2066,7 @@ async function switchConversation(convId, convObj = null) {
 
     const conv = convObj || conversationsCache.find(c => c.id === convId) || { id: convId };
     
-    // ★ 后备拦截：如果是系统固定对话，且不是 VIP，强行打断
-    if (conv.is_system_fixed && !currentVipStatus.is_vip) {
-        alert('该频道为会员专属，请先开通会员！');
-        return;
-    }
+    // ★ 去掉后备拦截，所有人都能进
 
     const fetchId = ++currentFetchId;
     currentConversationId = convId;
@@ -2164,10 +2155,7 @@ async function autoOpenLastConversation() {
     let lastId = null;
     try { lastId = localStorage.getItem('rp_last_conv_' + USER_ID); } catch(e) {}
     let target = conversationsCache.find(c => c.id === lastId);
-    // 避免自动进入无权限的系统对话
-    if (target && target.is_system_fixed && !currentVipStatus.is_vip) {
-        target = conversationsCache.find(c => !c.is_system_fixed) || conversationsCache[0];
-    }
+    // ★ 去掉权限拦截判断
     if (!target) target = conversationsCache[0];
     if (target) await switchConversation(target.id, target);
 }
@@ -2975,7 +2963,7 @@ function renderCharSettings() {
         $('#modalCharName').value = currentEditAgent.name || '';
         $('#modalGreeting').value = currentEditAgent.greeting || '';
         const promptEl = $('#modalCharPrompt');
-        // ★ 无论是谁，只要进了固定对话，指令就锁死不可见
+        // 无论是谁，只要进了固定对话，指令就锁死不可见
         if (isSystemConv) {
             promptEl.value = '';
             promptEl.disabled = true;
