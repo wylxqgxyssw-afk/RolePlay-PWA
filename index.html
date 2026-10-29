@@ -1470,18 +1470,13 @@ async function saveGlobalSettings() {
     } catch (e) { console.error('❌ 保存全局配置异常:', e); updateCloudStatusUI(false); }
 }
 
-// ★ 重写：拉列表，带 VIP 权限判断
+// ★ 修正：所有用户都拉取固定对话
 async function loadConversations() {
     if (!USER_ID) return [];
     try {
         let query = supabaseClient.from('conversations')
-            .select('id, agent_name, agent_prompt, greeting, created_at, avatar, user_avatar, active_leaf_id, is_pinned, agents, is_system_fixed, is_hidden_prompt');
-
-        if (currentVipStatus && currentVipStatus.is_vip) {
-            query = query.or(`user_id.eq.${USER_ID},is_system_fixed.eq.true`);
-        } else {
-            query = query.eq('user_id', USER_ID);
-        }
+            .select('id, agent_name, agent_prompt, greeting, created_at, avatar, user_avatar, active_leaf_id, is_pinned, agents, is_system_fixed, is_hidden_prompt')
+            .or(`user_id.eq.${USER_ID},is_system_fixed.eq.true`);
 
         const { data, error } = await query
             .order('is_pinned', { ascending: false })
@@ -1633,7 +1628,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
     const msgMap = new Map();
     allMsgs.forEach(m => msgMap.set(m.local_id, m));
 
-    // ★ 修改：系统固定对话从 local storage 读取
     let startNodeId = targetNodeId;
     if (!startNodeId) {
         if (currentConversation && currentConversation.is_system_fixed) {
@@ -1680,7 +1674,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         currId = node.parent_id;
     }
 
-    // ★ 修改：不再统一写回，改用 persistActiveLeafId 逻辑
     if (currentConversation && currentConversation.is_system_fixed) {
         try { localStorage.setItem('rp_fixed_leaf_' + USER_ID + '_' + currentConversationId, targetLeafId); } catch(e) {}
     } else {
@@ -1793,7 +1786,6 @@ function formatConvDate(dateStr) {
     return `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
 
-// ★ 重写：插入固定对话分组
 function renderConversationList(convs) {
     const container = $('#conversationListContainer');
     if (!container) return;
@@ -1813,6 +1805,7 @@ function renderConversationList(convs) {
         container.appendChild(title);
         pinnedConvs.forEach(c => container.appendChild(createConvItem(c)));
     }
+    // 所有人都会看到固定对话组
     if (fixedConvs.length > 0) {
         const title = document.createElement('div');
         title.className = 'conv-group-title';
@@ -1835,16 +1828,22 @@ function renderConversationList(convs) {
     });
 }
 
-// ★ 重写：系统固定对话加星号，禁止长按菜单
 function createConvItem(c) {
     const item = document.createElement('div');
     item.className = 'conv-item';
     if (c.id === currentConversationId) item.classList.add('active');
     item.setAttribute('data-id', c.id);
     const displayName = (c.agents && c.agents.length > 0) ? c.agents[0].name : (c.agent_name || '未命名');
-    const starPrefix = c.is_system_fixed
-        ? '<span style="margin-right:6px; color:var(--vip-gold);">⭐</span>'
-        : '';
+    
+    // ★ 图标区分：VIP 显示星星，非 VIP 显示锁
+    let starPrefix = '';
+    if (c.is_system_fixed) {
+        if (currentVipStatus.is_vip) {
+            starPrefix = '<span style="margin-right:6px; color:var(--vip-gold);">⭐</span>';
+        } else {
+            starPrefix = '<span style="margin-right:6px; color:var(--muted);">🔒</span>';
+        }
+    }
 
     if (isMultiSelectMode) {
         const isChecked = selectedConvs.has(c.id);
@@ -1864,7 +1863,7 @@ function createConvItem(c) {
 
     const startPress = (e) => {
         if (isMultiSelectMode) return;
-        if (c.is_system_fixed) return; // 系统对话不弹菜单
+        if (c.is_system_fixed) return;
         isLongPress = false;
         if (e.touches && e.touches.length > 0) {
             pressStartX = e.touches[0].clientX;
@@ -1895,6 +1894,13 @@ function createConvItem(c) {
     item.addEventListener('click', (e) => {
         if (isMultiSelectMode) { toggleSelectConv(c.id); return; }
         if (isLongPress) { e.preventDefault(); return; }
+        
+        // ★ 拦截非会员点击
+        if (c.is_system_fixed && !currentVipStatus.is_vip) {
+            alert('该频道为会员专属，请先开通会员！');
+            return;
+        }
+
         switchConversation(c.id, c);
         closeSidebar();
     });
@@ -1951,7 +1957,7 @@ function updateMultiSelectCount() {
 
 function toggleSelectConv(convId) {
     const c = conversationsCache.find(x => x.id === convId);
-    if (c && c.is_system_fixed) return; // 固定对话不能选
+    if (c && c.is_system_fixed) return;
     if (selectedConvs.has(convId)) selectedConvs.delete(convId);
     else selectedConvs.add(convId);
     updateMultiSelectCount();
@@ -2063,6 +2069,14 @@ let currentFetchId = 0;
 async function switchConversation(convId, convObj = null) {
     if (busy) { alert('请等待当前回复生成完成后再切换。'); return; }
 
+    const conv = convObj || conversationsCache.find(c => c.id === convId) || { id: convId };
+    
+    // ★ 后备拦截：如果是系统固定对话，且不是 VIP，强行打断
+    if (conv.is_system_fixed && !currentVipStatus.is_vip) {
+        alert('该频道为会员专属，请先开通会员！');
+        return;
+    }
+
     const fetchId = ++currentFetchId;
     currentConversationId = convId;
     if (USER_ID) { try { localStorage.setItem('rp_last_conv_' + USER_ID, convId); } catch(e){} }
@@ -2071,7 +2085,6 @@ async function switchConversation(convId, convObj = null) {
     activeLeafId = null;
     cancelEditMode();
 
-    const conv = convObj || conversationsCache.find(c => c.id === convId) || { id: convId };
     if (!conv.agents || conv.agents.length === 0) {
         conv.agents = [{
             id: 'default_agent',
@@ -2151,6 +2164,10 @@ async function autoOpenLastConversation() {
     let lastId = null;
     try { lastId = localStorage.getItem('rp_last_conv_' + USER_ID); } catch(e) {}
     let target = conversationsCache.find(c => c.id === lastId);
+    // 避免自动进入无权限的系统对话
+    if (target && target.is_system_fixed && !currentVipStatus.is_vip) {
+        target = conversationsCache.find(c => !c.is_system_fixed) || conversationsCache[0];
+    }
     if (!target) target = conversationsCache[0];
     if (target) await switchConversation(target.id, target);
 }
@@ -2923,7 +2940,6 @@ function setBusyUI(b){
   if(newBtn) newBtn.disabled = b;
 }
 
-// ★ 重写：系统固定对话隐藏 Prompt
 function renderCharSettings() {
     const tabList = $('#agentTabList');
     if (!tabList) return;
@@ -2959,6 +2975,7 @@ function renderCharSettings() {
         $('#modalCharName').value = currentEditAgent.name || '';
         $('#modalGreeting').value = currentEditAgent.greeting || '';
         const promptEl = $('#modalCharPrompt');
+        // ★ 无论是谁，只要进了固定对话，指令就锁死不可见
         if (isSystemConv) {
             promptEl.value = '';
             promptEl.disabled = true;
@@ -2973,7 +2990,6 @@ function renderCharSettings() {
     if ($('#chkHideAvatarName')) $('#chkHideAvatarName').checked = !!styleConfig.hideAvatarName;
 }
 
-// ★ 重写：系统固定对话不覆盖原 Prompt
 function saveFormToCurrentAgent() {
     const agent = currentAgents.find(a => a.id === editingAgentId);
     if (agent) {
@@ -3078,7 +3094,6 @@ window.approveOrder = async function(orderId, userId, planName) {
             currentVipStatus.expire_at = expireDate.toISOString();
             msgBox.innerHTML = '';
             msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
-            // ★ 刷新列表，让固定对话出现
             const convs = await loadConversations();
             conversationsCache = convs;
             renderConversationList(convs);
