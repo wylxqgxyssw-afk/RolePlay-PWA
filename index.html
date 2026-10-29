@@ -893,7 +893,6 @@ html[data-theme="dark"] .floating-ball {
       <button class="settings-tab locked" data-stab="global" id="globalSettingsTab">全局设置 <span class="tab-lock">🔒</span><span class="tab-locked-text">未完成</span></button>
     </div>
 
-    <!-- 当前角色 tab：保留“接口配置”和“指令”编辑 -->
     <div class="settings-body" id="settingsTabRole">
       
       <div class="settings-group">
@@ -927,7 +926,6 @@ html[data-theme="dark"] .floating-ball {
       </div>
     </div>
 
-    <!-- 全局设置 tab -->
     <div class="settings-body hidden" id="settingsTabGlobal">
 
       <button class="settings-list-item" id="openAccountBtn" style="margin-bottom:14px; background:var(--panel-2);">
@@ -1230,6 +1228,9 @@ let globalDefaultUserAvatar = null;
 let activeLeafId = null;
 let currentUserEmail = '';
 
+// 新增：流式结束后的保护窗口（防止 realtime 立刻用云端旧数据覆盖 UI）
+let ignoreRefreshUntil = 0;
+
 let currentVipStatus = { is_vip: false, expire_at: null };
 let selectedVipPlan = { name: '月卡', amount: 30 };
 
@@ -1238,7 +1239,6 @@ let editingAgentId = null;
 
 let pendingFiles = [];
 
-// 新增：多选状态
 let isMultiSelectMode = false;
 let selectedConvs = new Set();
 
@@ -1317,16 +1317,12 @@ function openChatScreen() { closeSidebar(); }
 function closeChatScreen() { openSidebar(); }
 function switchTab() { /* 已弃用 */ }
 
-/* ============ 安全权限验证（防控制台绕过） ============ */
 function hasGlobalSettingsPermission() {
-    // 1. 检查闭包变量
     if (!isFeatureEnabled) return false;
-    // 2. 检查 DOM 上的安全标记
     if (document.body.getAttribute('data-rp-auth-unlocked') !== 'true') return false;
     return true;
 }
 
-/* ============ 全局设置 Tab 锁状态更新 ============ */
 function updateGlobalSettingsTabLock() {
   const globalTab = document.getElementById('globalSettingsTab');
   if (!globalTab) return;
@@ -1334,21 +1330,17 @@ function updateGlobalSettingsTabLock() {
   const lockedText = globalTab.querySelector('.tab-locked-text');
   
   if (hasGlobalSettingsPermission()) {
-    // 内测版 / 全局发布：解锁
     globalTab.classList.remove('locked');
     if (lockIcon) lockIcon.textContent = '🔓';
     if (lockedText) lockedText.style.display = 'none';
   } else {
-    // 普通版本：保持锁上
     globalTab.classList.add('locked');
     if (lockIcon) lockIcon.textContent = '🔒';
     if (lockedText) lockedText.style.display = 'inline';
   }
 }
 
-/* ============ 设置弹窗 tab 切换 ============ */
 function switchSettingsTab(tab) {
-  // 全局设置 tab 未解锁时，强制回退到当前角色
   if (tab === 'global' && !hasGlobalSettingsPermission()) {
     return;
   }
@@ -1378,7 +1370,6 @@ function openSettingsModal(defaultTab = 'role') {
     updateUserAvatarPreview(currentConversation.user_avatar);
   }
   renderAccountMini();
-  // 未解锁全局设置时，强制使用 role tab
   if (defaultTab === 'global' && !hasGlobalSettingsPermission()) defaultTab = 'role';
   switchSettingsTab(defaultTab);
   document.getElementById('char-settings-modal').classList.add('show');
@@ -1513,7 +1504,6 @@ function setupThemeUI(){
       if (e.key === THEME_KEY && e.newValue) applyTheme(e.newValue, { persist: false });
   });
 
-  /* 弹窗关闭 */
   const closeSettings = () => {
       closeAllApiHistoryPanels();
       document.getElementById('char-settings-modal').classList.remove('show');
@@ -1529,11 +1519,9 @@ function setupThemeUI(){
       if (e.target.id === 'char-settings-modal') closeSettings();
   });
 
-  /* 设置内部 tab 切换 */
   document.querySelectorAll('.settings-tab').forEach(tab => {
       tab.addEventListener('click', () => {
           const stab = tab.getAttribute('data-stab');
-          // 安全校验
           if (stab === 'global' && !hasGlobalSettingsPermission()) {
               alert('内测功能尚未开放，请等待版本更新。');
               return;
@@ -1543,7 +1531,6 @@ function setupThemeUI(){
       });
   });
 
-  /* 会员 */
   if($('#goToVip')) $('#goToVip').addEventListener('click', () => $('#vip-modal').classList.add('show'));
   if($('#closeVipModal')) $('#closeVipModal').addEventListener('click', () => $('#vip-modal').classList.remove('show'));
 
@@ -1709,7 +1696,6 @@ async function checkFeatureFlags() {
             .single();
         if (error) throw error;
         if (data) {
-            // 兼容 text[] 和 jsonb 格式
             let whitelist = [];
             if (Array.isArray(data.beta_user_ids)) {
                 whitelist = data.beta_user_ids;
@@ -1720,7 +1706,6 @@ async function checkFeatureFlags() {
             isBetaUser = isInWhitelist;
             isFeatureEnabled = data.is_global_release === true || isInWhitelist;
             
-            // 设置安全标记，防止控制台篡改 isFeatureEnabled 变量
             if (isFeatureEnabled) {
                 document.body.setAttribute('data-rp-auth-unlocked', 'true');
             } else {
@@ -1920,21 +1905,28 @@ async function deleteConversation(convId) {
 }
 
 /* ============================================================
-   【改动 1】saveMessageToCloud：
-   把 reasoning_time 塞进 tokens 字段（jsonb）里持久化，
-   这样不需要改 SQL 表结构。
+   saveMessageToCloud：
+   修复：tokens 为数字时会丢掉 total_tokens 的 bug。
+   现在：数字会自动包成 { total_tokens: N }，再叠加 _reasoning_time。
    ============================================================ */
 async function saveMessageToCloud(msg) {
     if (!USER_ID || !currentConversationId) return;
     try {
-        let tokensPayload = msg.tokens || null;
-        if (msg.reasoning_time !== undefined && msg.reasoning_time !== null) {
-            if (tokensPayload && typeof tokensPayload === 'object') {
-                tokensPayload = Object.assign({}, tokensPayload, { _reasoning_time: msg.reasoning_time });
-            } else {
-                tokensPayload = { _reasoning_time: msg.reasoning_time };
-            }
+        const rt = msg.reasoning_time;
+        const t = msg.tokens;
+        let tokensPayload = null;
+
+        if (typeof t === 'object' && t !== null) {
+            tokensPayload = Object.assign({}, t);
+        } else if (typeof t === 'number') {
+            tokensPayload = { total_tokens: t };
         }
+
+        if (rt !== undefined && rt !== null) {
+            if (!tokensPayload) tokensPayload = {};
+            tokensPayload._reasoning_time = rt;
+        }
+
         const payload = {
             user_id: USER_ID,
             conversation_id: currentConversationId,
@@ -1960,10 +1952,6 @@ async function saveMessageToCloud(msg) {
     }
 }
 
-/* ============================================================
-   【改动 2】loadMessagesFromCloud：
-   从 tokens._reasoning_time 中恢复 reasoning_time。
-   ============================================================ */
 async function loadMessagesFromCloud(targetNodeId = null) {
     if (!USER_ID || !currentConversationId) return { pathMsgs: [], leafId: null };
 
@@ -2037,7 +2025,6 @@ async function loadMessagesFromCloud(targetNodeId = null) {
         siblings.sort((a, b) => (a.sibling_order || 0) - (b.sibling_order || 0));
         const sibIndex = siblings.findIndex(x => x.local_id === m.local_id);
 
-        // 从 tokens 里恢复 reasoning_time（不依赖 SQL 字段）
         let restoredReasoningTime = null;
         if (m.tokens && typeof m.tokens === 'object' && m.tokens._reasoning_time !== undefined && m.tokens._reasoning_time !== null) {
             restoredReasoningTime = m.tokens._reasoning_time;
@@ -2064,10 +2051,17 @@ async function loadMessagesFromCloud(targetNodeId = null) {
     return { pathMsgs: finalMsgs, leafId: targetLeafId };
 }
 
+/* ============================================================
+   refreshCurrentChat：
+   加保护窗口 ignoreRefreshUntil，避免流刚结束瞬间被云端旧数据覆盖。
+   ============================================================ */
 async function refreshCurrentChat() {
     if (busy || !currentConversationId) return;
+    if (Date.now() < ignoreRefreshUntil) return;
     try {
         const res = await loadMessagesFromCloud(activeLeafId);
+        // 二次保护：await 期间状态可能变化
+        if (busy || Date.now() < ignoreRefreshUntil) return;
         msgs = res.pathMsgs;
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
@@ -2106,7 +2100,6 @@ function updateGlobalUI() {
   if ($('#tempVal')) $('#tempVal').textContent = Number(cfg.temperature).toFixed(2);
 }
 
-// 格式化日期用于分组
 function formatConvDate(dateStr) {
     if (!dateStr) return '更早';
     const d = new Date(dateStr);
@@ -2268,7 +2261,6 @@ function showContextMenuAt(clientX, clientY, conv, displayName) {
     menu.classList.add('show');
 }
 
-// 多选控制逻辑
 function toggleMultiSelectMode(enable) {
     isMultiSelectMode = enable;
     if (!enable) selectedConvs.clear();
@@ -2591,10 +2583,6 @@ function addBubble(role, content, index = null, tokens = null, reasoning = null,
       if (totalVal > 0) tokenHtml = `<span class="token-display" title="总 Token: ${totalVal}">T: ${totalVal}</span>`;
   }
 
-  /* ============================================================
-     【改动 3】addBubble 里恢复 reasoning_time 显示：
-     不论 0 秒还是多少秒都正确显示出来（只要不是 null/undefined）。
-     ============================================================ */
   let reasoningHtml = '';
   if (role === 'assistant' && reasoning) {
       const rt = (msgs[index] && msgs[index].reasoning_time !== undefined && msgs[index].reasoning_time !== null)
@@ -3046,10 +3034,12 @@ async function send(){
 }
 
 /* ============================================================
-   【改动 4】generateAIResponse：
-   · 开启深度思考：最终 reasoning_time 强制 ≥ 10 秒
-   · 关闭深度思考：保持真实秒数
-   · 最终 fallback 一定把 reasoning_time 写入 aiMsg，并回填到 msgs
+   generateAIResponse（重写）
+   关键点：
+   1) 真实计时：reasoningSeconds 只来自 setInterval，不做 Math.max 造假
+   2) 深度思考时，正文流被门控缓冲，等真实满 10 秒才放行渲染
+   3) 普通生成（send/continue）结束后不重建 msgBox，只更新数据与当前气泡
+   4) regenerate 场景保留原重建逻辑（用户主动换版本，重建可接受）
    ============================================================ */
 async function generateAIResponse(contextMsgs, parentId, agentId = null, replaceMsgIndex = null) {
   busy = true; setBusyUI(true);
@@ -3057,6 +3047,7 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
   const actualParentId = parentId !== undefined ? parentId : activeLeafId;
   const actualAgentId = agentId || currentAgentId;
   const deepThinkActive = $('#deepThinkBtn').classList.contains('active');
+  const MIN_THINK_SEC = 10;
 
   let insertBeforeNode = null;
   if (replaceMsgIndex !== null) {
@@ -3067,12 +3058,22 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
       }
   }
 
-  const bubble = addBubble('assistant', '', null, null, null, actualAgentId, insertBeforeNode);
+  // 创建 aiMsg 并 push 到 msgs，便于 addBubble 读到它
+  const aiMsg = {
+      role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null,
+      parent_id: actualParentId, sibling_order: Date.now(), agent_id: actualAgentId,
+      reasoning_time: null,
+      _sibTotal: 1, _sibIndex: 0, _siblings: []
+  };
+  const aiMsgIndex = msgs.length;
+  msgs.push(aiMsg);
+
+  const bubble = addBubble('assistant', '', aiMsgIndex, null, null, actualAgentId, insertBeforeNode);
   const contentEl = bubble.querySelector('.content');
   const contentWrap = bubble.querySelector('.content-wrap');
 
   const rBox = document.createElement('div');
-  rBox.className = 'reasoning-box'; 
+  rBox.className = 'reasoning-box';
   rBox.innerHTML = `
       <div class="reasoning-header thinking">
           <span class="reasoning-label">正在思考</span>
@@ -3086,128 +3087,176 @@ async function generateAIResponse(contextMsgs, parentId, agentId = null, replace
   const rLabel = rBox.querySelector('.reasoning-label');
   const rContent = rBox.querySelector('.reasoning-content');
   const rIcon = rBox.querySelector('.arrow-icon');
-
   rHeader.addEventListener('click', () => rBox.classList.toggle('collapsed'));
 
   contentEl.innerHTML = '<span class="cursor"></span>';
 
-  const aiMsg = { 
-      role: 'assistant', content: '', reasoning: '', local_id: generateId(), tokens: null, 
-      parent_id: actualParentId, sibling_order: Date.now(), agent_id: actualAgentId,
-      reasoning_time: null
-  };
-
+  // 先保存一条空消息（占位）
   await saveMessageToCloud(aiMsg);
 
-  let lastCloudSave = 0;
+  let lastCloudSave = Date.now();
   let reasoningSeconds = 0;
   let timerInterval = null;
   let hasStartedContent = false;
+  let contentGated = false;
+  let pendingContent = '';
+
+  function releaseGate(finalSec) {
+      contentGated = false;
+      if (!hasStartedContent) {
+          hasStartedContent = true;
+          rHeader.classList.remove('thinking');
+          rIcon.classList.remove('up-down');
+          rIcon.classList.add('right');
+          rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
+          rBox.classList.add('collapsed');
+          rLabel.textContent = `已思考（用时 ${finalSec} 秒）`;
+      }
+      if (pendingContent) {
+          contentEl.innerHTML = renderContent(pendingContent, true) + '<span class="cursor"></span>';
+          pendingContent = '';
+      }
+  }
+
+  // 真实计时器
+  timerInterval = setInterval(() => {
+      reasoningSeconds++;
+      if (contentGated && reasoningSeconds >= MIN_THINK_SEC) {
+          releaseGate(reasoningSeconds);
+      } else if (!hasStartedContent) {
+          rLabel.textContent = `正在思考 (${reasoningSeconds} 秒)`;
+      }
+  }, 1000);
 
   try {
-    const { full, fullReasoning, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText, partialReasoning) => {
-        if (partialReasoning) {
-            rBox.classList.remove('collapsed');
-            rContent.textContent = partialReasoning;
-            aiMsg.reasoning = partialReasoning;
-            if (!timerInterval && !hasStartedContent) {
-                timerInterval = setInterval(() => {
-                    reasoningSeconds++;
-                    rLabel.textContent = `正在思考 (${reasoningSeconds} 秒)`;
-                }, 1000);
-            }
-        }
-        if (partialText) {
-            if (!hasStartedContent) {
-                hasStartedContent = true;
-                if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-                rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
-                rHeader.classList.remove('thinking');
-                rIcon.classList.remove('up-down');
-                rIcon.classList.add('right');
-                rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
-                rBox.classList.add('collapsed');
-            }
-            contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
-            aiMsg.content = partialText;
-        }
-        if (Date.now() - lastCloudSave > 2000) {
-            saveMessageToCloud(aiMsg).catch(e => console.error(e));
-            lastCloudSave = Date.now();
-        }
-    });
+      const { full, fullReasoning, usage } = await fetchAIResponseStreaming(contextMsgs, (partialText, partialReasoning) => {
+          if (partialReasoning) {
+              rBox.classList.remove('collapsed');
+              rContent.textContent = partialReasoning;
+              aiMsg.reasoning = partialReasoning;
+          }
+          if (partialText) {
+              aiMsg.content = partialText;
 
-    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+              if (deepThinkActive && reasoningSeconds < MIN_THINK_SEC) {
+                  // 门控：缓冲内容，不渲染
+                  contentGated = true;
+                  pendingContent = partialText;
+              } else {
+                  if (!hasStartedContent) {
+                      hasStartedContent = true;
+                      rHeader.classList.remove('thinking');
+                      rIcon.classList.remove('up-down');
+                      rIcon.classList.add('right');
+                      rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
+                      rBox.classList.add('collapsed');
+                      rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
+                  }
+                  contentEl.innerHTML = renderContent(partialText, true) + '<span class="cursor"></span>';
+                  pendingContent = '';
+              }
+          }
+          if (Date.now() - lastCloudSave > 2000) {
+              saveMessageToCloud(aiMsg).catch(e => console.error(e));
+              lastCloudSave = Date.now();
+          }
+      });
 
-    // 【改动】根据深度思考开关决定最终展示秒数
-    if (deepThinkActive) {
-        reasoningSeconds = Math.max(reasoningSeconds, 10);
-    }
-
-    if (!hasStartedContent) {
-         rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
-         rHeader.classList.remove('thinking');
-         rIcon.classList.remove('up-down');
-         rIcon.classList.add('right');
-         rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
-         rBox.classList.add('collapsed');
-    } else {
-         // 如果正文已经开始输出，也把 label 更新为最终秒数（深度思考开启时会被抬到 10）
-         rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
-    }
-
-    if(full.trim()){
-      contentEl.innerHTML = renderContent(full, false);
-      aiMsg.content = full;
-      aiMsg.reasoning = fullReasoning;
-      aiMsg.tokens = usage ? usage.total_tokens : null;
-      aiMsg.reasoning_time = reasoningSeconds;
-      
-      if (usage && usage.total_tokens) {
-          const tokenSpan = document.createElement('span');
-          tokenSpan.className = 'token-display';
-          tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens}`;
-          tokenSpan.textContent = `T: ${usage.total_tokens}`;
-          bubble.querySelector('.msg-actions').appendChild(tokenSpan);
+      // 流结束
+      if (full) {
+          aiMsg.content = full;
+          aiMsg.reasoning = fullReasoning;
       }
-    } else if (!aiMsg.content) {
-        contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
-        aiMsg.content = '（模型返回了空内容）';
-        aiMsg.reasoning_time = reasoningSeconds;
-    }
-  } catch(err) {
-    if (timerInterval) clearInterval(timerInterval);
-    rHeader.classList.remove('thinking');
-    rIcon.classList.remove('up-down');
-    rIcon.classList.add('right');
-    rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
-    rBox.classList.add('collapsed');
-    rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
-    contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
-    if (!aiMsg.content) aiMsg.content = '（请求失败）';
-    // 失败场景也记录一下时长，方便复现时显示
-    aiMsg.reasoning_time = reasoningSeconds;
+
+      // 若门控未被满足（不到 10 秒），真实等待到 10 秒
+      if (contentGated) {
+          const remainingMs = Math.max(0, (MIN_THINK_SEC - reasoningSeconds) * 1000);
+          if (remainingMs > 0) {
+              contentEl.innerHTML = '<span class="muted">正在整理回答…</span>';
+              await new Promise(r => setTimeout(r, remainingMs + 80));
+          }
+          if (contentGated) {
+              releaseGate(Math.max(reasoningSeconds, MIN_THINK_SEC));
+          }
+      }
+
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+      const finalSeconds = reasoningSeconds;
+
+      // 最终 label
+      if (rLabel) {
+          rLabel.textContent = `已思考（用时 ${finalSeconds} 秒）`;
+          rHeader.classList.remove('thinking');
+          rIcon.classList.remove('up-down');
+          rIcon.classList.add('right');
+          rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
+          rBox.classList.add('collapsed');
+      }
+
+      if (full && full.trim()) {
+          contentEl.innerHTML = renderContent(full, false);
+          aiMsg.content = full;
+          aiMsg.reasoning = fullReasoning;
+          aiMsg.tokens = usage ? usage.total_tokens : null;
+          aiMsg.reasoning_time = finalSeconds;
+
+          if (usage && usage.total_tokens) {
+              const existing = bubble.querySelector('.token-display');
+              if (!existing) {
+                  const tokenSpan = document.createElement('span');
+                  tokenSpan.className = 'token-display';
+                  tokenSpan.title = `完成 Token: ${usage.completion_tokens || 0} / 总 Token: ${usage.total_tokens}`;
+                  tokenSpan.textContent = `T: ${usage.total_tokens}`;
+                  bubble.querySelector('.msg-actions').appendChild(tokenSpan);
+              }
+          }
+      } else if (!aiMsg.content) {
+          contentEl.innerHTML = '<span class="muted">（模型返回了空内容）</span>';
+          aiMsg.content = '（模型返回了空内容）';
+          aiMsg.reasoning_time = finalSeconds;
+      } else {
+          aiMsg.reasoning_time = finalSeconds;
+      }
+  } catch (err) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      rHeader.classList.remove('thinking');
+      rIcon.classList.remove('up-down');
+      rIcon.classList.add('right');
+      rIcon.innerHTML = '<path d="M9 18l6-6-6-6"></path>';
+      rBox.classList.add('collapsed');
+      rLabel.textContent = `已思考（用时 ${reasoningSeconds} 秒）`;
+      contentEl.innerHTML = renderContent(aiMsg.content || '', false) + '<div class="err">请求中断或失败：' + escapeHtml(err.message) + '</div>';
+      if (!aiMsg.content) aiMsg.content = '（请求失败）';
+      aiMsg.reasoning_time = reasoningSeconds;
   } finally {
-    try { await saveMessageToCloud(aiMsg); } catch(e) {}
-    
-    try {
-        const res = await loadMessagesFromCloud(aiMsg.local_id);
-        msgs = res.pathMsgs;
-        if (msgs.length > 0) {
-            const lastMsg = msgs[msgs.length - 1];
-            if (lastMsg.local_id === aiMsg.local_id) {
-                lastMsg.reasoning_time = reasoningSeconds;
-            }
-        }
-        activeLeafId = res.leafId;
-        msgBox.innerHTML = '';
-        msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
-    } catch (e) {
-        console.error("刷新分支树失败:", e);
-    }
-    
-    busy = false; setBusyUI(false);
-    scrollBottom(true);
+      // 最终保存（await 保证完成）
+      try { await saveMessageToCloud(aiMsg); } catch(e) {}
+
+      // 更新 active_leaf_id
+      activeLeafId = aiMsg.local_id;
+      try {
+          await supabaseClient.from('conversations').update({ active_leaf_id: activeLeafId }).eq('id', currentConversationId);
+      } catch(e) {}
+
+      // regenerate 场景：保持原重建逻辑
+      if (replaceMsgIndex !== null) {
+          try {
+              const res = await loadMessagesFromCloud(aiMsg.local_id);
+              msgs = res.pathMsgs;
+              activeLeafId = res.leafId;
+              msgBox.innerHTML = '';
+              msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+          } catch (e) {
+              console.error("刷新分支树失败:", e);
+          }
+      }
+
+      // 保护窗口：2 秒内忽略 realtime 刷新
+      ignoreRefreshUntil = Date.now() + 2000;
+
+      busy = false; setBusyUI(false);
+      scrollBottom(true);
   }
 }
 
@@ -3593,7 +3642,6 @@ function bindEvents(){
   if (hasBoundEvents) return;
   hasBoundEvents = true;
 
-  /* 侧边栏 */
   if($('#openSidebarBtn')) $('#openSidebarBtn').addEventListener('click', openSidebar);
   if($('#sidebarBackdrop')) $('#sidebarBackdrop').addEventListener('click', closeSidebar);
   if($('#openSettingsFromSidebar')) $('#openSettingsFromSidebar').addEventListener('click', () => {
@@ -3601,7 +3649,6 @@ function bindEvents(){
       openSettingsModal('global');
   });
 
-  /* 手势：屏幕左边缘右滑打开 */
   let touchStartX = 0, touchStartY = 0, dragging = false;
   document.addEventListener('touchstart', (e) => {
       if (e.touches.length !== 1) return;
@@ -3623,7 +3670,6 @@ function bindEvents(){
 
   document.addEventListener('touchend', () => { dragging = false; });
 
-  /* 侧栏内左滑关闭 */
   let sbStartX = 0;
   const sidebarEl = document.getElementById('sidebar');
   if (sidebarEl) {
@@ -3636,7 +3682,6 @@ function bindEvents(){
       }, { passive: true });
   }
 
-  // 菜单相关事件
   if($('#multiCancelBtn')) $('#multiCancelBtn').addEventListener('click', () => toggleMultiSelectMode(false));
   if($('#multiDeleteBtn')) $('#multiDeleteBtn').addEventListener('click', deleteSelectedConvs);
 
@@ -3680,7 +3725,6 @@ function bindEvents(){
       }
   });
 
-  /* API 历史记录下拉 */
   ['apiBase', 'apiKey'].forEach(field => {
       const btnId = field + 'HistoryBtn';
       const panelId = field + 'HistoryPanel';
@@ -3721,7 +3765,6 @@ function bindEvents(){
   $('#deepThinkBtn').addEventListener('click', function() { this.classList.toggle('active'); });
   $('#searchBtn').addEventListener('click', function() { this.classList.toggle('active'); });
 
-  /* 附件 */
   const attachBtn = $('#attachBtn');
   const attachMenu = $('#attachMenu');
   
@@ -3951,7 +3994,6 @@ function bindEvents(){
           msgBox.innerHTML = '';
           msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
       }
-      /* 全局保存 */
       cfg.apiBase = $('#apiBase').value.trim();
       cfg.apiKey = $('#apiKey').value.trim();
       cfg.model = $('#model').value.trim();
@@ -4044,7 +4086,6 @@ function bindEvents(){
   const addAccBtn = $('#addAccountBtn');
   if (addAccBtn) addAccBtn.addEventListener('click', addAccount);
 
-  /* ============ 悬浮球逻辑 ============ */
   initFloatingBall();
 }
 
@@ -4055,7 +4096,6 @@ function initFloatingBall() {
   
   if (!fabContainer || !fabBall || !fabMenu) return;
 
-  // 恢复上次保存的位置
   const savedPos = localStorage.getItem('rp_fab_pos');
   if (savedPos) {
     try {
@@ -4066,12 +4106,10 @@ function initFloatingBall() {
       fabContainer.style.top = Math.max(10, Math.min(pos.y, maxY)) + 'px';
     } catch(e) {}
   } else {
-    // 默认位置：右下角
     fabContainer.style.right = '20px';
     fabContainer.style.bottom = '120px';
   }
 
-  // 拖拽逻辑
   let isDragging = false;
   let hasMoved = false;
   let startX, startY, initialLeft, initialTop;
@@ -4133,15 +4171,13 @@ function initFloatingBall() {
       if (isShowing) {
         fabMenu.classList.remove('show');
       } else {
-        // 根据球的位置判断菜单是在上方还是下方显示
         if (rect.top < window.innerHeight / 2) {
           fabMenu.style.bottom = 'auto';
-          fabMenu.style.top = '65px'; // 下方
+          fabMenu.style.top = '65px';
         } else {
           fabMenu.style.top = 'auto';
-          fabMenu.style.bottom = '65px'; // 上方
+          fabMenu.style.bottom = '65px';
         }
-        // 处理横向位置，避免菜单超出屏幕
         if (rect.left < window.innerWidth / 2) {
             fabMenu.style.right = 'auto';
             fabMenu.style.left = '0';
@@ -4154,14 +4190,12 @@ function initFloatingBall() {
     }
   });
 
-  // 点击外部关闭菜单
   document.addEventListener('click', (e) => {
     if (!fabContainer.contains(e.target)) {
       fabMenu.classList.remove('show');
     }
   });
 
-  // 窗口大小变化限制边界
   window.addEventListener('resize', () => {
     const rect = fabContainer.getBoundingClientRect();
     const maxX = window.innerWidth - fabContainer.offsetWidth;
@@ -4170,7 +4204,6 @@ function initFloatingBall() {
     if (rect.top > maxY) fabContainer.style.top = maxY + 'px';
   });
 
-  // 绑定菜单点击事件 —— 仅保留「账号」
   document.getElementById('fab-account').addEventListener('click', () => {
     fabMenu.classList.remove('show');
     if (typeof saveCurrentAccountToCache === 'function') saveCurrentAccountToCache();
@@ -4427,7 +4460,6 @@ async function loadUserData() {
   await fetchGlobalSettings(); 
   await checkFeatureFlags();
 
-  // 更新内测徽章 & 全局设置 Tab 锁状态
   if ($('#betaBadge')) {
       if (isBetaUser) {
           $('#betaBadge').style.display = 'inline-block';
@@ -4446,7 +4478,6 @@ async function loadUserData() {
   conversationsCache = convs;
   renderConversationList(convs);
 
-  /* 自动打开上次会话或第一个会话 */
   await autoOpenLastConversation();
 
   setupRealtimeListener();
