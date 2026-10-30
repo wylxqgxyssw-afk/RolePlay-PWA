@@ -571,7 +571,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
         <label>指令</label>
         <textarea id="modalCharPrompt" rows="10" spellcheck="false" placeholder="请在这里输入角色设定、世界观、说话风格等指令..."></textarea>
       </div>
-      <div style="font-size: calc(12px * var(--font-scale)); color: var(--muted); padding: 6px 4px 0; line-height: 1.6;">
+      <div id="roleTabTip" style="font-size: calc(12px * var(--font-scale)); color: var(--muted); padding: 6px 4px 0; line-height: 1.6;">
         提示：角色名、头像、开场白等请到「全局设置」中修改。
       </div>
     </div>
@@ -1988,7 +1988,7 @@ async function deleteSelectedConvs() {
         const c = conversationsCache.find(x => x.id === id);
         return c && !c.is_system_fixed;
     });
-    if (ids.length === 0) { alert('选中的都是系统固定对话，不可删除'); return; }
+      if (ids.length === 0) { alert('选中的都是系统固定对话，不可删除'); return; }
     if (!confirm(`确定要删除选中的 ${ids.length} 个会话吗？此操作不可恢复。`)) return;
     const btn = document.getElementById('multiDeleteBtn');
     btn.textContent = '删除中...';
@@ -4143,6 +4143,38 @@ async function init() {
   });
 }
 
+// ============================================================
+// ★ 新增：内测号（对外ID为 nc 开头）专属布局
+//   1. 收起悬浮球（“账号”入口已整合进设置面板）
+//   2. 把“账号”卡片从「全局设置」移到「当前角色」，置于接口配置上方
+//   普通号（纯数字ID）直接 return，完全保持原样
+// ============================================================
+function applyBetaAccountLayout() {
+    const isBetaAccount = /^nc\d+$/i.test(currentPublicUserId || '');
+    if (!isBetaAccount) return;
+
+    // 1. 收起悬浮球
+    const fabContainer = document.getElementById('floating-ball-container');
+    if (fabContainer) fabContainer.style.display = 'none';
+
+    // 2. 账号卡片前移到「当前角色」页（接口配置上方）
+    const accountBtn = document.getElementById('openAccountBtn');
+    const roleTab = document.getElementById('settingsTabRole');
+    if (accountBtn && roleTab) {
+        const apiGroup = roleTab.querySelector('.settings-group');
+        if (apiGroup) {
+            accountBtn.style.marginBottom = '14px';
+            roleTab.insertBefore(accountBtn, apiGroup);
+        }
+    }
+
+    // 3. 同步更新提示文案
+    const tip = document.getElementById('roleTabTip');
+    if (tip) {
+        tip.innerHTML = '提示：账号、角色名、头像、开场白等请在本页或「全局设置」中修改。';
+    }
+}
+
 async function loadUserData() {
   if (!USER_ID || currentLoadedUserId === USER_ID) return;
   currentLoadedUserId = USER_ID;
@@ -4158,7 +4190,7 @@ async function loadUserData() {
           // 如果查不到，说明是新注册的，前端自动补一个
           const { data: seqData } = await supabaseClient.from('public_id_seq').select('last_value').single();
           const nextSeq = (seqData?.last_value || 1) + 1;
-        const newPid = '1' + String(nextSeq).padStart(4, '0');
+          const newPid = '1' + String(nextSeq).padStart(4, '0');
           
           await supabaseClient.from('profiles').insert({ 
               id: USER_ID, 
@@ -4174,6 +4206,9 @@ async function loadUserData() {
       console.warn('获取用户公开ID失败', e);
       currentPublicUserId = '未分配';
   }
+
+  // ★ 新增：内测号专属布局（nc 开头），普通号不触发任何变化
+  applyBetaAccountLayout();
 
   await fetchGlobalSettings();
   await checkFeatureFlags();
