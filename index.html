@@ -4150,31 +4150,25 @@ async function loadUserData() {
   updateGlobalUI();
   bindEvents();
   
-  // 拉取对外展示的用户ID
+  // 拉取对外展示的用户ID（带自愈逻辑）
   try {
-    // 新代码（带自愈，绝对不会重复）
-let { data: profile } = await supabaseClient.from('profiles').select('public_user_id').eq('id', USER_ID).maybeSingle();
+      let { data: profile } = await supabaseClient.from('profiles').select('public_user_id').eq('id', USER_ID).maybeSingle();
 
-// 如果查不到，说明是新注册的，前端自动给他补一个（老号有数据，绝不会走这里，不会重复）
-if (!profile) {
-    // 获取当前序号并生成新ID
-    const { data: seqData } = await supabaseClient.from('public_id_seq').select('last_value').single();
-    const nextSeq = (seqData?.last_value || 1) + 1;
-    const newPid = 'k1' + String(nextSeq).padStart(4, '0');
-    
-    // 插入数据库
-    await supabaseClient.from('profiles').insert({ 
-        id: USER_ID, 
-        public_user_id: newPid, 
-        public_id_seq: nextSeq, 
-        account_type: 'user' 
-    });
-    currentPublicUserId = newPid;
-} else {
-    currentPublicUserId = profile.public_user_id;
-}
+      if (!profile) {
+          // 如果查不到，说明是新注册的，前端自动补一个
+          const { data: seqData } = await supabaseClient.from('public_id_seq').select('last_value').single();
+          const nextSeq = (seqData?.last_value || 1) + 1;
+          const newPid = 'k1' + String(nextSeq).padStart(4, '0');
+          
+          await supabaseClient.from('profiles').insert({ 
+              id: USER_ID, 
+              public_user_id: newPid, 
+              public_id_seq: nextSeq, 
+              account_type: 'user' 
+          });
+          currentPublicUserId = newPid;
       } else {
-          currentPublicUserId = '未分配';
+          currentPublicUserId = profile.public_user_id;
       }
   } catch(e) {
       console.warn('获取用户公开ID失败', e);
