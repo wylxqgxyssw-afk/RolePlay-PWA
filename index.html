@@ -1391,7 +1391,7 @@ async function checkFeatureFlags() {
             } else if (typeof data.beta_user_ids === 'string') {
                 try { whitelist = JSON.parse(data.beta_user_ids); } catch(e){}
             }
-            const isInWhitelist = whitelist.includes(USER_ID);
+           const isInWhitelist = whitelist.includes(userId) || /^nc\d+$/i.test(currentPublicUserId || '');
             isBetaUser = isInWhitelist;
             isFeatureEnabled = data.is_global_release === true || isInWhitelist;
             if (isFeatureEnabled) {
