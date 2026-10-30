@@ -4158,7 +4158,7 @@ async function loadUserData() {
           // 如果查不到，说明是新注册的，前端自动补一个
           const { data: seqData } = await supabaseClient.from('public_id_seq').select('last_value').single();
           const nextSeq = (seqData?.last_value || 1) + 1;
-          const newPid = 'k1' + String(nextSeq).padStart(4, '0');
+        const newPid = '1' + String(nextSeq).padStart(4, '0');
           
           await supabaseClient.from('profiles').insert({ 
               id: USER_ID, 
