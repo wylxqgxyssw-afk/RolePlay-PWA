@@ -1447,8 +1447,8 @@ async function enforceVersionGate(userId) {
     if (Array.isArray(data.beta_user_ids)) whitelist = data.beta_user_ids;
     else if (typeof data.beta_user_ids === 'string') {
       try { whitelist = JSON.parse(data.beta_user_ids); } catch(e){}
-    }
-    const isInWhitelist = whitelist.includes(userId);
+    }    // 只要在名单里，或者公开ID是以 nc 开头，都算命中测试范围
+    const isInWhitelist = whitelist.includes(userId) || /^nc\d+$/i.test(currentPublicUserId || '');
     const scope = data.min_version_scope || 'beta';
 
     const applies = (scope === 'all') || (scope === 'beta' && isInWhitelist);
