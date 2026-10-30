@@ -712,7 +712,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
       </div>
 
       <div style="text-align:center; padding:20px 0 6px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">2.3.2</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">1.0.2</span></span>
       </div>
     </div>
 
@@ -797,7 +797,20 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
 </div>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-const CURRENT_VERSION = '2.3.2';
+const CURRENT_VERSION = '1.0.2';
+
+// 版本号逐段按数字比较，"2.3.10" > "2.3.9" 才不会被字符串比较坑到
+function compareVersion(a, b) {
+  const pa = String(a || '0').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b || '0').split('.').map(n => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
+}
 
 const katexExt = {
   extensions: [
@@ -1395,6 +1408,63 @@ async function checkFeatureFlags() {
     }
 }
 
+// ====== 版本门禁 ======
+// 全屏锁死遮罩，只有"当前版本 < 云端最低版本"且命中生效范围时才会显示
+function showVersionLockOverlay(current, required) {
+  if (document.getElementById('version-lock-overlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'version-lock-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#121212;color:#ececec;' +
+    'display:flex;align-items:center;justify-content:center;flex-direction:column;padding:32px;' +
+    'text-align:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;';
+  ov.innerHTML =
+    '<div style="font-size:40px;margin-bottom:16px;">🔒</div>' +
+    '<div style="font-size:18px;font-weight:600;margin-bottom:12px;">版本已停用</div>' +
+    '<div style="font-size:14px;color:#9e9e9e;line-height:1.75;max-width:320px;">' +
+      '当前版本 <b style="color:#4d6bfe;">v' + escapeHtml(current) + '</b> 已无法使用。<br>' +
+      '请向创作者获取最新版本（需 <b style="color:#4d6bfe;">v' + escapeHtml(required) + '</b> 或更高）。' +
+    '</div>' +
+    '<div style="font-size:12px;color:#6b7280;margin-top:20px;max-width:320px;line-height:1.6;">' +
+      '若已拿到新版仍看到此页，请关闭页面重新打开（或清除浏览器缓存）。' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+
+// 返回 true = 放行；false = 已锁死，调用方必须停止后续加载
+// 查询失败 → 放行（弱网优先可用性），这是明确选择的策略
+async function enforceVersionGate(userId) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('app_config')
+      .select('beta_user_ids, min_version, min_version_scope')
+      .eq('id', 'feature_flags')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return true;
+    if (!data.min_version || data.min_version === '0.0.0') return true;
+
+    let whitelist = [];
+    if (Array.isArray(data.beta_user_ids)) whitelist = data.beta_user_ids;
+    else if (typeof data.beta_user_ids === 'string') {
+      try { whitelist = JSON.parse(data.beta_user_ids); } catch(e){}
+    }
+    const isInWhitelist = whitelist.includes(userId);
+    const scope = data.min_version_scope || 'beta';
+
+    const applies = (scope === 'all') || (scope === 'beta' && isInWhitelist);
+    if (!applies) return true;
+
+    if (compareVersion(CURRENT_VERSION, data.min_version) < 0) {
+      showVersionLockOverlay(CURRENT_VERSION, data.min_version);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('版本门禁检查失败，放行:', e);
+    return true;
+  }
+}
+
 async function fetchGlobalSettings() {
     if (!USER_ID) return false;
     try {
@@ -1754,7 +1824,8 @@ async function refreshCurrentChat() {
         msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
         scrollBottom(true);
-    } catch (e) { console.warn('实时刷新失败:', e); }
+    } catch (e) { console.warn('
+                                   } catch (e) { console.warn('实时刷新失败:', e); }
 }
 
 let realtimeChannel = null;
@@ -4119,6 +4190,11 @@ async function init() {
     upsertAccountFromSession(session);
     authOverlay.classList.add('hidden');
     await new Promise(r => setTimeout(r, 80));
+
+    // ★ 版本门禁：未通过则锁死，不发请求、不渲染
+    const passed = await enforceVersionGate(USER_ID);
+    if (!passed) return;
+
     await loadUserData();
   } else {
     authOverlay.classList.remove('hidden');
@@ -4138,7 +4214,8 @@ async function init() {
     } else if (session && session.user && USER_ID !== session.user.id) {
       USER_ID = session.user.id;
       authOverlay.classList.add('hidden');
-      loadUserData();
+      // ★ 切号/重登也必须过门禁，否则可绕过
+      enforceVersionGate(USER_ID).then(ok => { if (ok) loadUserData(); });
     }
   });
 }
