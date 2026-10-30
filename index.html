@@ -615,9 +615,13 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
             <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
             <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
             <!-- 新增：用户 ID 展示 -->
-            <div style="font-size:calc(12px * var(--font-scale)); color:var(--accent); margin-top:4px;" id="accountMiniPublicId">
-              ID: 加载中...
-            </div>
+           <!-- 修改后：在 ID 下方增加版本号显示 -->
+<div style="font-size:calc(12px * var(--font-scale)); color:var(--accent); margin-top:4px;" id="accountMiniPublicId">
+  ID: 加载中...
+</div>
+<div style="font-size:calc(12px * var(--font-scale)); color:var(--muted); margin-top:2px;">
+  当前版本：v<span id="accountMiniVersionDisplay">1.0.2</span>
+</div>
           </div>
         </div>
         <span class="arrow">›</span>
