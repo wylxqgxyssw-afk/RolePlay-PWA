@@ -1823,9 +1823,8 @@ async function refreshCurrentChat() {
         activeLeafId = res.leafId;
         msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
-        scrollBottom(true);
-    } catch (e) { console.warn('
-                                   } catch (e) { console.warn('实时刷新失败:', e); }
+                scrollBottom(true);
+    } catch (e) { console.warn('实时刷新失败:', e); }
 }
 
 let realtimeChannel = null;
