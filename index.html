@@ -850,6 +850,11 @@ const katexExt = {
 document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('appVersionDisplay');
     if (el) el.textContent = CURRENT_VERSION;
+    
+    // ★ 新增：同步版本号到 ID 下方
+    const miniEl = document.getElementById('accountMiniVersionDisplay');
+    if (miniEl) miniEl.textContent = CURRENT_VERSION;
+
     if (window.marked && window.katex) { marked.use(katexExt); }
 });
 
