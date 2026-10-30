@@ -2,7 +2,7 @@
 
 // 【极其重要】每次更新前端代码（index.html），必须把这里的 v1.0.1 改成 v1.0.2、v1.0.3...
 // 必须与 index.html 里的 CURRENT_VERSION 保持一致！
-const CACHE_NAME = 'roleplay-cache-v1.0.1'; 
+const CACHE_NAME = 'roleplay-cache-v1.0.2'; 
 
 const ASSETS_TO_CACHE = [
   './',
