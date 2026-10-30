@@ -576,7 +576,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
       </div>
     </div>
 
-    <!-- 美化 Tab（新增） -->
+    <!-- 美化 Tab -->
     <div class="settings-body hidden" id="settingsTabBeautify">
       <div class="settings-group">
         <div class="settings-group-title">主题</div>
@@ -614,6 +614,10 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
           <div style="text-align:left;">
             <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
             <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
+            <!-- 新增：用户 ID 展示 -->
+            <div style="font-size:calc(12px * var(--font-scale)); color:var(--accent); margin-top:4px;" id="accountMiniPublicId">
+              ID: 加载中...
+            </div>
           </div>
         </div>
         <span class="arrow">›</span>
@@ -689,7 +693,6 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
         <textarea id="userPrompt" rows="3" spellcheck="false"></textarea>
       </div>
 
-      <!-- 外观设置：只保留隐藏头像和名字（其他已移到「美化」Tab） -->
       <div class="settings-group">
         <div class="settings-group-title">外观设置</div>
         <div class="settings-row" style="margin-top:0;">
@@ -729,7 +732,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
       <div class="vip-plan" data-plan="季卡" data-amount="80"><div class="p-name">季卡</div><div class="p-price">¥80<span>/季</span></div></div>
       <div class="vip-plan" data-plan="年卡" data-amount="258"><div class="p-name">年卡</div><div class="p-price">¥258<span>/年</span></div></div>
     </div>
-    <div class="qr-tip">请使用微信/支付宝扫码支付 <strong id="payAmountText">¥30</strong><br><span style="font-size:calc(11px * var(--font-scale)); color:var(--danger);">支付时请在备注里填写你的账号ID</span></div>
+    <div class="qr-tip">请使用微信/支付宝扫码支付 <strong id="payAmountText">¥30</strong><br><span style="font-size:calc(11px * var(--font-scale)); color:var(--danger);">支付时请在备注里填写你的账号ID：<strong id="vipUserPublicId">加载中...</strong></span></div>
     <div class="qr-container"><img src="pay.png" alt="收款码"></div>
     <div class="payment-input-group">
       <input type="text" id="paymentNoteInput" placeholder="请输入付款单号后4位/填写的备注">
@@ -742,6 +745,22 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
 <div id="admin-modal">
   <div class="vip-card" style="max-width: 600px;">
     <h3 style="color:var(--text);">📋 订单审核台</h3>
+    
+    <!-- 新增：管理员按ID直接开通面板 -->
+    <div class="settings-group" style="margin-top:10px; background:var(--bg);">
+      <div class="settings-group-title">手动按 ID 开通</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <input type="text" id="adminManualUid" placeholder="输入 k10001 等" style="flex:1;">
+        <select id="adminManualPlan" class="btn" style="width:auto; padding:9px 11px;">
+          <option value="月卡">月卡</option>
+          <option value="季卡">季卡</option>
+          <option value="年卡">年卡</option>
+        </select>
+        <button class="btn primary" onclick="adminManualAddVip()">开通</button>
+      </div>
+      <div id="adminSearchResult" style="font-size:12px; color:var(--muted); margin-top:4px; display:none;"></div>
+    </div>
+
     <div id="adminOrderList" style="flex:1; overflow-y:auto; min-height:100px; margin-bottom:16px;"></div>
     <div class="actions" style="display:flex; justify-content:flex-end;"><button class="btn" id="closeAdminModal">关闭</button></div>
   </div>
@@ -825,6 +844,7 @@ const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
 const inputEl = $('#input');
 let USER_ID = null;
+let currentPublicUserId = ''; // 新增：对外展示的用户ID
 let isBetaUser = false;
 let isFeatureEnabled = false;
 let currentConversationId = null;
@@ -1173,7 +1193,10 @@ function setupThemeUI(){
       });
   });
 
-  if($('#goToVip')) $('#goToVip').addEventListener('click', () => $('#vip-modal').classList.add('show'));
+  if($('#goToVip')) $('#goToVip').addEventListener('click', () => {
+      $('#vipUserPublicId').textContent = currentPublicUserId || '未获取到';
+      $('#vip-modal').classList.add('show');
+  });
   if($('#closeVipModal')) $('#closeVipModal').addEventListener('click', () => $('#vip-modal').classList.remove('show'));
 
   document.querySelectorAll('.vip-plan').forEach(plan => {
@@ -3034,6 +3057,11 @@ async function openAdminPanel() {
     const listBox = $('#adminOrderList');
     listBox.innerHTML = '<div class="muted" style="text-align:center;">加载中...</div>';
     $('#admin-modal').classList.add('show');
+    
+    // 清空手动输入框
+    if ($('#adminManualUid')) $('#adminManualUid').value = '';
+    if ($('#adminSearchResult')) $('#adminSearchResult').style.display = 'none';
+
     try {
         const { data: orders, error } = await supabaseClient.from('vip_orders')
             .select('*').eq('status', 'pending').order('created_at', { ascending: true });
@@ -3049,7 +3077,7 @@ async function openAdminPanel() {
             div.innerHTML = `
                 <div class="admin-order-info">
                     <strong>${o.plan_name} - ¥${o.amount}</strong>
-                    <span>UID: ${o.user_id}</span>
+                    <span>UUID: ${o.user_id}</span>
                     <span>备注: <strong>${escapeHtml(o.payment_note)}</strong></span>
                     <span>时间: ${new Date(o.created_at).toLocaleString()}</span>
                 </div>
@@ -3087,6 +3115,70 @@ window.approveOrder = async function(orderId, userId, planName) {
             renderConversationList(convs);
         }
     } catch (e) { alert('操作失败: ' + e.message); }
+};
+
+// 新增：管理员手动按ID开通
+window.adminManualAddVip = async function() {
+    const inputId = $('#adminManualUid').value.trim();
+    const plan = $('#adminManualPlan').value;
+    const resBox = $('#adminSearchResult');
+    
+    if (!inputId) { alert('请输入要开通的ID'); return; }
+    
+    resBox.style.display = 'block';
+    resBox.textContent = '正在查找用户...';
+    resBox.style.color = 'var(--muted)';
+
+    try {
+        // 1. 通过 public_user_id 查 UUID
+        const { data: profile, error: pError } = await supabaseClient
+            .from('profiles')
+            .select('id, email')
+            .eq('public_user_id', inputId)
+            .single();
+            
+        if (pError || !profile) {
+            resBox.textContent = '❌ 未找到该用户ID';
+            resBox.style.color = 'var(--danger)';
+            return;
+        }
+
+        const uuid = profile.id;
+        resBox.textContent = `找到用户: ${profile.email || '无邮箱'} (${uuid})。正在开通...`;
+
+        // 2. 计算日期并开通
+        let days = 30;
+        if (plan === '季卡') days = 90;
+        if (plan === '年卡') days = 365;
+        const expireDate = new Date();
+        expireDate.setDate(expireDate.getDate() + days);
+
+        const { error: updateError } = await supabaseClient.from('agent_settings')
+            .upsert({ 
+                id: uuid, 
+                is_vip: true, 
+                vip_expire_at: expireDate.toISOString() 
+            }, { onConflict: 'id' });
+
+        if (updateError) throw updateError;
+
+        resBox.textContent = `✅ 成功为用户 ${inputId} 开通了 ${plan}，到期时间: ${expireDate.toLocaleDateString()}`;
+        resBox.style.color = 'var(--success)';
+        $('#adminManualUid').value = ''; // 清空
+        
+        // 如果开的是自己的号，刷新前端状态
+        if (uuid === USER_ID) {
+            currentVipStatus.is_vip = true;
+            currentVipStatus.expire_at = expireDate.toISOString();
+            msgBox.innerHTML = '';
+            msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
+        }
+
+    } catch (e) {
+        console.error(e);
+        resBox.textContent = '❌ 操作失败: ' + e.message;
+        resBox.style.color = 'var(--danger)';
+    }
 };
 
 function renderPendingFiles() {
@@ -3858,8 +3950,16 @@ function saveCurrentAccountToCache() {
 function renderAccountMini() {
   const emailEl = $('#accountMiniEmail');
   const avatarEl = $('#accountMiniAvatar');
+  const pidEl = $('#accountMiniPublicId');
   if (!emailEl || !avatarEl) return;
+  
   emailEl.textContent = currentUserEmail || USER_ID || '未登录';
+  
+  if (pidEl) {
+      pidEl.innerHTML = `ID: <strong>${currentPublicUserId || '未分配'}</strong> 
+        <span style="margin-left:6px; font-size:10px; color:var(--accent); cursor:pointer;" onclick="navigator.clipboard.writeText('${currentPublicUserId}');alert('已复制ID: ${currentPublicUserId}')">复制</span>`;
+  }
+
   if (globalDefaultUserAvatar) {
     avatarEl.innerHTML = `<img src="${globalDefaultUserAvatar}" alt="avatar" style="width:100%;height:100%;object-fit:cover;">`;
   } else {
@@ -3880,8 +3980,10 @@ function renderAccountModal() {
     <div class="acc-avatar">${avatarHtml}</div>
     <div style="flex:1; text-align:left; margin-left:10px; min-width:0;">
       <div style="font-size:calc(13px * var(--font-scale)); font-weight:600; word-break:break-all;">${escapeHtml(currentUserEmail || USER_ID || '未登录')}</div>
+      <div style="font-size:calc(12px * var(--font-scale)); color:var(--accent); margin:2px 0;">ID: <strong>${currentPublicUserId || '未分配'}</strong></div>
       <div style="font-size:calc(11px * var(--font-scale)); color:var(--muted);">当前正在使用</div>
     </div>
+    <button class="btn sm" onclick="navigator.clipboard.writeText('${currentPublicUserId}');alert('已复制ID: ${currentPublicUserId}')" style="padding:4px 8px; font-size:11px;">复制ID</button>
   `;
 
   listBox.innerHTML = '';
@@ -4047,6 +4149,20 @@ async function loadUserData() {
   cfg = loadCfg();
   updateGlobalUI();
   bindEvents();
+  
+  // 拉取对外展示的用户ID
+  try {
+      const { data: profile } = await supabaseClient.from('profiles').select('public_user_id').eq('id', USER_ID).single();
+      if (profile) {
+          currentPublicUserId = profile.public_user_id;
+      } else {
+          currentPublicUserId = '未分配';
+      }
+  } catch(e) {
+      console.warn('获取用户公开ID失败', e);
+      currentPublicUserId = '未分配';
+  }
+
   await fetchGlobalSettings();
   await checkFeatureFlags();
 
