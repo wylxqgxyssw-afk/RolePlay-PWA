@@ -712,7 +712,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
       </div>
 
       <div style="text-align:center; padding:20px 0 6px; color:var(--muted); font-size:calc(11.5px * var(--font-scale));">
-        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">1.0.1</span></span>
+        <span id="appVersionTrigger" style="cursor:pointer;">RolePlay · v<span id="appVersionDisplay">1.0.2</span></span>
       </div>
     </div>
 
@@ -797,7 +797,7 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
 </div>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-const CURRENT_VERSION = '1.0.1';
+const CURRENT_VERSION = '1.0.2';
 
 // 版本号逐段按数字比较，"2.3.10" > "2.3.9" 才不会被字符串比较坑到
 function compareVersion(a, b) {
@@ -1824,10 +1824,10 @@ async function refreshCurrentChat() {
         msgBox.innerHTML = '';
         msgs.forEach((m, i) => addBubble(m.role, m.content, i, m.tokens, m.reasoning, m.agent_id));
         scrollBottom(true);
-    } catch (e) { console.warn('实时刷新失败:', e); }
+    } catch (e) { console.warn('
+                                   } catch (e) { console.warn('实时刷新失败:', e); }
 }
 
-let real
 let realtimeChannel = null;
 function setupRealtimeListener() {
     if (!USER_ID) return;
