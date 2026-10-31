@@ -614,8 +614,6 @@ html[data-theme="dark"] .floating-ball { background: rgba(40, 40, 40, 0.9); bord
           <div style="text-align:left;">
             <div style="font-weight:600; font-size:calc(14px * var(--font-scale));">账号</div>
             <div id="accountMiniEmail" style="font-size:calc(12px * var(--font-scale)); color:var(--muted); word-break:break-all;">未登录</div>
-            <!-- 新增：用户 ID 展示 -->
-           <!-- 修改后：在 ID 下方增加版本号显示 -->
 <div style="font-size:calc(12px * var(--font-scale)); color:var(--accent); margin-top:4px;" id="accountMiniPublicId">
   ID: 加载中...
 </div>
@@ -1735,7 +1733,7 @@ async function saveMessageToCloud(msg) {
         if (error) {
             console.error('❌ 消息同步失败:', error.message);
             updateCloudStatusUI(false);
-            throw new Error(error.message);
+                       throw new Error(error.message);
         } else updateCloudStatusUI(true);
     } catch (e) {
         console.error('❌ 消息同步异常:', e);
@@ -4037,9 +4035,10 @@ async function saveAccounts(list) {
     }
   } catch(e) {}
 }
+
 async function upsertAccountFromSession(session) {
   if (!session || !session.user) return;
- const list = await getAccounts();
+  const list = await getAccounts();
   const uid = session.user.id;
   const existing = list.find(a => a.uid === uid);
   const snapshot = {
@@ -4058,7 +4057,7 @@ async function upsertAccountFromSession(session) {
   };
   if (existing) Object.assign(existing, entry);
   else list.push(entry);
-  saveAccounts(list);
+  await saveAccounts(list);
 }
 
 function saveCurrentAccountToCache() {
@@ -4112,7 +4111,7 @@ async function renderAccountModal() {
   `;
 
   listBox.innerHTML = '';
-const others = (await getAccounts()).filter(a => a.uid !== USER_ID);
+  const others = (await getAccounts()).filter(a => a.uid !== USER_ID);
   if (others.length === 0) {
     listBox.innerHTML = '<div class="muted" style="font-size:calc(12px * var(--font-scale)); padding:8px 0;">暂无其他已保存账号，点击下方「添加账号」登录。</div>';
     return;
@@ -4134,11 +4133,11 @@ const others = (await getAccounts()).filter(a => a.uid !== USER_ID);
   });
 }
 
-function renderSavedAccountsInAuth() {
+async function renderSavedAccountsInAuth() {
   const box = $('#authSavedAccounts');
   const listBox = $('#authSavedList');
   if (!box || !listBox) return;
-  const list = getAccounts();
+  const list = await getAccounts();
   if (list.length === 0) { box.style.display = 'none'; return; }
   box.style.display = 'block';
   listBox.innerHTML = '';
@@ -4158,25 +4157,31 @@ function renderSavedAccountsInAuth() {
   });
 }
 
-function switchAccount(uid) {
+async function switchAccount(uid) {
   if (uid === USER_ID) { alert('已经是当前账号了'); return; }
   saveCurrentAccountToCache();
-  const target = getAccounts().find(a => a.uid === uid);
+  const list = await getAccounts();
+  const target = list.find(a => a.uid === uid);
   if (!target || !target.session) { alert('账号信息缺失，请重新登录该账号'); return; }
   const key = getSupabaseStorageKey();
   if (!key) { alert('无法定位登录存储，请刷新页面重试'); return; }
   try {
     localStorage.setItem(key, JSON.stringify(target.session));
+    // 同步到底层保险柜
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+        await window.Capacitor.Plugins.Preferences.set({ key: key, value: JSON.stringify(target.session) });
+    }
     window.location.reload();
   } catch(e) {
     alert('切换账号失败：' + (e.message || e));
   }
 }
 
-function removeAccount(uid) {
+async function removeAccount(uid) {
   if (uid === USER_ID) { alert('不能移除当前正在使用的账号'); return; }
   if (!confirm('确定要从此设备移除该账号吗？（不会注销账号，只是清除本机保存）')) return;
-  saveAccounts(getAccounts().filter(a => a.uid !== uid));
+  const list = await getAccounts();
+  await saveAccounts(list.filter(a => a.uid !== uid));
   renderAccountModal();
 }
 
