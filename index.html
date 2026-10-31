@@ -4037,9 +4037,9 @@ async function saveAccounts(list) {
     }
   } catch(e) {}
 }
-function upsertAccountFromSession(session) {
+async function upsertAccountFromSession(session) {
   if (!session || !session.user) return;
-  const list = getAccounts();
+ const list = await getAccounts();
   const uid = session.user.id;
   const existing = list.find(a => a.uid === uid);
   const snapshot = {
@@ -4092,7 +4092,7 @@ function renderAccountMini() {
   }
 }
 
-function renderAccountModal() {
+async function renderAccountModal() {
   const currentBox = $('#currentAccountBox');
   const listBox = $('#accountListBox');
   if (!currentBox || !listBox) return;
@@ -4112,7 +4112,7 @@ function renderAccountModal() {
   `;
 
   listBox.innerHTML = '';
-  const others = getAccounts().filter(a => a.uid !== USER_ID);
+const others = (await getAccounts()).filter(a => a.uid !== USER_ID);
   if (others.length === 0) {
     listBox.innerHTML = '<div class="muted" style="font-size:calc(12px * var(--font-scale)); padding:8px 0;">暂无其他已保存账号，点击下方「添加账号」登录。</div>';
     return;
