@@ -860,7 +860,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 const SUPABASE_URL = 'https://bpkipmnvvrjsfckzhfrl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_K5hZV5mkiX0GHchcYIr7dQ_Z7ICn1mu';
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ================= 数据双保险桥梁 =================
+// 1. 定义原生存储适配器，优先使用底层存储，降级使用 localStorage
+const nativeStorage = {
+  getItem: async (key) => {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+      const { value } = await window.Capacitor.Plugins.Preferences.get({ key });
+      return value;
+    }
+    return localStorage.getItem(key);
+  },
+  setItem: async (key, value) => {
+    localStorage.setItem(key, value);
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+      await window.Capacitor.Plugins.Preferences.set({ key, value });
+    }
+  },
+  removeItem: async (key) => {
+    localStorage.removeItem(key);
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+      await window.Capacitor.Plugins.Preferences.remove({ key });
+    }
+  }
+};
+
+// 2. 将 Supabase 的登录态存入底层保险柜
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: nativeStorage, // 替换掉默认的 localStorage
+    persistSession: true,   // 持久化 Session
+    autoRefreshToken: true  // 自动刷新 Token
+  }
+});
+// ===================================================
 
 const $ = s => document.querySelector(s);
 const msgBox = $('#messages');
