@@ -4016,13 +4016,27 @@ function getSupabaseStorageKey() {
   return m ? `sb-${m[1]}-auth-token` : null;
 }
 
-function getAccounts() {
-  try { return JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'); } catch(e) { return []; }
-}
-function saveAccounts(list) {
-  try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list)); } catch(e) {}
+async function getAccounts() {
+  try { 
+    let data = null;
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+      const { value } = await window.Capacitor.Plugins.Preferences.get({ key: ACCOUNTS_KEY });
+      data = value;
+    }
+    if (!data) data = localStorage.getItem(ACCOUNTS_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch(e) { return []; }
 }
 
+async function saveAccounts(list) {
+  try { 
+    const str = JSON.stringify(list);
+    localStorage.setItem(ACCOUNTS_KEY, str); 
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) {
+      await window.Capacitor.Plugins.Preferences.set({ key: ACCOUNTS_KEY, value: str });
+    }
+  } catch(e) {}
+}
 function upsertAccountFromSession(session) {
   if (!session || !session.user) return;
   const list = getAccounts();
